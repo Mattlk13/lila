@@ -4,14 +4,12 @@ import * as seekRepo from './seekRepo';
 import { make as makeStores, Stores } from './store';
 import * as xhr from './xhr';
 import * as poolRangeStorage from './poolRangeStorage';
-import { LobbyOpts, LobbyData, Tab, Mode, Sort, Filter, Hook, Seek, Pool, PoolMember } from './interfaces';
+import { LobbyOpts, LobbyData, Tab, Mode, Sort, Hook, Seek, Pool, PoolMember } from './interfaces';
 import LobbySocket from './socket';
-
-const li = window.lichess;
+import Filter from './filter';
+import Setup from './setup';
 
 export default class LobbyController {
-
-  opts: LobbyOpts;
   data: LobbyData;
   playban: any;
   isBot: boolean;
@@ -20,40 +18,41 @@ export default class LobbyController {
   tab: Tab;
   mode: Mode;
   sort: Sort;
-  filterOpen: boolean = false;
   stepHooks: Hook[] = [];
-  stepping: boolean = false;
-  redirecting: boolean = false;
+  stepping = false;
+  redirecting = false;
   poolMember?: PoolMember;
   trans: Trans;
-  redraw: () => void;
   pools: Pool[];
+  filter: Filter;
+  setup: Setup;
 
   private poolInStorage: LichessStorage;
   private flushHooksTimeout?: number;
   private alreadyWatching: string[] = [];
 
-  constructor(opts: LobbyOpts, redraw: () => void) {
-    this.opts = opts;
+  constructor(readonly opts: LobbyOpts, readonly redraw: () => void) {
     this.data = opts.data;
     this.data.hooks = [];
     this.pools = opts.pools;
     this.playban = opts.playban;
-    this.isBot = opts.data.me && opts.data.me.isBot;
-    this.redraw = redraw;
+    this.isBot = !!opts.data.me?.isBot;
+    this.filter = new Filter(lichess.storage.make('lobby.filter'), this);
+    this.setup = new Setup(lichess.storage.make, this);
 
     hookRepo.initAll(this);
     seekRepo.initAll(this);
     this.socket = new LobbySocket(opts.socketSend, this);
 
-    this.stores = makeStores(this.data.me ? this.data.me.username.toLowerCase() : null);
-    this.tab = this.isBot ? 'now_playing' : this.stores.tab.get(),
-      this.mode = this.stores.mode.get(),
-      this.sort = this.stores.sort.get(),
-      this.trans = opts.trans;
+    this.stores = makeStores(this.data.me?.username.toLowerCase());
+    (this.tab = this.isBot ? 'now_playing' : this.stores.tab.get()),
+      (this.mode = this.stores.mode.get()),
+      (this.sort = this.stores.sort.get()),
+      (this.trans = opts.trans);
 
-    this.poolInStorage = li.storage.make('lobby.pool-in');
-    this.poolInStorage.listen(_ => { // when another tab joins a pool
+    this.poolInStorage = lichess.storage.make('lobby.pool-in');
+    this.poolInStorage.listen(_ => {
+      // when another tab joins a pool
       this.leavePool();
       redraw();
     });
@@ -62,9 +61,8 @@ export default class LobbyController {
     this.startWatching();
 
     if (this.playban) {
-      if (this.playban.remainingSecond < 86400) setTimeout(li.reload, this.playban.remainingSeconds * 1000);
-    }
-    else {
+      if (this.playban.remainingSecond < 86400) setTimeout(lichess.reload, this.playban.remainingSeconds * 1000);
+    } else {
       setInterval(() => {
         if (this.poolMember) this.poolIn();
         else if (this.tab === 'real_time' && !this.data.hooks.length) this.socket.realTimeIn();
@@ -72,7 +70,7 @@ export default class LobbyController {
       this.joinPoolFromLocationHash();
     }
 
-    li.pubsub.on('socket.open', () => {
+    lichess.pubsub.on('socket.open', () => {
       if (this.tab === 'real_time') {
         this.data.hooks = [];
         this.socket.realTimeIn();
@@ -87,7 +85,7 @@ export default class LobbyController {
   private doFlushHooks() {
     this.stepHooks = this.data.hooks.slice(0);
     if (this.tab === 'real_time') this.redraw();
-  };
+  }
 
   flushHooks = (now: boolean) => {
     if (this.flushHooksTimeout) clearTimeout(this.flushHooksTimeout);
@@ -103,9 +101,7 @@ export default class LobbyController {
     this.flushHooksTimeout = this.flushHooksSchedule();
   };
 
-  private flushHooksSchedule(): number {
-    return setTimeout(this.flushHooks, 8000);
-  }
+  private flushHooksSchedule = (): number => setTimeout(this.flushHooks, 8000);
 
   setTab = (tab: Tab) => {
     if (tab !== this.tab) {
@@ -117,24 +113,19 @@ export default class LobbyController {
       }
       this.tab = this.stores.tab.set(tab);
     }
-    this.filterOpen = false;
+    this.filter.open = false;
   };
 
   setMode = (mode: Mode) => {
     this.mode = this.stores.mode.set(mode);
-    this.filterOpen = false;
+    this.filter.open = false;
   };
 
   setSort = (sort: Sort) => {
     this.sort = this.stores.sort.set(sort);
   };
 
-  toggleFilter = () => {
-    this.filterOpen = !this.filterOpen;
-  };
-
-  setFilter = (filter: Filter) => {
-    this.data.filter = filter;
+  onSetFilter = () => {
     this.flushHooks(true);
     if (this.tab !== 'real_time') this.redraw();
   };
@@ -159,9 +150,7 @@ export default class LobbyController {
 
   clickPool = (id: string) => {
     if (!this.data.me) {
-      xhr.anonPoolSeek(this.pools.find(function(p) {
-        return p.id === id;
-      }));
+      xhr.anonPoolSeek(this.pools.find(p => p.id == id)!);
       this.setTab('real_time');
     } else if (this.poolMember && this.poolMember.id === id) this.leavePool();
     else {
@@ -190,7 +179,7 @@ export default class LobbyController {
     this.socket.poolIn(this.poolMember);
   };
 
-  gameActivity = gameId => {
+  gameActivity = (gameId: string) => {
     if (this.data.nowPlaying.find(p => p.gameId === gameId))
       xhr.nowPlaying().then(povs => {
         this.data.nowPlaying = povs;
@@ -200,14 +189,12 @@ export default class LobbyController {
   };
 
   private startWatching() {
-    const newIds = this.data.nowPlaying
-      .map(p => p.gameId)
-      .filter(id => !this.alreadyWatching.includes(id));
+    const newIds = this.data.nowPlaying.map(p => p.gameId).filter(id => !this.alreadyWatching.includes(id));
     if (newIds.length) {
-      setTimeout(() => this.socket.send("startWatching", newIds.join(' ')), 2000);
+      setTimeout(() => this.socket.send('startWatching', newIds.join(' ')), 2000);
       newIds.forEach(id => this.alreadyWatching.push(id));
     }
-  };
+  }
 
   setRedirecting = () => {
     this.redirecting = true;

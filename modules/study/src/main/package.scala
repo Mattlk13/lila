@@ -1,6 +1,6 @@
 package lila
 
-import com.github.blemale.scaffeine.AsyncLoadingCache
+import reactivemongo.api.ReadPreference
 
 package object study extends PackageObject {
 
@@ -8,6 +8,5 @@ package object study extends PackageObject {
 
   private[study] type ChapterMap = Map[lila.study.Chapter.Id, lila.study.Chapter]
 
-  private[study] type LightStudyCache =
-    AsyncLoadingCache[lila.study.Study.Id, Option[lila.study.Study.LightStudy]]
+  private[study] val readPref = ReadPreference.primary
 }

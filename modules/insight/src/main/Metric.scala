@@ -28,7 +28,7 @@ object Metric {
 
   import DataType._
   import Position._
-  import Entry.{ BSONFields => F }
+  import InsightEntry.{ BSONFields => F }
 
   case object MeanCpl
       extends Metric(
@@ -39,6 +39,17 @@ object Metric {
         Move,
         Average,
         raw("""Precision of your moves. Lower is better.""")
+      )
+
+  case object CplBucket
+      extends Metric(
+        "cplBucket",
+        "Centipawn loss bucket",
+        F moves "c",
+        Move,
+        Move,
+        Percent,
+        Dimension.CplRange.description
       )
 
   case object Movetime
@@ -147,8 +158,31 @@ object Metric {
         Dimension.MaterialRange.description
       )
 
+  case object Blurs
+      extends Metric(
+        "blurs",
+        "Blurs",
+        F moves "b",
+        Move,
+        Move,
+        Percent,
+        raw("How often moves are preceded by a window blur.")
+      )
+
+  case object TimeVariance
+      extends Metric(
+        "timeVariance",
+        "Time variance",
+        F moves "v",
+        Move,
+        Move,
+        Average,
+        raw("Low variance means consistent move times")
+      )
+
   val all = List(
     MeanCpl,
+    CplBucket,
     Movetime,
     Result,
     Termination,
@@ -158,45 +192,57 @@ object Metric {
     PieceRole,
     Opportunism,
     Luck,
-    Material
+    Material,
+    Blurs,
+    TimeVariance
   )
   val byKey = all map { p =>
     (p.key, p)
   } toMap
 
-  def requiresAnalysis(m: Metric) = m match {
-    case MeanCpl => true
-    case _       => false
-  }
+  def requiresAnalysis(m: Metric) =
+    m match {
+      case MeanCpl   => true
+      case CplBucket => true
+      case _         => false
+    }
 
-  def requiresStableRating(m: Metric) = m match {
-    case RatingDiff     => true
-    case OpponentRating => true
-    case _              => false
-  }
+  def requiresStableRating(m: Metric) =
+    m match {
+      case RatingDiff     => true
+      case OpponentRating => true
+      case _              => false
+    }
 
-  def isStacked(m: Metric) = m match {
-    case Result      => true
-    case Termination => true
-    case PieceRole   => true
-    case _           => false
-  }
+  def isStacked(m: Metric) =
+    m match {
+      case Result      => true
+      case Termination => true
+      case PieceRole   => true
+      case CplBucket   => true
+      case _           => false
+    }
 
-  def valuesOf(metric: Metric): List[MetricValue] = metric match {
-    case Result =>
-      lila.insight.Result.all.map { r =>
-        MetricValue(BSONInteger(r.id), MetricValueName(r.name))
-      }
-    case Termination =>
-      lila.insight.Termination.all.map { r =>
-        MetricValue(BSONInteger(r.id), MetricValueName(r.name))
-      }
-    case PieceRole =>
-      chess.Role.all.reverse.map { r =>
-        MetricValue(BSONString(r.forsyth.toString), MetricValueName(r.toString))
-      }
-    case _ => Nil
-  }
+  def valuesOf(metric: Metric): List[MetricValue] =
+    metric match {
+      case Result =>
+        lila.insight.Result.all.map { r =>
+          MetricValue(BSONInteger(r.id), MetricValueName(r.name))
+        }
+      case Termination =>
+        lila.insight.Termination.all.map { r =>
+          MetricValue(BSONInteger(r.id), MetricValueName(r.name))
+        }
+      case PieceRole =>
+        chess.Role.all.reverse.map { r =>
+          MetricValue(BSONString(r.forsyth.toString), MetricValueName(r.toString))
+        }
+      case CplBucket =>
+        lila.insight.CplRange.all.map { cpl =>
+          MetricValue(BSONInteger(cpl.cpl), MetricValueName(cpl.name))
+        }
+      case _ => Nil
+    }
 
   case class MetricValueName(name: String)
   case class MetricValue(key: BSONValue, name: MetricValueName)

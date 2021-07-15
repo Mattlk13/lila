@@ -11,7 +11,7 @@ private object GameToRoot {
       lila.round.TreeBuilder(
         game = game,
         analysis = none,
-        initialFen = initialFen | FEN(game.variant.initialFen),
+        initialFen = initialFen | game.variant.initialFen,
         withFlags = WithFlags(clocks = withClocks)
       )
     }
@@ -20,11 +20,12 @@ private object GameToRoot {
     }
   }
 
-  private def endComment(game: Game) = game.finished option {
-    import lila.tree.Node.Comment
-    val result = chess.Color.showResult(game.winnerColor)
-    val status = lila.game.StatusText(game)
-    val text   = s"$result $status"
-    Comment(Comment.Id.make, Comment.Text(text), Comment.Author.Lichess)
-  }
+  private def endComment(game: Game) =
+    game.finished option {
+      import lila.tree.Node.Comment
+      val result = chess.Color.showResult(game.winnerColor)
+      val status = lila.game.StatusText(game)
+      val text   = s"$result $status"
+      Comment(Comment.Id.make, Comment.Text(text), Comment.Author.Lichess)
+    }
 }

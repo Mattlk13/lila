@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="emailConfirm_subject">დაადასტურეთ თქვენი lichess.org პროფილი, %s</string>
-  <string name="emailConfirm_click">დააკლიკეთ ლინკს, რათა გაააქტიუროთ თქვენი Lichess პროფილი:</string>
+  <string name="emailConfirm_click" comment="emailConfirm_click&#10;&#10;Part of the confirmation email upon registering for a Lichess account.&#10;&#10;The unique reset link is presented just after this string.">დააკლიკეთ ლინკს, რათა გაააქტიუროთ თქვენი Lichess პროფილი:</string>
   <string name="emailConfirm_ignore">თუ Lichess-ზე თქვენ არ დარეგისტრირებულხართ, შეგიძლიათ ამ შეტყობინებას ყურადღება არ მიაქციოთ.</string>
   <string name="passwordReset_subject">შეცვალეთ თქვენი lichess.org პაროლი, %s</string>
   <string name="passwordReset_intro">ჩვენ მივიღეთ თქვენი პროფილისათვის პაროლის ცვლილების მოთხოვნა.</string>
@@ -17,4 +17,5 @@
 გაერთეთ, დაე თქვენმა ფიგურებმა ყოველთვის იპოვონ გზა მოწინააღმდეგის მეფის დასაშამათებლად!</string>
   <string name="common_orPaste">(დაკლიკება არ მუშაობს? ცადეთ ბმულის ბრაუზერში გახსნა!)</string>
   <string name="common_note">ეს არის სერვის-წერილი დაკავშეირებული %s გამოყენებასთან.</string>
+  <string name="common_contact">ჩვენთან დაკავშირებისთვის გამოიყენეთ %s.</string>
 </resources>

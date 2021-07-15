@@ -4,38 +4,39 @@ import chess.Color
 
 import lila.game.{ Event, Game, Pov, Progress }
 import lila.pref.{ Pref, PrefApi }
+import scala.concurrent.duration.FiniteDuration
 
 final private class Moretimer(
     messenger: Messenger,
-    prefApi: PrefApi,
-    duration: MoretimeDuration
+    prefApi: PrefApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   // pov of the player giving more time
-  def apply(pov: Pov): Fu[Option[Progress]] = IfAllowed(pov.game) {
-    (pov.game moretimeable !pov.color) ?? {
-      if (pov.game.hasClock) give(pov.game, List(!pov.color), duration).some
-      else
-        pov.game.hasCorrespondenceClock option {
-          messenger.volatile(pov.game, s"${!pov.color} gets more time")
-          val p = pov.game.correspondenceGiveTime
-          p.game.correspondenceClock.map(Event.CorrespondenceClock.apply).fold(p)(p + _)
-        }
+  def apply(pov: Pov, duration: FiniteDuration): Fu[Option[Progress]] =
+    IfAllowed(pov.game) {
+      (pov.game moretimeable !pov.color) ?? {
+        if (pov.game.hasClock) give(pov.game, List(!pov.color), duration).some
+        else
+          pov.game.hasCorrespondenceClock option {
+            messenger.volatile(pov.game, s"${!pov.color} gets more time")
+            val p = pov.game.correspondenceGiveTime
+            p.game.correspondenceClock.map(Event.CorrespondenceClock.apply).fold(p)(p + _)
+          }
+      }
     }
-  }
 
   def isAllowedIn(game: Game): Fu[Boolean] =
     if (game.isMandatory) fuFalse
     else isAllowedByPrefs(game)
 
-  private[round] def give(game: Game, colors: List[Color], duration: MoretimeDuration): Progress =
+  private[round] def give(game: Game, colors: List[Color], duration: FiniteDuration): Progress =
     game.clock.fold(Progress(game)) { clock =>
-      val centis = duration.value.toCentis
-      val newClock = colors.foldLeft(clock) {
-        case (c, color) => c.giveTime(color, centis)
+      val centis = duration.toCentis
+      val newClock = colors.foldLeft(clock) { case (c, color) =>
+        c.giveTime(color, centis)
       }
       colors.foreach { c =>
-        messenger.volatile(game, s"$c + ${duration.value.toSeconds} seconds")
+        messenger.volatile(game, s"$c + ${duration.toSeconds} seconds")
       }
       (game withClock newClock) ++ colors.map { Event.ClockInc(_, centis) }
     }

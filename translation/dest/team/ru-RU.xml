@@ -14,16 +14,18 @@
   <string name="noTeamFound">Нет таких клубов</string>
   <string name="joinTeam">Вступить в клуб</string>
   <string name="quitTeam">Покинуть клуб</string>
-  <string name="anyoneCanJoin">Любой может свободно вступить в клуб</string>
-  <string name="aConfirmationIsRequiredToJoin">Для вступления требуется подтверждение</string>
-  <string name="joiningPolicy">Условия вступления</string>
-  <string name="teamLeader">Руководитель клуба</string>
+  <string name="manuallyReviewAdmissionRequests">Ручная проверка запросов на вступление</string>
+  <string name="manuallyReviewAdmissionRequestsHelp">Если отмечено, то кандидаты на вступление в клуб должны написать запрос, который вы можете принять или отклонить.</string>
+  <plurals name="teamLeaders">
+    <item quantity="one">Руководитель клуба</item>
+    <item quantity="few">Руководители клуба</item>
+    <item quantity="many">Руководители клуба</item>
+    <item quantity="other">Руководители клуба</item>
+  </plurals>
   <string name="teamBestPlayers">Лучшие игроки клуба</string>
   <string name="teamRecentMembers">Новые члены клуба</string>
   <string name="kickSomeone">Исключить кого-то из клуба</string>
   <string name="whoToKick">Кого вы хотите исключить из клуба?</string>
-  <string name="appointOwner">Назначить другого руководителя клуба</string>
-  <string name="changeOwner">Кого вы хотите назначить руководителем клуба?</string>
   <plurals name="xJoinRequests">
     <item quantity="one">%s запрос на вступление</item>
     <item quantity="few">%s запроса на вступление</item>
@@ -32,5 +34,27 @@
   </plurals>
   <string name="willBeReviewed">Ваш запрос на вступление будет рассмотрен руководителем клуба.</string>
   <string name="beingReviewed">Ваш запрос на рассмотрении у руководителя клуба.</string>
+  <string name="subToTeamMessages">Подписаться на сообщения от клуба</string>
   <string name="teamBattle">Межклубный турнир</string>
+  <string name="teamBattleOverview">Сражение нескольких клубов, каждый игрок набирает очки за свой клуб</string>
+  <string name="teamTournament">Клубный турнир</string>
+  <string name="teamTournamentOverview">Арена, в которой могут участвовать только члены вашего клуба</string>
+  <string name="swissTournamentOverview">Швейцарские турниры, в которых могут участвовать только члены клуба</string>
+  <string name="messageAllMembers">Сообщение всем участникам</string>
+  <string name="messageAllMembersOverview">Отправить личное сообщение всем членам клуба</string>
+  <string name="messageAllMembersLongDescription">Отправить личное сообщение всем членам клуба.
+Можно использовать для вызова игроков на турнир или в командный бой.
+Игроки, которым не нравится получать ваши сообщения, могут покинуть клуб.</string>
+  <string name="teamsIlead">Клубы под моим руководством</string>
+  <string name="youWayWantToLinkOneOfTheseTournaments">Не хотите ли присоединить один из предстоящих турниров?</string>
+  <string name="usersWhoCanManageThisTeam">Пользователи, которые могут управлять этим клубом</string>
+  <string name="leadersChat">Чат руководителей</string>
+  <string name="closeTeam">Расформировать клуб</string>
+  <string name="closeTeamDescription">Закрывает клуб навсегда.</string>
+  <string name="teamPassword">Клубный пароль</string>
+  <string name="teamPasswordDescriptionForLeader">(Необязательно) Пароль для вступления в этот клуб новых членов.</string>
+  <string name="incorrectTeamPassword">Неправильный клубный пароль.</string>
+  <string name="teamAlreadyExists">Такой клуб уже существует.</string>
+  <string name="upcomingTourns">Предстоящие турниры</string>
+  <string name="completedTourns">Завершённые турниры</string>
 </resources>

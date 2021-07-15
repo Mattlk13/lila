@@ -17,18 +17,15 @@ final class Env(
     chapterRepo: lila.study.ChapterRepo,
     pager: lila.study.StudyPager,
     makeClient: Index => ESClient
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, mat: akka.stream.Materializer) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    mat: akka.stream.Materializer
+) {
 
   private val client = makeClient(Index("study"))
 
-  private val indexThrottler = system.actorOf(
-    Props(
-      new LateMultiThrottler(
-        executionTimeout = 3.seconds.some,
-        logger = logger
-      )
-    )
-  )
+  private val indexThrottler = LateMultiThrottler(executionTimeout = 3.seconds.some, logger = logger)
 
   val api: StudySearchApi = wire[StudySearchApi]
 
@@ -43,15 +40,16 @@ final class Env(
       maxPerPage = pager.maxPerPage
     )
 
-  def cli = new lila.common.Cli {
-    def process = {
-      case "study" :: "search" :: "reset" :: Nil          => api.reset("reset") inject "done"
-      case "study" :: "search" :: "index" :: since :: Nil => api.reset(since) inject "done"
+  def cli =
+    new lila.common.Cli {
+      def process = {
+        case "study" :: "search" :: "reset" :: Nil          => api.reset("reset") inject "done"
+        case "study" :: "search" :: "index" :: since :: Nil => api.reset(since) inject "done"
+      }
     }
-  }
 
   Bus.subscribeFun("study") {
-    case lila.study.actorApi.SaveStudy(study) => api store study
-    case RemoveStudy(id, _)                   => client deleteById Id(id)
+    case lila.study.actorApi.SaveStudy(study) => api.store(study).unit
+    case RemoveStudy(id, _)                   => client.deleteById(Id(id)).unit
   }
 }

@@ -4,7 +4,7 @@ import akka.actor._
 import com.softwaremill.macwire._
 import io.methvin.play.autoconfig._
 import play.api.Configuration
-import play.api.libs.ws.WSClient
+import play.api.libs.ws.StandaloneWSClient
 import scala.concurrent.duration._
 
 import lila.common.config._
@@ -29,7 +29,11 @@ final class Env(
     cacheApi: lila.memo.CacheApi,
     isOnline: lila.socket.IsOnline,
     onlineIds: lila.socket.OnlineIds
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, ws: WSClient) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    ws: StandaloneWSClient
+) {
 
   private val config = appConfig.get[UserConfig]("user")(AutoConfig.loader)
 
@@ -40,7 +44,8 @@ final class Env(
   val lightUserSync              = lightUserApi.sync
   val isBotSync                  = new LightUser.IsBotSync(id => lightUserApi.sync(id).exists(_.isBot))
 
-  lazy val botIds = new GetBotIds(() => cached.botIds.get({}))
+  lazy val botIds     = new GetBotIds(() => cached.botIds.get {})
+  lazy val rankingsOf = new RankingsOf(cached.rankingsOf)
 
   lazy val jsonView = wire[JsonView]
 
@@ -66,24 +71,19 @@ final class Env(
 
   lazy val authenticator = wire[Authenticator]
 
-  lazy val forms = wire[DataForm]
+  lazy val forms = wire[UserForm]
 
   lila.common.Bus.subscribeFuns(
-    "adjustCheater" -> {
-      case lila.hub.actorApi.mod.MarkCheater(userId, true) =>
-        rankingApi remove userId
-        repo.setRoles(userId, Nil)
+    "adjustCheater" -> { case lila.hub.actorApi.mod.MarkCheater(userId, true) =>
+      rankingApi remove userId
+      repo.setRoles(userId, Nil).unit
     },
-    "adjustBooster" -> {
-      case lila.hub.actorApi.mod.MarkBooster(userId) => rankingApi remove userId
+    "adjustBooster" -> { case lila.hub.actorApi.mod.MarkBooster(userId) =>
+      rankingApi.remove(userId).unit
+      repo.setRoles(userId, Nil).unit
     },
-    "kickFromRankings" -> {
-      case lila.hub.actorApi.mod.KickFromRankings(userId) => rankingApi remove userId
-    },
-    "gdprErase" -> {
-      case User.GDPRErase(user) =>
-        repo erase user
-        noteApi erase user
+    "kickFromRankings" -> { case lila.hub.actorApi.mod.KickFromRankings(userId) =>
+      rankingApi.remove(userId).unit
     }
   )
 }

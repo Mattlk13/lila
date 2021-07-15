@@ -3,7 +3,6 @@ package lila.notify
 import lila.common.paginator.Paginator
 import lila.notify.MentionedInThread.PostId
 import org.joda.time.DateTime
-import ornicar.scalalib.Random
 
 case class NewNotification(notification: Notification, unreadNotifications: Int)
 
@@ -18,10 +17,11 @@ case class Notification(
 
   def unread = !read.value
 
-  def isMsg = content match {
-    case _: PrivateMessage => true
-    case _                 => false
-  }
+  def isMsg =
+    content match {
+      case _: PrivateMessage => true
+      case _                 => false
+    }
 }
 
 object Notification {
@@ -33,7 +33,7 @@ object Notification {
 
   def make(notifies: Notification.Notifies, content: NotificationContent): Notification = {
     val idSize = 8
-    val id     = Random nextString idSize
+    val id     = lila.common.ThreadLocalRandom nextString idSize
     new Notification(id, notifies, content, NotificationRead(false), DateTime.now)
   }
 }
@@ -88,16 +88,6 @@ object TeamJoined {
   case class Name(value: String) extends AnyVal with StringValue
 }
 
-case class TeamMadeOwner(
-    id: TeamMadeOwner.Id,
-    name: TeamMadeOwner.Name
-) extends NotificationContent("teamMadeOwner")
-
-object TeamMadeOwner {
-  case class Id(value: String)   extends AnyVal with StringValue
-  case class Name(value: String) extends AnyVal with StringValue
-}
-
 case class TitledTournamentInvitation(
     id: String,
     text: String
@@ -121,8 +111,8 @@ case class RatingRefund(perf: String, points: Int) extends NotificationContent("
 
 case object CoachReview extends NotificationContent("coachReview")
 
-case class PlanStart(userId: String)  extends NotificationContent("planStart")
-case class PlanExpire(userId: String) extends NotificationContent("planExpire")
+case class PlanStart(userId: String)  extends NotificationContent("planStart")  // BC
+case class PlanExpire(userId: String) extends NotificationContent("planExpire") // BC
 
 case class CorresAlarm(
     gameId: lila.game.Game.ID,

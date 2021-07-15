@@ -7,19 +7,23 @@ import lila.common.Bus
 import lila.common.config.Max
 import lila.game.{ Game, Pov }
 import lila.hub.actorApi.socket.SendTo
-import lila.user.{ User, UserRepo }
 import lila.memo.CacheApi._
+import lila.user.{ User, UserRepo }
+import lila.i18n.I18nLangPicker
 
 final class ChallengeApi(
     repo: ChallengeRepo,
     challengeMaker: ChallengeMaker,
     userRepo: UserRepo,
-    joiner: Joiner,
+    joiner: ChallengeJoiner,
     jsonView: JsonView,
     gameCache: lila.game.Cached,
     maxPlaying: Max,
     cacheApi: lila.memo.CacheApi
-)(implicit ec: scala.concurrent.ExecutionContext) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: akka.actor.ActorSystem
+) {
 
   import Challenge._
 
@@ -27,19 +31,22 @@ final class ChallengeApi(
     createdByDestId(userId) zip createdByChallengerId(userId) dmap (AllChallenges.apply _).tupled
 
   // returns boolean success
-  def create(c: Challenge): Fu[Boolean] = isLimitedByMaxPlaying(c) flatMap {
-    case true => fuFalse
-    case false => {
-      repo like c flatMap { _ ?? repo.cancel }
-    } >> (repo insert c) >>- {
-      uncacheAndNotify(c)
-      Bus.publish(Event.Create(c), "challenge")
-    } inject true
-  }
+  def create(c: Challenge): Fu[Boolean] =
+    isLimitedByMaxPlaying(c) flatMap {
+      case true => fuFalse
+      case false =>
+        {
+          repo like c flatMap { _ ?? repo.cancel }
+        } >> (repo insert c) >>- {
+          uncacheAndNotify(c)
+          Bus.publish(Event.Create(c), "challenge")
+        } inject true
+    }
 
   def byId = repo byId _
 
   def activeByIdFor(id: Challenge.ID, dest: User) = repo.byIdFor(id, dest).dmap(_.filter(_.active))
+  def activeByIdBy(id: Challenge.ID, orig: User)  = repo.byIdBy(id, orig).dmap(_.filter(_.active))
 
   def onlineByIdFor(id: Challenge.ID, dest: User) = repo.byIdFor(id, dest).dmap(_.filter(_.online))
 
@@ -52,26 +59,49 @@ final class ChallengeApi(
 
   def createdByDestId = repo createdByDestId _
 
-  def cancel(c: Challenge) = (repo cancel c) >>- uncacheAndNotify(c)
+  def cancel(c: Challenge) =
+    repo.cancel(c) >>- {
+      uncacheAndNotify(c)
+      Bus.publish(Event.Cancel(c), "challenge")
+    }
 
   private def offline(c: Challenge) = (repo offline c) >>- uncacheAndNotify(c)
 
-  private[challenge] def ping(id: Challenge.ID): Funit = repo statusById id flatMap {
-    case Some(Status.Created) => repo setSeen id
-    case Some(Status.Offline) => (repo setSeenAgain id) >> byId(id).map { _ foreach uncacheAndNotify }
-    case _                    => fuccess(socketReload(id))
-  }
+  private[challenge] def ping(id: Challenge.ID): Funit =
+    repo statusById id flatMap {
+      case Some(Status.Created) => repo setSeen id
+      case Some(Status.Offline) => (repo setSeenAgain id) >> byId(id).map { _ foreach uncacheAndNotify }
+      case _                    => fuccess(socketReload(id))
+    }
 
-  def decline(c: Challenge) = (repo decline c) >>- uncacheAndNotify(c)
+  def decline(c: Challenge, reason: Challenge.DeclineReason) =
+    repo.decline(c, reason) >>- {
+      uncacheAndNotify(c)
+      Bus.publish(Event.Decline(c declineWith reason), "challenge")
+    }
 
-  def accept(c: Challenge, user: Option[User]): Fu[Option[Pov]] =
-    joiner(c, user).flatMap {
-      case None => fuccess(None)
-      case Some(pov) =>
-        (repo accept c) >>- {
-          uncacheAndNotify(c)
-          Bus.publish(Event.Accept(c, user.map(_.id)), "challenge")
-        } inject pov.some
+  private val acceptQueue = new lila.hub.DuctSequencer(maxSize = 64, timeout = 5 seconds, "challengeAccept")
+
+  def accept(
+      c: Challenge,
+      user: Option[User],
+      sid: Option[String],
+      color: Option[chess.Color] = None
+  ): Fu[Option[Pov]] =
+    acceptQueue {
+      if (user.exists(_.isBot) && !Game.isBotCompatible(chess.Speed(c.clock.map(_.config))))
+        fuccess(none)
+      else if (c.challengerIsOpen)
+        repo.setChallenger(c.setChallenger(user, sid), color) inject none
+      else
+        joiner(c, user, color).flatMap {
+          _ ?? { pov =>
+            (repo accept c) >>- {
+              uncacheAndNotify(c)
+              Bus.publish(Event.Accept(c, user.map(_.id)), "challenge")
+            } inject pov.some
+          }
+        }
     }
 
   def sendRematchOf(game: Game, user: User): Fu[Boolean] =
@@ -85,9 +115,13 @@ final class ChallengeApi(
     }
   }
 
-  def removeByUserId(userId: User.ID) = repo allWithUserId userId flatMap { cs =>
-    lila.common.Future.applySequentially(cs)(remove).void
-  }
+  def removeByUserId(userId: User.ID) =
+    repo allWithUserId userId flatMap { cs =>
+      lila.common.Future.applySequentially(cs)(remove).void
+    }
+
+  def oauthAccept(dest: User, challenge: Challenge): Fu[Option[Game]] =
+    joiner(challenge, dest.some, none).map2(_.game)
 
   private def isLimitedByMaxPlaying(c: Challenge) =
     if (c.hasClock) fuFalse
@@ -100,7 +134,7 @@ final class ChallengeApi(
         .dmap(_ exists identity)
 
   private[challenge] def sweep: Funit =
-    repo.realTimeUnseenSince(DateTime.now minusSeconds 10, max = 50).flatMap { cs =>
+    repo.realTimeUnseenSince(DateTime.now minusSeconds 20, max = 50).flatMap { cs =>
       lila.common.Future.applySequentially(cs)(offline).void
     } >>
       repo.expired(50).flatMap { cs =>
@@ -118,20 +152,18 @@ final class ChallengeApi(
   }
 
   private def socketReload(id: Challenge.ID): Unit =
-    socket foreach (_ reload id)
+    socket.foreach(_ reload id)
 
   private def notify(userId: User.ID): Funit =
     for {
-      all <- allFor(userId)
-      lang <- userRepo langOf userId map {
-        _ flatMap lila.i18n.I18nLangPicker.byStr getOrElse lila.i18n.defaultLang
-      }
+      all  <- allFor(userId)
+      lang <- userRepo langOf userId map I18nLangPicker.byStrOrDefault
     } yield Bus.publish(
       SendTo(userId, lila.socket.Socket.makeMessage("challenges", jsonView(all)(lang))),
       "socketUsers"
     )
 
   // work around circular dependency
-  private var socket: Option[ChallengeSocket]               = None
+  private var socket: Option[ChallengeSocket] = None
   private[challenge] def registerSocket(s: ChallengeSocket) = { socket = s.some }
 }

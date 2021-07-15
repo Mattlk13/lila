@@ -66,14 +66,21 @@ case class Chapter(
 
   def isEmptyInitial = order == 1 && root.children.nodes.isEmpty
 
-  def cloneFor(study: Study) = copy(
-    _id = Chapter.makeId,
-    studyId = study.id,
-    ownerId = study.ownerId,
-    createdAt = DateTime.now
-  )
+  def cloneFor(study: Study) =
+    copy(
+      _id = Chapter.makeId,
+      studyId = study.id,
+      ownerId = study.ownerId,
+      createdAt = DateTime.now
+    )
 
-  def metadata = Chapter.Metadata(_id = _id, name = name, setup = setup)
+  def metadata = Chapter.Metadata(
+    _id = _id,
+    name = name,
+    setup = setup,
+    resultColor = tags.resultColor.isDefined option tags.resultColor,
+    hasRelayPath = relay.exists(!_.path.isEmpty)
+  )
 
   def isPractice = ~practice
   def isGamebook = ~gamebook
@@ -144,8 +151,15 @@ object Chapter {
   case class Metadata(
       _id: Id,
       name: Name,
-      setup: Setup
-  ) extends Like
+      setup: Setup,
+      resultColor: Option[Option[Option[Color]]],
+      hasRelayPath: Boolean
+  ) extends Like {
+
+    def looksOngoing = resultColor.exists(_.isEmpty) && hasRelayPath
+
+    def resultStr: Option[String] = resultColor.map(_.fold("*")(chess.Color.showResult).replace("1/2", "½"))
+  }
 
   case class IdName(id: Id, name: Name)
 
@@ -162,7 +176,7 @@ object Chapter {
 
   val idSize = 8
 
-  def makeId = Id(scala.util.Random.alphanumeric take idSize mkString)
+  def makeId = Id(lila.common.ThreadLocalRandom nextString idSize)
 
   def make(
       studyId: Study.Id,
@@ -176,19 +190,20 @@ object Chapter {
       gamebook: Boolean,
       conceal: Option[Ply],
       relay: Option[Relay] = None
-  ) = Chapter(
-    _id = makeId,
-    studyId = studyId,
-    name = fixName(name),
-    setup = setup,
-    root = root,
-    tags = tags,
-    order = order,
-    ownerId = ownerId,
-    practice = practice option true,
-    gamebook = gamebook option true,
-    conceal = conceal,
-    relay = relay,
-    createdAt = DateTime.now
-  )
+  ) =
+    Chapter(
+      _id = makeId,
+      studyId = studyId,
+      name = fixName(name),
+      setup = setup,
+      root = root,
+      tags = tags,
+      order = order,
+      ownerId = ownerId,
+      practice = practice option true,
+      gamebook = gamebook option true,
+      conceal = conceal,
+      relay = relay,
+      createdAt = DateTime.now
+    )
 }

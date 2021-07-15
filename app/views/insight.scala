@@ -14,7 +14,7 @@ object insight {
 
   def index(
       u: User,
-      cache: lila.insight.UserCache,
+      cache: lila.insight.InsightUser,
       prefId: Int,
       ui: play.api.libs.json.JsObject,
       question: play.api.libs.json.JsObject,
@@ -24,31 +24,29 @@ object insight {
       title = s"${u.username}'s chess insights",
       moreJs = frag(
         highchartsLatestTag,
-        jsAt("vendor/multiple-select/multiple-select.js"),
-        jsAt(s"compiled/lichess.insight${isProd ?? (".min")}.js"),
+        jsAt("javascripts/vendor/jquery.min.js"),
+        jsAt("javascripts/vendor/multiple-select.min.js"),
+        jsModule("insight"),
         jsTag("insight-refresh.js"),
-        jsTag("insight-tour.js"),
-        embedJsUnsafe(s"""
-$$(function() {
-lichess = lichess || {};
-lichess.insight = LichessInsight(document.getElementById('insight'), ${safeJsonValue(
-          Json.obj(
-            "ui"              -> ui,
-            "initialQuestion" -> question,
-            "i18n"            -> Json.obj(),
-            "myUserId"        -> ctx.userId,
-            "user" -> Json.obj(
-              "id"      -> u.id,
-              "name"    -> u.username,
-              "nbGames" -> cache.count,
-              "stale"   -> stale,
-              "shareId" -> prefId
-            ),
-            "pageUrl" -> routes.Insight.index(u.username).url,
-            "postUrl" -> routes.Insight.json(u.username).url
-          )
-        )});
-});""")
+        embedJsUnsafeLoadThen(
+          s"""lichess.insight=LichessInsight(document.getElementById('insight'), ${safeJsonValue(
+            Json.obj(
+              "ui"              -> ui,
+              "initialQuestion" -> question,
+              "i18n"            -> Json.obj(),
+              "myUserId"        -> ctx.userId,
+              "user" -> Json.obj(
+                "id"      -> u.id,
+                "name"    -> u.username,
+                "nbGames" -> cache.count,
+                "stale"   -> stale,
+                "shareId" -> prefId
+              ),
+              "pageUrl" -> routes.Insight.index(u.username).url,
+              "postUrl" -> routes.Insight.json(u.username).url
+            )
+          )})"""
+        )
       ),
       moreCss = cssTag("insight")
     )(
@@ -68,7 +66,7 @@ lichess.insight = LichessInsight(document.getElementById('insight'), ${safeJsonV
       moreCss = cssTag("insight")
     )(
       main(cls := "box box-pad page-small")(
-        h1(cls := "text", dataIcon := "7")(u.username, " chess insights"),
+        h1(cls := "text", dataIcon := "")(u.username, " chess insights"),
         p(userLink(u), " has no chess insights yet!"),
         refreshForm(u, s"Generate ${u.username}'s chess insights")
       )
@@ -90,7 +88,7 @@ lichess.insight = LichessInsight(document.getElementById('insight'), ${safeJsonV
 
   def refreshForm(u: User, action: String) =
     postForm(cls := "insight-refresh", st.action := routes.Insight.refresh(u.username))(
-      button(dataIcon := "E", cls := "button text")(action),
+      button(dataIcon := "", cls := "button text")(action),
       div(cls := "crunching none")(
         spinner,
         br,

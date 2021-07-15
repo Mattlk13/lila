@@ -7,7 +7,7 @@ import scalatags.Text.all._
 import lila.base.RawHtml
 import lila.common.base.StringUtils.{ escapeHtmlRaw, safeJsonString }
 
-final object String {
+object String {
 
   private[this] val slugR              = """[^\w-]""".r
   private[this] val slugMultiDashRegex = """-{2,}""".r
@@ -30,11 +30,27 @@ final object String {
     }
   }
 
+  private[this] def oneline(s: String) = s.replace('\n', ' ')
   def shorten(text: String, length: Int, sep: String = "…") = {
-    val t = text.replace('\n', ' ')
-    if (t.size > (length + sep.size)) (t take length) ++ sep
-    else t
+    if (text.lengthIs > length + sep.length) oneline(text take length) ++ sep
+    else oneline(text)
   }
+
+  def isShouting(text: String) =
+    text.lengthIs >= 5 && {
+      import java.lang.Character._
+      // true if >1/2 of the latin letters are uppercase
+      (text take 80).foldLeft(0) { (i, c) =>
+        getType(c) match {
+          case UPPERCASE_LETTER => i + 1
+          case LOWERCASE_LETTER => i - 1
+          case _                => i
+        }
+      } > 0
+    }
+  def noShouting(str: String): String = if (isShouting(str)) str.toLowerCase else str
+
+  def hasLinks = RawHtml.hasLinks _
 
   object base64 {
     import java.util.Base64
@@ -49,28 +65,36 @@ final object String {
       }
   }
 
-  val atUsernameRegex = RawHtml.atUsernameRegex
+  val atUsernameRegex    = RawHtml.atUsernameRegex
+  val forumPostPathRegex = """(?:(?<= )|^)\b([\w-]+/[\w-]+)\b(?:(?= )|$)""".r
 
   object html {
-    def richText(rawText: String, nl2br: Boolean = true): Frag = raw {
-      val withLinks = RawHtml.addLinks(rawText)
-      if (nl2br) RawHtml.nl2br(withLinks) else withLinks
-    }
 
-    def nl2brUnsafe(text: String): Frag = raw {
-      RawHtml nl2br text
-    }
+    def richText(rawText: String, nl2br: Boolean = true, expandImg: Boolean = true): Frag =
+      raw {
+        val withLinks = RawHtml.addLinks(rawText, expandImg)
+        if (nl2br) RawHtml.nl2br(withLinks) else withLinks
+      }
+
+    def nl2brUnsafe(text: String): Frag =
+      raw {
+        RawHtml nl2br text
+      }
 
     def nl2br(text: String): Frag = nl2brUnsafe(escapeHtmlRaw(text))
 
-    def escapeHtml(s: String): RawFrag = raw {
-      escapeHtmlRaw(s)
-    }
+    def escapeHtml(s: String): RawFrag =
+      raw {
+        escapeHtmlRaw(s)
+      }
     def unescapeHtml(html: String): String =
-      org.apache.commons.lang3.StringEscapeUtils.unescapeHtml4(html)
+      org.apache.commons.text.StringEscapeUtils.unescapeHtml4(html)
 
-    def markdownLinks(text: String): Frag = raw {
-      RawHtml.markdownLinks(text)
+    def markdownLinksOrRichText(text: String): Frag = {
+      val escaped = escapeHtmlRaw(text)
+      val marked  = RawHtml.justMarkdownLinks(escaped)
+      if (marked == escaped) richText(text)
+      else nl2brUnsafe(marked)
     }
 
     def safeJsonValue(jsValue: JsValue): String = {
@@ -80,16 +104,21 @@ final object String {
         case JsNull         => "null"
         case JsString(s)    => safeJsonString(s)
         case JsNumber(n)    => n.toString
-        case JsBoolean(b)   => if (b) "true" else "false"
+        case JsFalse        => "false"
+        case JsTrue         => "true"
         case JsArray(items) => items.map(safeJsonValue).mkString("[", ",", "]")
-        case JsObject(fields) => {
+        case JsObject(fields) =>
           fields
-            .map {
-              case (k, v) => s"${safeJsonString(k)}:${safeJsonValue(v)}"
+            .map { case (k, v) =>
+              s"${safeJsonString(k)}:${safeJsonValue(v)}"
             }
             .mkString("{", ",", "}")
-        }
       }
     }
   }
+
+  private val prizeRegex =
+    """(?i)(prize|\$|€|£|¥|₽|元|₹|₱|₿|rupee|rupiah|ringgit|(\b|\d)usd|dollar|paypal|cash|award|\bfees?\b|\beuros?\b|price|(\b|\d)btc|bitcoin)""".r.unanchored
+
+  def looksLikePrize(txt: String) = prizeRegex matches txt
 }

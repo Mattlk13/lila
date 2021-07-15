@@ -20,7 +20,7 @@ object StreamerForm {
         text
           .verifying(
             Constraints.minLength(2),
-            Constraints.maxLength(24)
+            Constraints.maxLength(47)
           )
           .verifying("Invalid Twitch username", s => Streamer.Twitch.parseUserId(s).isDefined)
       ),
@@ -31,30 +31,36 @@ object StreamerForm {
       "approval" -> optional(
         mapping(
           "granted"   -> boolean,
-          "featured"  -> boolean,
+          "tier"      -> optional(number(min = 0, max = Streamer.maxTier)),
           "requested" -> boolean,
           "ignored"   -> boolean,
-          "chat"      -> boolean
+          "chat"      -> boolean,
+          "quick"     -> optional(nonEmptyText)
         )(ApprovalData.apply)(ApprovalData.unapply)
       )
     )(UserData.apply)(UserData.unapply)
+      .verifying(
+        "Must specify a Twitch and/or YouTube channel.",
+        u => u.twitch.isDefined || u.youTube.isDefined
+      )
   )
 
-  def userForm(streamer: Streamer) = emptyUserForm fill UserData(
-    name = streamer.name,
-    headline = streamer.headline,
-    description = streamer.description,
-    twitch = streamer.twitch.map(_.userId),
-    youTube = streamer.youTube.map(_.channelId),
-    listed = streamer.listed.value,
-    approval = ApprovalData(
-      granted = streamer.approval.granted,
-      featured = streamer.approval.autoFeatured,
-      requested = streamer.approval.requested,
-      ignored = streamer.approval.ignored,
-      chat = streamer.approval.chatEnabled
-    ).some
-  )
+  def userForm(streamer: Streamer) =
+    emptyUserForm fill UserData(
+      name = streamer.name,
+      headline = streamer.headline,
+      description = streamer.description,
+      twitch = streamer.twitch.map(_.userId),
+      youTube = streamer.youTube.map(_.channelId),
+      listed = streamer.listed.value,
+      approval = ApprovalData(
+        granted = streamer.approval.granted,
+        tier = streamer.approval.tier.some,
+        requested = streamer.approval.requested,
+        ignored = streamer.approval.ignored,
+        chat = streamer.approval.chatEnabled
+      ).some
+    )
 
   case class UserData(
       name: Name,
@@ -77,11 +83,11 @@ object StreamerForm {
         updatedAt = DateTime.now
       )
       newStreamer.copy(
-        approval = approval match {
+        approval = approval.map(_.resolve) match {
           case Some(m) if asMod =>
             streamer.approval.copy(
               granted = m.granted,
-              autoFeatured = m.featured && m.granted,
+              tier = m.tier | streamer.approval.tier,
               requested = !m.granted && {
                 if (streamer.approval.requested != m.requested) m.requested
                 else streamer.approval.requested || m.requested
@@ -90,7 +96,12 @@ object StreamerForm {
               chatEnabled = m.chat,
               lastGrantedAt = m.granted.option(DateTime.now) orElse streamer.approval.lastGrantedAt
             )
-          case None => streamer.approval
+          case _ =>
+            streamer.approval.copy(
+              granted = streamer.approval.granted &&
+                newStreamer.twitch.fold(true)(streamer.twitch.has) &&
+                newStreamer.youTube.fold(true)(streamer.youTube.has)
+            )
         }
       )
     }
@@ -98,19 +109,27 @@ object StreamerForm {
 
   case class ApprovalData(
       granted: Boolean,
-      featured: Boolean,
+      tier: Option[Int],
       requested: Boolean,
       ignored: Boolean,
-      chat: Boolean
-  )
+      chat: Boolean,
+      quick: Option[String] = None
+  ) {
+    def resolve =
+      quick.fold(this) {
+        case "approve" => copy(granted = true, requested = false)
+        case "decline" => copy(granted = false, requested = false)
+      }
+  }
 
   implicit private val headlineFormat    = formatter.stringFormatter[Headline](_.value, Headline.apply)
   private def headlineField              = of[Headline].verifying(constraint.maxLength[Headline](_.value)(300))
   implicit private val descriptionFormat = formatter.stringFormatter[Description](_.value, Description.apply)
   private def descriptionField           = of[Description].verifying(constraint.maxLength[Description](_.value)(50000))
   implicit private val nameFormat        = formatter.stringFormatter[Name](_.value, Name.apply)
-  private def nameField = of[Name].verifying(
-    constraint.minLength[Name](_.value)(3),
-    constraint.maxLength[Name](_.value)(20)
-  )
+  private def nameField =
+    of[Name].verifying(
+      constraint.minLength[Name](_.value)(3),
+      constraint.maxLength[Name](_.value)(30)
+    )
 }

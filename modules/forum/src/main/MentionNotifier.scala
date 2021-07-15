@@ -4,17 +4,18 @@ import lila.common.Future
 import lila.notify.NotifyApi
 import lila.notify.{ MentionedInThread, Notification }
 import lila.relation.RelationApi
+import lila.pref.PrefApi
 import lila.user.{ User, UserRepo }
 
-/**
-  * Notifier to inform users if they have been mentioned in a post
+/** Notifier to inform users if they have been mentioned in a post
   *
   * @param notifyApi Api for sending inbox messages
   */
 final class MentionNotifier(
     userRepo: UserRepo,
     notifyApi: NotifyApi,
-    relationApi: RelationApi
+    relationApi: RelationApi,
+    prefApi: PrefApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   def notifyMentionedUsers(post: Post, topic: Topic): Funit =
@@ -26,16 +27,21 @@ final class MentionNotifier(
       }
     }
 
-  /**
-    * Checks the database to make sure that the users mentioned exist, and removes any users that do not exist
+  /** Checks the database to make sure that the users mentioned exist, and removes any users that do not exist
     * or block the mentioner from the returned list.
     */
-  private def filterValidUsers(users: Set[User.ID], mentionedBy: User.ID): Fu[List[Notification.Notifies]] = {
+  private def filterValidUsers(
+      candidates: Set[User.ID],
+      mentionedBy: User.ID
+  ): Fu[List[Notification.Notifies]] = {
     for {
-      validUsers          <- userRepo.existingUsernameIds(users take 10).map(_ take 5)
-      validUnblockedUsers <- filterNotBlockedByUsers(validUsers, mentionedBy)
-      validNotifies = validUnblockedUsers.map(Notification.Notifies.apply)
-    } yield validNotifies
+      existingUsers <-
+        userRepo
+          .existingUsernameIds(candidates take 10)
+          .map(_.take(5).toSet)
+      mentionableUsers <- prefApi.mentionableIds(existingUsers)
+      users            <- filterNotBlockedByUsers(mentionableUsers.toList, mentionedBy)
+    } yield users.map(Notification.Notifies.apply)
   }
 
   private def filterNotBlockedByUsers(
@@ -64,6 +70,6 @@ final class MentionNotifier(
   private def extractMentionedUsers(post: Post): Set[User.ID] =
     post.text.contains('@') ?? {
       val m = lila.common.String.atUsernameRegex.findAllMatchIn(post.text)
-      (post.author foldLeft m.map(_ group 1).toSet) { _ - _ }
+      (post.author foldLeft m.map(_ group 1).map(User.normalize).toSet) { _ - _ }
     }
 }

@@ -9,6 +9,7 @@
   <string name="yourTurn">תורך</string>
   <string name="aiNameLevelAiLevel">%1$s רמה %2$s</string>
   <string name="level">רמה</string>
+  <string name="strength">רמת קושי</string>
   <string name="toggleTheChat">הפעל/כבה את הצ\'אט</string>
   <string name="toggleSound">הפעל/כבה צלילים</string>
   <string name="chat">צ\'אט</string>
@@ -24,6 +25,7 @@
   <string name="youPlayTheWhitePieces">את/ה משחק/ת את הכלים הלבנים</string>
   <string name="youPlayTheBlackPieces">את/ה משחק/ת את הכלים השחורים</string>
   <string name="itsYourTurn">זה התור שלך!</string>
+  <string name="cheatDetected">רמות התגלתה</string>
   <string name="kingInTheCenter">המלך במרכז</string>
   <string name="threeChecks">שח משולש</string>
   <string name="raceFinished">המירוץ נגמר</string>
@@ -33,6 +35,12 @@
   <string name="joinTheGame">הצטרף למשחק</string>
   <string name="whitePlays">תור הלבן</string>
   <string name="blackPlays">תור השחור</string>
+  <plurals name="opponentLeftCounter">
+    <item quantity="one">המשתמש עזב את המשחק. תוכל לקחת ניצחון בעוד %s שנייה.</item>
+    <item quantity="two">המשתמש עזב את המשחק. תוכל לירוש ניצחון בעוד %s שניות.</item>
+    <item quantity="many">יריבך עזב את המשחק. תוכל לדרוש ניצחון בעוד %s שניות.</item>
+    <item quantity="other">יריבך עזב את המשחק. תוכל לדרוש ניצחון בעוד %s שניות.</item>
+  </plurals>
   <string name="opponentLeftChoices">יריבך עזב את המשחק. באפשרותך לכפות פרישה, להכריז על תיקו או להמתין לו.</string>
   <string name="makeYourOpponentResign">הכרז על ניצחון</string>
   <string name="forceResignation">קח את הניצחון</string>
@@ -68,7 +76,7 @@
   <string name="insufficientMaterial">אין מספיק כלים</string>
   <string name="pawnMove">מסע רגלי</string>
   <string name="capture">הכאה</string>
-  <string name="close">סגור</string>
+  <string name="close">סגירה</string>
   <string name="winning">זוכה</string>
   <string name="losing">מפסיד</string>
   <string name="drawn">תיקו</string>
@@ -99,7 +107,7 @@
   <string name="lossSavedBy50MoveRule">נמנע הפסד מפעת כלל 50 המהלכים</string>
   <string name="allSet">הכול מוכן!</string>
   <string name="importPgn">ייבא בפורמט PGN</string>
-  <string name="delete">מחק</string>
+  <string name="delete">מחיקה</string>
   <string name="deleteThisImportedGame">מחק את משחק העבר הזה?</string>
   <string name="replayMode">מצב הרצת המסעים</string>
   <string name="realtimeReplay">זמן אמת</string>
@@ -109,16 +117,31 @@
   <string name="bestMoveArrow">חץ המהלך הטוב ביותר</string>
   <string name="evaluationGauge">מד הערכה</string>
   <string name="multipleLines">המשכים מקבילים</string>
-  <string name="cpus">רוחב החישוב המקבילי</string>
-  <string name="memory">גודל הזיכרון</string>
+  <string name="cpus">מעבדים</string>
+  <string name="memory">זיכרון</string>
   <string name="infiniteAnalysis">ניתוח אינסופי</string>
   <string name="removesTheDepthLimit">מסיר את מגבלת העומק ו\"מחמם\" את המחשב</string>
   <string name="blunder">בלאנדר</string>
-  <string name="blunders">טעויות גסות</string>
   <string name="mistake">שגיאה</string>
-  <string name="mistakes">טעויות</string>
   <string name="inaccuracy">החמצה</string>
-  <string name="inaccuracies">החמצות</string>
+  <plurals name="nbBlunders">
+    <item quantity="one">טעות גסה %s</item>
+    <item quantity="two">%s טעויות גסות</item>
+    <item quantity="many">%s טעויות גסות</item>
+    <item quantity="other">%s טעויות גסות</item>
+  </plurals>
+  <plurals name="nbMistakes">
+    <item quantity="one">שגיאה %s</item>
+    <item quantity="two">%s שגיאות</item>
+    <item quantity="many">%s שגיאות</item>
+    <item quantity="other">%s שגיאות</item>
+  </plurals>
+  <plurals name="nbInaccuracies">
+    <item quantity="one">%s אי-דיוק</item>
+    <item quantity="two">%s אי-דיוקים</item>
+    <item quantity="many">%s אי-דיוקים</item>
+    <item quantity="other">%s אי-דיוקים</item>
+  </plurals>
   <string name="moveTimes">זמני המהלך</string>
   <string name="flipBoard">הפוך את הלוח</string>
   <string name="threefoldRepetition">חזרה משולשת</string>
@@ -138,6 +161,12 @@
     <item quantity="many">%s משחקים</item>
     <item quantity="other">%s משחקים</item>
   </plurals>
+  <plurals name="nbBookmarks">
+    <item quantity="one">%s מועדפים</item>
+    <item quantity="two">%s סימניות</item>
+    <item quantity="many">%s סימניות</item>
+    <item quantity="other">%s סימניות</item>
+  </plurals>
   <string name="viewInFullSize">צפה בגודל מלא</string>
   <string name="logOut">התנתק</string>
   <string name="signIn">התחבר</string>
@@ -150,6 +179,7 @@
   <string name="latestForumPosts">פרסומים אחרונים בפורום</string>
   <string name="players">שחקנים</string>
   <string name="friends">חברים</string>
+  <string name="discussions">דיונים</string>
   <string name="today">היום</string>
   <string name="yesterday">אתמול</string>
   <string name="minutesPerSide">דקות עבור כל צד</string>
@@ -160,22 +190,40 @@
   <string name="correspondence">התכתבות</string>
   <string name="daysPerTurn">ימים למהלך</string>
   <string name="oneDay">יום אחד</string>
+  <plurals name="nbDays">
+    <item quantity="one">יום %s</item>
+    <item quantity="two">%s ימים</item>
+    <item quantity="many">%s ימים</item>
+    <item quantity="other">%s ימים</item>
+  </plurals>
+  <plurals name="nbHours">
+    <item quantity="one">שעה %s</item>
+    <item quantity="two">%s שעות</item>
+    <item quantity="many">%s שעות</item>
+    <item quantity="other">%s שעות</item>
+  </plurals>
   <string name="time">זמן</string>
   <string name="rating">דירוג</string>
   <string name="ratingStats">סטטיסטיקת דירוג</string>
   <string name="username">שם משתמש</string>
-  <string name="usernameOrEmail">שם משתמש או כתובת דואר אלקטרוני</string>
+  <string name="usernameOrEmail">שם משתמש או דוא״ל</string>
   <string name="changeUsername">שנה שם משתמש</string>
   <string name="changeUsernameNotSame">באותיות לועזיות ניתן להחליף אותיות קטנות בגדולות, למשל מ-\"johndoe\" ל-\"JohnDoe\".</string>
   <string name="changeUsernameDescription">שנוי שם המשתמש. ניתן לעשותו פעם אחת בלבד, ורק על ידי החלפת אותיות גדולות בקטנות ולהיפך.</string>
   <string name="password">סיסמה</string>
   <string name="changePassword">שנה סיסמה</string>
-  <string name="changeEmail">שנה כתובת דואר אלקטרוני</string>
-  <string name="email">הדואר האלקטרוני</string>
+  <string name="changeEmail">שינוי דוא״ל</string>
+  <string name="email">דוא״ל</string>
   <string name="passwordReset">איפוס סיסמה</string>
   <string name="forgotPassword">שכחת סיסמה?</string>
   <string name="rank">דרוג</string>
   <string name="rankX">דירוג: %s</string>
+  <plurals name="rankIsUpdatedEveryNbMinutes">
+    <item quantity="one">הדירוג מתעדכן כל דקה</item>
+    <item quantity="two">הדירוג מתעדכנת כל %s דקות</item>
+    <item quantity="many">הדירוג מתעדכנת כל %s דקות</item>
+    <item quantity="other">הדירוג מתעדכן כל %s דקות</item>
+  </plurals>
   <plurals name="nbPuzzles">
     <item quantity="one">חידה</item>
     <item quantity="two">%s פאזלים</item>
@@ -183,8 +231,15 @@
     <item quantity="other">חידות מסוג %s</item>
   </plurals>
   <string name="gamesPlayed">משחקים ששוחקו</string>
-  <string name="cancel">בטל</string>
-  <string name="timeOut">נגמר הזמן</string>
+  <plurals name="nbGamesWithYou">
+    <item quantity="one">%s משחק איתך</item>
+    <item quantity="two">%s משחקים איתך</item>
+    <item quantity="many">%s משחקים איתך</item>
+    <item quantity="other">%s משחקים איתך</item>
+  </plurals>
+  <string name="cancel">ביטול</string>
+  <string name="whiteTimeOut">נגמר הזמן ללבן</string>
+  <string name="blackTimeOut">נגמר הזמן לשחור</string>
   <string name="drawOfferSent">הצעת תיקו נשלחה</string>
   <string name="drawOfferDeclined">הצעת התיקו נדחתה</string>
   <string name="drawOfferAccepted">הצעת התיקו התקבלה</string>
@@ -219,6 +274,7 @@
   <string name="rematchOfferDeclined">בקשת משחק חוזר נדחתה</string>
   <string name="cancelRematchOffer">בטל הצעה למשחק חוזר</string>
   <string name="viewRematch">צפה במשחק חוזר</string>
+  <string name="confirmMove">אשר מהלך</string>
   <string name="play">שחק</string>
   <string name="inbox">תיבת דואר</string>
   <string name="chatRoom">חדר צא\'ט</string>
@@ -232,12 +288,29 @@
   <string name="send">שלח</string>
   <string name="incrementInSeconds">תוספת בשניות</string>
   <string name="freeOnlineChess">שחמט חינמי ברשת</string>
-  <string name="spectators">צופים:</string>
   <plurals name="nbRated">
     <item quantity="one">מדורג %s</item>
     <item quantity="two">מדורג %s</item>
     <item quantity="many">מדורג %s</item>
     <item quantity="other">מדורג %s</item>
+  </plurals>
+  <plurals name="nbWins">
+    <item quantity="one">%s ניצחון</item>
+    <item quantity="two">%s נצחונות</item>
+    <item quantity="many">%s נצחונות</item>
+    <item quantity="other">%s נצחונות</item>
+  </plurals>
+  <plurals name="nbLosses">
+    <item quantity="one">%s הפסד</item>
+    <item quantity="two">%s הפסדים</item>
+    <item quantity="many">%s הפסדים</item>
+    <item quantity="other">%s הפסדים</item>
+  </plurals>
+  <plurals name="nbDraws">
+    <item quantity="one">%s תוצאת תיקו</item>
+    <item quantity="two">%s תוצאות תיקו</item>
+    <item quantity="many">%s תוצאות תיקו</item>
+    <item quantity="other">%s תוצאות תיקו</item>
   </plurals>
   <plurals name="nbPlaying">
     <item quantity="one">%s משחק</item>
@@ -247,8 +320,13 @@
   </plurals>
   <string name="exportGames">ייצא משחקים</string>
   <string name="ratingRange">טווח דירוג</string>
-  <string name="thisPlayerUsesChessComputerAssistance">שחקן זה משתמש בסיוע מחשב שחמט</string>
-  <string name="thisPlayerArtificiallyIncreasesTheirRating">שחקן זה מעלה/מוריד את דירוגו באופן מלאכותי</string>
+  <plurals name="giveNbSeconds">
+    <item quantity="one">תן %s שנייה</item>
+    <item quantity="two">תן %s שניות</item>
+    <item quantity="many">תן %s שניות</item>
+    <item quantity="other">תן %s שניות</item>
+  </plurals>
+  <string name="thisAccountViolatedTos">החשבון הזה הפר את תנאי השימוש של ליצ\'ס</string>
   <string name="openingExplorerAndTablebase">סייר הפתיחות וניתוח סיומים</string>
   <string name="takeback">החזר מהלך</string>
   <string name="proposeATakeback">הצע החזרת המהלך האחרון</string>
@@ -266,6 +344,12 @@
     <item quantity="two">%s נקודות טורניר</item>
     <item quantity="many">%s נקודות טורניר</item>
     <item quantity="other">%s נקודות טורניר</item>
+  </plurals>
+  <plurals name="nbStudies">
+    <item quantity="one">%s לימוד</item>
+    <item quantity="two">%s למידות</item>
+    <item quantity="many">%s למידות</item>
+    <item quantity="other">%s למידות</item>
   </plurals>
   <string name="viewTournament">צפה בטורניר</string>
   <string name="backToTournament">חזור לטורניר</string>
@@ -306,6 +390,7 @@
   <string name="siteDescription">משחק שחמט חינם ברשת.  שחק שחמט כעת בממשק נקי. בלי הרשמה, בלי פרסומות, בלי להתקין שום דבר. שחק שחמט עם המחשב, חברים או יריבים אקראיים.</string>
   <string name="xJoinedTeamY">%1$s הצטרף לקבוצה %2$s</string>
   <string name="xCreatedTeamY">%1$s יצר קבוצה %2$s</string>
+  <string name="xStartedStreaming">%s התחיל שידור חי</string>
   <string name="averageElo">דירוג ממוצע</string>
   <string name="location">מיקום</string>
   <string name="filterGames">סנן משחקים</string>
@@ -320,6 +405,12 @@
   <string name="toStudy">לחקור</string>
   <string name="importGame">ייבא משחק</string>
   <string name="importGameExplanation">כשמדביקים משחק בפורמט PGN אתה מקבל הרצה מחדש בצורת דפדפוף, ניתוח מחשב, צ\'אט משחק וקישור לשיתוף.</string>
+  <plurals name="nbImportedGames">
+    <item quantity="one">%s משחק מיובא</item>
+    <item quantity="two">%s משחקים מיובאים</item>
+    <item quantity="many">%s משחקים מיובאים</item>
+    <item quantity="other">%s משחקים מיובאים</item>
+  </plurals>
   <string name="thisIsAChessCaptcha">זו קאפצ\'ה של שחמט.</string>
   <string name="clickOnTheBoardToMakeYourMove">לחץ על הלוח כדי לעשות מהלך, והוכח שאתה בן אנוש.</string>
   <string name="captcha.fail">אנא בצע את המהלך הנכון בלוח, לצורך captcha.</string>
@@ -345,18 +436,29 @@
   <string name="unblock">בטל חסימה</string>
   <string name="followsYou">עוקב אחריך</string>
   <string name="xStartedFollowingY">%1$s התחיל לעקוב אחרי %2$s</string>
+  <plurals name="nbFollowers">
+    <item quantity="one">%s עוקב</item>
+    <item quantity="two">%s עוקבים</item>
+    <item quantity="many">%s עוקבים</item>
+    <item quantity="other">%s עוקבים</item>
+  </plurals>
+  <plurals name="nbFollowing">
+    <item quantity="one">%s עוקב</item>
+    <item quantity="two">%s עוקבים</item>
+    <item quantity="many">%s עוקב</item>
+    <item quantity="other">%s עוקב</item>
+  </plurals>
   <string name="more">עוד</string>
   <string name="memberSince">רשום מ</string>
   <string name="lastSeenActive">נכנס לאחרונה %s</string>
-  <string name="challengeToPlay">הזמן למשחק</string>
   <string name="player">שחקן</string>
   <string name="list">רשימה</string>
   <string name="graph">גרף</string>
   <plurals name="lessThanNbMinutes">
     <item quantity="one">פחות מ- %s דקות</item>
     <item quantity="two">פחות מ- %s דקות</item>
-    <item quantity="many">פחות מ- %s דקות</item>
-    <item quantity="other">פחות מ- %s דקות</item>
+    <item quantity="many">פחות מ%s דקות</item>
+    <item quantity="other">פחות מ%s דקות</item>
   </plurals>
   <string name="required">נדרש.</string>
   <string name="openTournaments">הטורנירים הפתוחים</string>
@@ -373,6 +475,7 @@
   <string name="recommendNotTouching">אנו ממליצים לא לגעת בזה.</string>
   <string name="fewerPlayers">אם אתה מגדיר תנאי כניסה, יהיו לטורניר פחות שחקנים.</string>
   <string name="showAdvancedSettings">הצג הגדרות מתקדמות</string>
+  <string name="makePrivateTournament">הפוך את הטורניר לפרטי, והגבל כניסה עם סיסמה</string>
   <string name="join">הצטרף</string>
   <string name="withdraw">צא</string>
   <string name="points">נקודות</string>
@@ -388,12 +491,11 @@
   <string name="berserkRate">מתוכם ברזרק</string>
   <string name="performance">דירוג הביצוע</string>
   <string name="tournamentComplete">הטורניר הושלם</string>
-  <string name="movesPlayed">מהלים ששוחקו</string>
+  <string name="movesPlayed">מהלכים ששוחקו</string>
   <string name="whiteWins">לבן מנצח</string>
   <string name="blackWins">שחור מנצח</string>
   <string name="draws">תוצאות תיקו</string>
   <string name="nextXTournament">טורניר ה%s הבא:</string>
-  <string name="viewMoreTournaments">צפה בעוד טורנירים</string>
   <string name="averageOpponent">יריב ממוצע</string>
   <string name="membersOnly">לרשומים בלבד</string>
   <string name="boardEditor">עריכת לוח</string>
@@ -414,7 +516,9 @@
   <string name="firstName">שם פרטי</string>
   <string name="lastName">שם משפחה</string>
   <string name="biography">ביוגרפיה</string>
-  <string name="country">מדינה</string>
+  <string name="countryOrFlag" comment="countryOrFlag&#10;Appears when you edit your profile. Lets a player add a country/flag (not all flags are for countries) to their profile">מדינה או דגל</string>
+  <string name="thankYou">תודה רבה!</string>
+  <string name="socialMediaLinks">קישורי רשתות חברתיות</string>
   <string name="inlineNotation">תיאור מהלכים בשורה</string>
   <string name="watchLichessTV">צפה בטלוויזיה של ליצ\'ס TV</string>
   <string name="previouslyOnLichessTV">לאחרונה בטלוויזיה של ליצ\'ס</string>
@@ -422,37 +526,22 @@
   <string name="activeToday">הכי פעילים היום</string>
   <string name="activePlayers">הכי פעילים</string>
   <string name="bewareTheGameIsRatedButHasNoClock">היזהר, המשחק מדורג אך אין שעון.</string>
-  <string name="yourPuzzleRatingX">דירוג הפאזלים שלך: %s</string>
-  <string name="findTheBestMoveForWhite">מצא את המהלך הטוב ביותר ללבן</string>
-  <string name="findTheBestMoveForBlack">מצא את המהלך הטוב ביותר לשחור</string>
-  <string name="toTrackYourProgress">למעקב אחרי התקדמותך:</string>
-  <string name="puzzleId">פאזל %s</string>
-  <string name="puzzleOfTheDay">הפאזל היומי</string>
-  <string name="clickToSolve">לחץ כדי לפתור</string>
-  <string name="goodMove">מהלך טוב</string>
-  <string name="butYouCanDoBetter">אבל יש מהלך יותר טוב.</string>
-  <string name="bestMove">המהלך הטוב ביותר!</string>
-  <string name="keepGoing">המשך...</string>
-  <string name="puzzleFailed">נכשלת בפאזל</string>
-  <string name="butYouCanKeepTrying">אבל אתה יכול להמשיך לנסות.</string>
   <string name="success">הצלחה</string>
-  <string name="wasThisPuzzleAnyGood">האם אהבת את הפאזל?</string>
-  <string name="pleaseVotePuzzle">עזור לנו להשתפר ע\"י הצבעה. השתמש בחצים למעלה ולמטה.</string>
-  <string name="thankYou">תודה רבה!</string>
-  <string name="ratingX">דירוג: %s</string>
-  <string name="hidden">מוסתר</string>
-  <string name="fromGameLink">מהמשחק %s</string>
-  <string name="continueTraining">המשך להתאמן</string>
-  <string name="retryThisPuzzle">נסה שוב את הפאזל.</string>
-  <string name="thisPuzzleIsCorrect">הפאזל נכון ומעניין.</string>
-  <string name="thisPuzzleIsWrong">הפאזל לא נכון או משעמם</string>
+  <plurals name="nbGamesInPlay">
+    <item quantity="one">%s משחק בתהליך</item>
+    <item quantity="two">%s משחקים בתהליך</item>
+    <item quantity="many">%s משחקים בתהליך</item>
+    <item quantity="other">%s משחקים בתהליך</item>
+  </plurals>
   <string name="automaticallyProceedToNextGameAfterMoving">המשך אוטומטית למשחק הבא אחרי מהלך</string>
   <string name="autoSwitch">החלפה אוטומטית</string>
-  <string name="puzzles">פאזלים</string>
+  <string name="puzzles">חידות</string>
   <string name="latestUpdates">עדכונים אחרונים</string>
   <string name="tournamentWinners">מנצחי הטורנירים</string>
   <string name="name">שם</string>
   <string name="description">תיאור</string>
+  <string name="descPrivate">תיאור פרטי</string>
+  <string name="descPrivateHelp">טקסט שרק חברי הקבוצה יראו. אם נכתב, יחליף את התיאור הפומבי עבור חברי הקבוצה.</string>
   <string name="no">לא</string>
   <string name="yes">כן</string>
   <string name="help">:עזרה</string>
@@ -473,6 +562,7 @@
   <string name="cheat">רמאות</string>
   <string name="insult">העלבה</string>
   <string name="troll">טרול</string>
+  <string name="ratingManipulation">מניפולציה בדירוג</string>
   <string name="other">אחר</string>
   <string name="reportDescriptionHelp">הדבק את הקישור למשחק(ים) והסבר מה לא בסדר בהתנהגות המשתמש</string>
   <string name="error.provideOneCheatedGameLink">בבקשה לספק לפחות קישור אחד למשחק עם רמאות.</string>
@@ -486,11 +576,16 @@
   <string name="invalidUsernameOrPassword">שגיאה בשם משתמש או בסיסמא</string>
   <string name="incorrectPassword">סיסמה שגויה</string>
   <string name="invalidAuthenticationCode">קוד אימות לא תקין</string>
-  <string name="emailMeALink">שלחו לי קישור באמצעות הדואר האלקטרוני</string>
+  <string name="emailMeALink">שלחו לי קישור בדוא״ל</string>
   <string name="currentPassword">הסיסמא הנוכחית</string>
   <string name="newPassword">סיסמה חדשה</string>
   <string name="newPasswordAgain">סיסמא חדשה שוב</string>
+  <string name="newPasswordsDontMatch">הסיסמה החדשה אינה תאומת</string>
+  <string name="newPasswordStrength">חוזק הסיסמה</string>
+  <string name="clockInitialTime">זמן שעון התחלתי</string>
+  <string name="clockIncrement">הוספת זמן</string>
   <string name="privacy">פרטיות</string>
+  <string name="privacyPolicy">מדיניות הפרטיות</string>
   <string name="letOtherPlayersFollowYou">אפשר לשחקנים אחרים לעקוב אחריך</string>
   <string name="letOtherPlayersChallengeYou">אפשר לשחקנים אחרים להזמינך למשחק</string>
   <string name="letOtherPlayersInviteYouToStudy">תן לשחקנים אחרים להזמין אותך ללמידה</string>
@@ -530,6 +625,12 @@
     <item quantity="many">מספר תווים מירבי: %s.</item>
     <item quantity="other">מספר תווים מירבי: %s.</item>
   </plurals>
+  <plurals name="blocks">
+    <item quantity="one">%s נחסם</item>
+    <item quantity="two">%s נחסמו</item>
+    <item quantity="many">%s נחסמו</item>
+    <item quantity="other">%s נחסמו</item>
+  </plurals>
   <string name="listBlockedPlayers">רשימת שחקנים שחסמת</string>
   <string name="human">בן אנוש</string>
   <string name="computer">מחשב</string>
@@ -545,6 +646,7 @@
   <string name="opponent">יריב</string>
   <string name="learnMenu">למד</string>
   <string name="studyMenu">לימודים</string>
+  <string name="practice">תרגול</string>
   <string name="community">קהילה</string>
   <string name="tools">כלים</string>
   <string name="increment">שניות למהלך</string>
@@ -554,25 +656,33 @@
   <string name="allowAnalytics">אפשר דגימה אנונימית</string>
   <string name="shareGameURL">URL שתף</string>
   <string name="error.required">שדה חובה</string>
-  <string name="error.email">כתובת המייל אינה חוקית</string>
+  <string name="error.email">כתובת דוא״ל זו אינה תקינה</string>
   <string name="error.email_acceptable">כתובת המייל אינה קבילה</string>
-  <string name="error.email_unique">כתובת המייל שהזנת תפוסה</string>
-  <string name="error.email_different">זהו כבר המייל שלך</string>
+  <string name="error.email_unique">כתובת דוא״ל זו כבר תפוסה</string>
+  <string name="error.email_different">זאת כתובת הדוא״ל שלך כבר</string>
   <string name="ifRatingIsPlusMinusX">אלו מדורגים ± %s</string>
+  <string name="onlyExistingConversations">שיחה קיימת בלבד</string>
   <string name="onlyFriends">חברים בלבד</string>
   <string name="menu">תפריט</string>
   <string name="castling">הצרחה</string>
   <string name="whiteCastlingKingside">הצרחה קצרה לצד לבן</string>
   <string name="blackCastlingKingside">הצרחה קצרה לצד שחור</string>
+  <plurals name="nbForumPosts">
+    <item quantity="one">%s פוסט בפורום</item>
+    <item quantity="two">%s פוסטים בפורום</item>
+    <item quantity="many">%s פוסטים בפורום</item>
+    <item quantity="other">%s פוסטים בפורום</item>
+  </plurals>
   <string name="tpTimeSpentPlaying">זמן במשחק : %s</string>
   <string name="watchGames">לצפות במשחקים</string>
   <string name="tpTimeSpentOnTV">: %s זמן בטלוויזיה</string>
   <string name="watch">צפה</string>
   <string name="videoLibrary">ספריית וידאו</string>
+  <string name="streamersMenu">משדרים</string>
   <string name="mobileApp">אפליקציית מובייל</string>
   <string name="webmasters">מנהלי אתרים</string>
-  <string name="about">אודות</string>
-  <string name="aboutX">אודות%s</string>
+  <string name="about">על אודות</string>
+  <string name="aboutX">על אודות %s</string>
   <string name="xIsAFreeYLibreOpenSourceChessServer">%1$s הוא שרת שחמט חופשי (%2$s), קוד פתוח וללא מודעות.</string>
   <string name="really">באמת</string>
   <string name="contribute">לתרום</string>
@@ -623,15 +733,17 @@
   </plurals>
   <string name="yourPerfTypeRatingIsRating">דירוגך במשחקי %1$s הוא %2$s.</string>
   <string name="youAreBetterThanPercentOfPerfTypePlayers">דירוגך גבוה יותר מ-%1$s משחקני %2$s.</string>
+  <string name="userIsBetterThanPercentOfPerfTypePlayers">%1$s טוב יותר ב%2$s משחקני %3$s אחרים.</string>
   <string name="youDoNotHaveAnEstablishedPerfTypeRating">טרם נקבע לך דירוג במשחקי %s.</string>
   <string name="yourRating">הדירוג שלך</string>
   <string name="cumulative">מצטבר</string>
   <string name="glicko2Rating">דירוג Glicko-2</string>
-  <string name="checkYourEmail">בדוק את האימייל שלך</string>
+  <string name="checkYourEmail">נא לבדוק את הדוא״ל שלך</string>
   <string name="weHaveSentYouAnEmailClickTheLink">שלחנו לך אימייל. לחץ על הלינק באימייל על מנת להפעיל את חשבונך.</string>
   <string name="ifYouDoNotSeeTheEmailCheckOtherPlaces">אם אתה לא מוצא את האימייל, חפש במקומות אחרים, כמו דואר זבל, ספם או תיקיות אחרות.</string>
   <string name="weHaveSentYouAnEmailTo">שלחנו אימייל ל%s. לחץ על הלינק באימייל על מנת לאפס את הסיסמא</string>
   <string name="byRegisteringYouAgreeToBeBoundByOur">.%s על ידי הרשמה, אתה מסכים ל</string>
+  <string name="readAboutOur">קרא את ה%s.</string>
   <string name="networkLagBetweenYouAndLichess">עיכוב רשת בינך לבין ליצ\'ס</string>
   <string name="timeToProcessAMoveOnLichessServer">זמן לעיבוד מהלך בשרת ליצ\'ס</string>
   <string name="downloadAnnotated">להוריד עם פרשנויות</string>
@@ -653,8 +765,6 @@
   <string name="enableKidMode">הפעל מצב ילדים</string>
   <string name="disableKidMode">בטל מצב ילדים</string>
   <string name="security">אבטחה</string>
-  <string name="thisIsAListOfDevicesThatHaveLoggedIntoYourAccount">רשימת המכשירים שהתחברו לחשבונך, בטל את ההתחברויות שאתה לא מכיר.</string>
-  <string name="alternativelyYouCanX">לחלופין, ניתן לעשות %s.</string>
   <string name="revokeAllSessions">בטל כל הפעלות</string>
   <string name="playChessEverywhere">שחק בשחמט בכל מקום</string>
   <string name="asFreeAsLichess">חופשי כמו ליצ\'ס</string>
@@ -668,6 +778,12 @@
   <string name="onlineAndOfflinePlay">תשחק עם או בלי חיבור לאינטרנט</string>
   <string name="viewTheSolution">הראה פתרון</string>
   <string name="followAndChallengeFriends">עקוב אחר חברים ואתגר אותם</string>
+  <plurals name="availableInNbLanguages">
+    <item quantity="one">זמין ב%s שפה!</item>
+    <item quantity="two">זמין ב%s שפות!</item>
+    <item quantity="many">זמין ב%s שפות!</item>
+    <item quantity="other">זמין ב%s שפות!</item>
+  </plurals>
   <string name="gameAnalysis">ניתוח משחק</string>
   <string name="xHostsY">%1$s מארח %2$s</string>
   <string name="xJoinsY">%1$s מצטרף %2$s</string>
@@ -706,8 +822,13 @@
   <string name="error.unknown">שגיאה</string>
   <string name="custom">התאמה אישית</string>
   <string name="notifications">התראות</string>
-  <string name="challenges">הזמנות למשחק</string>
   <string name="perfRatingX">דירוג: %s</string>
+  <plurals name="nbSecondsToPlayTheFirstMove">
+    <item quantity="one">%s שניה לשחק את המסע הראשון</item>
+    <item quantity="two">%s שניות כדי לשחק את המסע הראשון</item>
+    <item quantity="many">%s שניות כדי לשחק את המסע הראשון</item>
+    <item quantity="other">%s שניות כדי לשחק את המסע הראשון</item>
+  </plurals>
   <string name="practiceWithComputer">התאמן עם המחשב</string>
   <string name="anotherWasX">מהלך טוב נוסף היה %s</string>
   <string name="bestWasX">המהלך הטוב ביותר היה %s</string>
@@ -742,40 +863,50 @@
   <string name="reviewWhiteMistakes">בדוק טעויות ללבן</string>
   <string name="reviewBlackMistakes">בדוק טעויות לשחור</string>
   <string name="advantage">יתרון</string>
+  <plurals name="nbSeconds">
+    <item quantity="one">%s שניה</item>
+    <item quantity="two">%s שניות</item>
+    <item quantity="many">%s שניות</item>
+    <item quantity="other">%s שניות</item>
+  </plurals>
   <string name="opening">פתיחה</string>
   <string name="middlegame">מציעה</string>
   <string name="endgame">סיום</string>
-  <string name="registerToSendChallenges">הירשם על מנת לשלוח אתגרים.</string>
-  <string name="youCannotChallengeX">לא ניתן לאתגר את %s.</string>
-  <string name="xDoesNotAcceptChallenges">%s לא מקבל אתגרים.</string>
-  <string name="yourXRatingIsTooFarFromY">דירוג שלך %1$s רחוק מדי מ-%2$s.</string>
-  <string name="cannotChallengeDueToProvisionalXRating">אינו יכול לבקש משחק חוזר כי דירוג %s שלו עדיין זמני.</string>
-  <string name="xOnlyAcceptsChallengesFromFriends">%s רק מחבר בין מנויים הרשומים כחברים.</string>
   <string name="conditionalPremoves">מסעים מותנים מראש</string>
   <string name="addCurrentVariation">תוסיף וריאציה הנוכחית</string>
   <string name="playVariationToCreateConditionalPremoves">צור מהלכים מותנים מראש מתוך וריאנט</string>
   <string name="noConditionalPremoves">ללא מהלכים מותנים מראש</string>
   <string name="playX">תשחק %s</string>
+  <plurals name="andSaveNbPremoveLines">
+    <item quantity="one">ושמור %s קו קדם המסע</item>
+    <item quantity="two">ושמור %s קו קדם המסעים</item>
+    <item quantity="many">ושמור %s קו קדם המסעים</item>
+    <item quantity="other">ושמור %s קו קדם המסעים</item>
+  </plurals>
   <string name="sorry">מצטערים :(</string>
-  <string name="weHadToTimeYouOutForAWhile">נאלצנו להשהות אותך.</string>
-  <string name="timeoutExpires">ההשהיה הסתיימה %s.</string>
+  <string name="weHadToTimeYouOutForAWhile">נאלצנו להשעות אותך לזמן מה.</string>
+  <string name="timeoutExpires">ההשעיה תסתיים %s.</string>
   <string name="why">למה?</string>
   <string name="pleasantChessExperience">אנחנו מנסים לספק חווית שח נעימה לכולם.</string>
   <string name="goodPractice">בעקבות זאת, אנחנו חייבים לוודא שכל השחקנים ינהגו בכבוד.</string>
   <string name="potentialProblem">כאשר בעיה מסויימת מתגלה, אנו מציגים הודעה זו.</string>
   <string name="howToAvoidThis">איך להימנע מכך?</string>
-  <string name="playEveryGame">סיים כל משחק שהתחלת.</string>
-  <string name="tryToWin">נסה/י לנצח (או לפחות לסיים בתיקו) כל משחק שהתחלת.</string>
-  <string name="resignLostGames">פרוש/י במצבים שאת/ה מפסיד/ה (אל תתן/י לשעון להיגמר).</string>
+  <string name="playEveryGame">יש לסיים כל משחק שהתחלת.</string>
+  <string name="tryToWin">יש לנסות לנצח (או לפחות לסיים בתיקו) כל משחק שהתחלת.</string>
+  <string name="resignLostGames">יש לפרוש במצבי הפסד (אין לתת לשעון להיגמר).</string>
   <string name="temporaryInconvenience">אנו מצטערים על אי הנעימות הזמנית,</string>
-  <string name="wishYouGreatGames">ומאחלים לך חוויה נעימה ב-lichess.org.</string>
-  <string name="thankYouForReading">תודה שקראת!</string>
+  <string name="wishYouGreatGames">ומאחלים לך חוויה נעימה ב־lichess.org.</string>
+  <string name="thankYouForReading">תודה רבה על הקריאה!</string>
   <string name="lifetimeScore">תוצאה כוללת</string>
   <string name="currentMatchScore">תוצאה במפגש הנוכחי</string>
   <string name="agreementAssistance">אני מסכים שאף פעם לא אקבל עזרה תוך כדי משחק (ממנוע שח ממוחשב, ספר, מסד-נתונים, או אדם אחר).</string>
   <string name="agreementNice">אני מסכים שתמיד אהיה אדיב כלפי השחקנים האחרים.</string>
   <string name="agreementAccount">אני מסכים שלא אצור יותר מחשבון אחד.</string>
   <string name="agreementPolicy">אני מסכים לעקוב אחרי כל תנאי השירות של Lichess.</string>
+  <string name="searchOrStartNewDiscussion">חפש את התחל שיחה חדשה</string>
+  <string name="edit">ערוך</string>
+  <string name="rapid">רפיד</string>
+  <string name="classical">קלאסי</string>
   <string name="ultraBulletDesc">משחקים מהירים בטירוף: פחות מ30 שניות</string>
   <string name="bulletDesc">משחקים מהירים מאוד: פחות מ3 דקות</string>
   <string name="blitzDesc">משחקים מהירים: בין 3 ל8 דקות</string>
@@ -783,4 +914,33 @@
   <string name="classicalDesc">משחקים קלאסיים: 25 דקות או יותר</string>
   <string name="correspondenceDesc">משחקים לפי תורות: יותר מיום עבור תור</string>
   <string name="puzzleDesc">מאמן טקטיקות שחמט</string>
+  <string name="important">חשוב</string>
+  <string name="yourQuestionMayHaveBeenAnswered">כנראה שלשאלה שלך כבר יש %1$s</string>
+  <string name="inTheFAQ">בשאלות הנפוצות</string>
+  <string name="toReportSomeoneForCheatingOrBadBehavior">על מנת לדווח על רמאות או על התנהגות עוינת, %1$s</string>
+  <string name="useTheReportForm">השתמש בטופס הדוח</string>
+  <string name="toRequestSupport">לבקשת תמיכה, %1$s</string>
+  <string name="tryTheContactPage">תנסה את עמוד אנשי הקשר</string>
+  <string name="thisTopicIsArchived">נושא זה עבר לארכיון ולא ניתן עוד להשיב עליו.</string>
+  <string name="joinTheTeamXToPost">הצטרף ל %1$s כדי לפרסם בפורום הזה</string>
+  <string name="teamNamedX">הקבוצה %1$s</string>
+  <string name="youCannotPostYetPlaySomeGames">אתה עדיין לא יכול לפרסם בפורום זה. שחק כמה משחקים!</string>
+  <string name="subscribe">עקוב</string>
+  <string name="unsubscribe">בטל את המעקב</string>
+  <string name="mentionedYouInX">ציינו אותכם ב- %1$s.</string>
+  <string name="xMentionedYouInY">%1$s הזכיר אותך בהודעה ב-\"%2$s\".</string>
+  <string name="invitedYouToX">הזמין אותך ל-\"%1$s\".</string>
+  <string name="xInvitedYouToY">%1$s הזמין אותך ללימוד \"%2$s\".</string>
+  <string name="youAreNowPartOfTeam">אתה כעת חבר בקבוצה.</string>
+  <string name="youHaveJoinedTeamX">הצטרפת אל \"%1$s\".</string>
+  <string name="someoneYouReportedWasBanned">מישהו שדיווחת עליו נחסם</string>
+  <string name="congratsYouWon">כל הכבוד, ניצחתם!</string>
+  <string name="gameVsX">משחק נגד %1$s</string>
+  <string name="resVsX">%1$s נגד %2$s</string>
+  <string name="someoneReviewedYourCoachProfile">מישהו דירג את פרופיל המאמן שלך.</string>
+  <string name="newPendingReview">דירוג ממתין חדש</string>
+  <string name="lostAgainstTOSViolator">הפסדת לאדם שהפר את תקנון השימוש בליצ\'ס</string>
+  <string name="refundXpointsTimeControlY">זיכוי: %1$s נקודות דירוג ב%2$s.</string>
+  <string name="timeAlmostUp">הזמן הולך ואוזל!</string>
+  <string name="clickToRevealEmailAddress">לחץ כדי לחשוף את כתובת הדוא\"ל</string>
 </resources>

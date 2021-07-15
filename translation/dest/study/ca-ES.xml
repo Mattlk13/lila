@@ -15,6 +15,7 @@
   <string name="dateAddedOldest">Data d’inclusió (més antics)</string>
   <string name="recentlyUpdated">Actualitzat darrerament</string>
   <string name="mostPopular">Més popular</string>
+  <string name="alphabetical">Alfabètic</string>
   <string name="addNewChapter">Afegir un nou capítol</string>
   <plurals name="nbChapters">
     <item quantity="one">%s Capítol</item>
@@ -58,14 +59,17 @@
   <string name="shareAndExport">Comparteix i exporta</string>
   <string name="cloneStudy">Clona</string>
   <string name="studyPgn">PGN de l’estudi</string>
+  <string name="downloadAllGames">Descarrega tots els jocs</string>
   <string name="chapterPgn">PGN del capítol</string>
+  <string name="downloadGame">Descarrega partida</string>
   <string name="studyUrl">URL de l’estudi</string>
   <string name="currentChapterUrl">URL del capítol actual</string>
-  <string name="youCanPasteThisInTheForumToEmbedTheChapter">Pots enganxar això en el forum per incrustar-ne el capítol</string>
+  <string name="youCanPasteThisInTheForumToEmbed">Pots enganxar això en el forum per insertar</string>
   <string name="startAtInitialPosition">Comnçar a la posició inicial</string>
   <string name="startAtX">Començar a %s</string>
-  <string name="embedThisChapter">Incrusta aquest capítol al teu lloc web o blog</string>
-  <string name="readMoreAboutEmbeddingAStudyChapter">Llegir més sobre incrustar un capítol d’un estudi</string>
+  <string name="embedInYourWebsite">Inserta en la teva web o blog</string>
+  <string name="readMoreAboutEmbedding">Llegeix més sobre insertar</string>
+  <string name="onlyPublicStudiesCanBeEmbedded">Només els estudis públics poden ser inserits!</string>
   <string name="open">Obrir</string>
   <string name="xBroughtToYouByY">%1$s, presentat per %2$s</string>
   <string name="studyNotFound">Estudi no trobat</string>
@@ -91,7 +95,7 @@
   <string name="startFromCustomPosition">Començar a una posició personalitzada</string>
   <string name="loadAGameByUrl">Carregar una partida desde una URL</string>
   <string name="loadAPositionFromFen">Carregar una posició via codi FEN</string>
-  <string name="loadAGameFromPgn">Carregar una partida desde PGN</string>
+  <string name="loadAGameFromPgn">Carregar una partida PGN</string>
   <string name="automatic">Automàtic</string>
   <plurals name="pasteYourPgnTextHereUpToNbGames">
     <item quantity="one">Enganxa el teu PGN aquí, fins a %s partida</item>
@@ -124,4 +128,30 @@
   <string name="deleteStudy">Eliminar estudi</string>
   <string name="deleteTheEntireStudy">Eliminar l’estudi complert? No hi ha volta enrera!</string>
   <string name="whereDoYouWantToStudyThat">A on vols estudiar-ho?</string>
+  <string name="goodMove">Bona jugada</string>
+  <string name="mistake">Errada</string>
+  <string name="brilliantMove">Jugada brillant</string>
+  <string name="blunder">Error greu</string>
+  <string name="interestingMove">Jugada interessant</string>
+  <string name="dubiousMove" comment="dubiousMove&#10;A questionable move.">Jugada dubtosa</string>
+  <string name="onlyMove" comment="onlyMove&#10;The only possible move. This is a label that can be placed in a study of a past game. It may not technically be the only move, but the only feasible one.">Única jugada</string>
+  <string name="zugzwang" comment="zugzwang&#10;What zugzwang is: https://lichess.org/practice/intermediate-tactics/zugzwang/9cKgYrHb/ybYJ9gNa&#10;&#10;This specific string is a label that can be applied to a position in a study, to indicate one side is in zugzwang.">Zugzwang (atzucac)</string>
+  <string name="equalPosition">Posició igualada</string>
+  <string name="unclearPosition" comment="unclearPosition&#10;It is unclear who is winning or losing.">Posició poc clara</string>
+  <string name="whiteIsSlightlyBetter">El blanc està lleugerament millor</string>
+  <string name="blackIsSlightlyBetter">El negre està lleugerament millor</string>
+  <string name="whiteIsBetter">El blanc està millor</string>
+  <string name="blackIsBetter">El negre està millor</string>
+  <string name="whiteIsWinning">El blanc està guanyant</string>
+  <string name="blackIsWinning">El negre està guanyant</string>
+  <string name="novelty" comment="novelty&#10;&#10;A move in the opening that has not been played before.&#10;https://en.wikipedia.org/wiki/Glossary_of_chess#theoretical_novelty">Novetat</string>
+  <string name="development" comment="development&#10;Used in studies - shows that the player made a developing move (e.g. pushing pawns to open their bishops in the opening).">Desenvolupament</string>
+  <string name="initiative">Iniciativa</string>
+  <string name="attack" comment="attack&#10;A label that can be applied to a position in a Lichess study. Noun.">Atac</string>
+  <string name="counterplay" comment="counterplay&#10;A label that can be applied to a position in a Lichess study. Noun.&#10;&#10;Generally describes a defending player who is under attack, and makes an attacking move elsewhere.">Contra atac</string>
+  <string name="timeTrouble" comment="timeTrouble&#10;A label that can be applied to a position in a Lichess study. Noun. Indicates that a player had little time to think and make this move (clock was running low).">Problema de temps</string>
+  <string name="withCompensation" comment="withCompensation&#10;&#10;Compensation is the short-term positional advantage a player has in exchange for typically material disadvantage. Short term advantages involve initiative and attack.&#10;https://en.wikipedia.org/wiki/Compensation_(chess)">Amb compensació</string>
+  <string name="withTheIdea" comment="withTheIdea&#10;A label that can be applied to a position in a Lichess study. Noun.&#10;&#10;Shows that the player was following the theory around an opening, even after the initial opening moves.">Amb la idea</string>
+  <string name="nextChapter">Capítol següent</string>
+  <string name="prevChapter">Capítol Anterior</string>
 </resources>

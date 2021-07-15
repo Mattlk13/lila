@@ -1,8 +1,8 @@
 package lila.study
 
 import com.softwaremill.macwire._
-import play.api.libs.ws.WSClient
-import scala.concurrent.duration._
+import play.api.Configuration
+import play.api.libs.ws.StandaloneWSClient
 
 import lila.common.config._
 import lila.socket.Socket.{ GetVersion, SocketVersion }
@@ -10,7 +10,8 @@ import lila.user.User
 
 @Module
 final class Env(
-    ws: WSClient,
+    appConfig: Configuration,
+    ws: StandaloneWSClient,
     lightUserApi: lila.user.LightUserApi,
     gamePgnDump: lila.game.PgnDump,
     divider: lila.game.Divider,
@@ -24,15 +25,17 @@ final class Env(
     timeline: lila.hub.actors.Timeline,
     fishnet: lila.hub.actors.Fishnet,
     chatApi: lila.chat.ChatApi,
-    db: lila.db.Db,
+    mongo: lila.db.Env,
     net: lila.common.config.NetConfig,
     cacheApi: lila.memo.CacheApi
-)(
-    implicit ec: scala.concurrent.ExecutionContext,
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
     system: akka.actor.ActorSystem,
     mat: akka.stream.Materializer,
     mode: play.api.Mode
 ) {
+
+  private lazy val studyDb = mongo.asyncDb("study", appConfig.get[String]("study.mongodb.uri"))
 
   def version(studyId: Study.Id): Fu[SocketVersion] =
     socket.rooms.ask[SocketVersion](studyId.value)(GetVersion)
@@ -42,12 +45,12 @@ final class Env(
 
   private def scheduler = system.scheduler
 
-  private val socket = wire[StudySocket]
+  private val socket: StudySocket = wire[StudySocket]
 
-  lazy val studyRepo             = new StudyRepo(db(CollName("study")))
-  lazy val chapterRepo           = new ChapterRepo(db(CollName("study_chapter")))
-  private lazy val topicRepo     = new StudyTopicRepo(db(CollName("study_topic")))
-  private lazy val userTopicRepo = new StudyUserTopicRepo(db(CollName("study_user_topic")))
+  lazy val studyRepo             = new StudyRepo(studyDb(CollName("study")))
+  lazy val chapterRepo           = new ChapterRepo(studyDb(CollName("study_chapter_flat")))
+  private lazy val topicRepo     = new StudyTopicRepo(studyDb(CollName("study_topic")))
+  private lazy val userTopicRepo = new StudyUserTopicRepo(studyDb(CollName("study_user_topic")))
 
   lazy val jsonView = wire[JsonView]
 
@@ -73,30 +76,23 @@ final class Env(
 
   lazy val pager = wire[StudyPager]
 
-  private def runCommand = db.runCommand
-
   lazy val multiBoard = wire[StudyMultiBoard]
 
   lazy val pgnDump = wire[PgnDump]
 
-  lazy val lightStudyCache: LightStudyCache =
-    cacheApi[Study.Id, Option[Study.LightStudy]](512, "study.lightStudyCache") {
-      _.expireAfterWrite(20 minutes)
-        .buildAsyncFuture(studyRepo.lightById)
-    }
+  lazy val gifExport = new GifExport(ws, appConfig.get[String]("game.gifUrl"))
 
-  def cli = new lila.common.Cli {
-    def process = {
-      case "study" :: "rank" :: "reset" :: Nil =>
+  def cli =
+    new lila.common.Cli {
+      def process = { case "study" :: "rank" :: "reset" :: Nil =>
         api.resetAllRanks.map { count =>
           s"$count done"
         }
+      }
     }
-  }
 
-  lila.common.Bus.subscribeFun("gdprErase", "studyAnalysisProgress") {
-    case lila.user.User.GDPRErase(user) => api erase user
+  lila.common.Bus.subscribeFun("studyAnalysisProgress") {
     case lila.analyse.actorApi.StudyAnalysisProgress(analysis, complete) =>
-      serverEvalMerger(analysis, complete)
+      serverEvalMerger(analysis, complete).unit
   }
 }

@@ -1,44 +1,47 @@
 package lila.oauth
 
 import org.joda.time.DateTime
+import reactivemongo.api.bson._
+import com.roundeights.hasher.Algo
 
+import lila.common.{ Bearer, SecureRandom }
 import lila.user.User
 
 case class AccessToken(
     id: AccessToken.Id,
-    clientId: String,
+    plain: Bearer,
     userId: User.ID,
-    createdAt: Option[DateTime] = None, // for personal access tokens
-    description: Option[String] = None, // for personal access tokens
+    createdAt: Option[DateTime],
+    description: Option[String], // for personal access tokens
     usedAt: Option[DateTime] = None,
-    scopes: List[OAuthScope]
+    scopes: List[OAuthScope],
+    clientOrigin: Option[String],
+    expires: Option[DateTime]
 ) {
   def isBrandNew = createdAt.exists(DateTime.now.minusSeconds(5).isBefore)
 }
 
 object AccessToken {
 
-  val idSize = 16
-
-  case class Id(value: String) extends AnyVal {
-    def isPersonal = value.size == idSize
+  case class Id(value: String) extends AnyVal
+  object Id {
+    def from(bearer: Bearer) = Id(Algo.sha256(bearer.secret).hex)
   }
-
-  def makeId = Id(ornicar.scalalib.Random secureString idSize)
 
   case class ForAuth(userId: User.ID, scopes: List[OAuthScope])
 
   object BSONFields {
-    val id          = "access_token_id"
-    val clientId    = "client_id"
-    val userId      = "user_id"
-    val createdAt   = "create_date"
-    val description = "description"
-    val usedAt      = "used_at"
-    val scopes      = "scopes"
+    val id           = "_id"
+    val plain        = "plain"
+    val userId       = "userId"
+    val createdAt    = "created"
+    val description  = "description"
+    val usedAt       = "used"
+    val scopes       = "scopes"
+    val clientOrigin = "clientOrigin"
+    val expires      = "expires"
   }
 
-  import reactivemongo.api.bson._
   import lila.db.BSON
   import lila.db.dsl._
   import BSON.BSONJodaDateTimeHandler
@@ -49,7 +52,8 @@ object AccessToken {
     BSONFields.scopes -> true
   )
 
-  implicit private[oauth] val accessTokenIdHandler = stringAnyValHandler[Id](_.value, Id.apply)
+  implicit private[oauth] val idHandler     = stringAnyValHandler[Id](_.value, Id.apply)
+  implicit private[oauth] val bearerHandler = stringAnyValHandler[Bearer](_.secret, Bearer.apply)
 
   implicit val ForAuthBSONReader = new BSONDocumentReader[ForAuth] {
     def readDocument(doc: BSONDocument) =
@@ -63,24 +67,30 @@ object AccessToken {
 
     import BSONFields._
 
-    def reads(r: BSON.Reader): AccessToken = AccessToken(
-      id = r.get[Id](id),
-      clientId = r str clientId,
-      userId = r str userId,
-      createdAt = r.getO[DateTime](createdAt),
-      description = r strO description,
-      usedAt = r.getO[DateTime](usedAt),
-      scopes = r.get[List[OAuthScope]](scopes)
-    )
+    def reads(r: BSON.Reader): AccessToken =
+      AccessToken(
+        id = r.get[Id](id),
+        plain = r.get[Bearer](plain),
+        userId = r str userId,
+        createdAt = r.getO[DateTime](createdAt),
+        description = r strO description,
+        usedAt = r.getO[DateTime](usedAt),
+        scopes = r.get[List[OAuthScope]](scopes),
+        clientOrigin = r strO clientOrigin,
+        expires = r.getO[DateTime](expires)
+      )
 
-    def writes(w: BSON.Writer, o: AccessToken) = $doc(
-      id          -> o.id,
-      clientId    -> o.clientId,
-      userId      -> o.userId,
-      createdAt   -> o.createdAt,
-      description -> o.description,
-      usedAt      -> o.usedAt,
-      scopes      -> o.scopes
-    )
+    def writes(w: BSON.Writer, o: AccessToken) =
+      $doc(
+        id           -> o.id,
+        plain        -> o.plain,
+        userId       -> o.userId,
+        createdAt    -> o.createdAt,
+        description  -> o.description,
+        usedAt       -> o.usedAt,
+        scopes       -> o.scopes,
+        clientOrigin -> o.clientOrigin,
+        expires      -> o.expires
+      )
   }
 }

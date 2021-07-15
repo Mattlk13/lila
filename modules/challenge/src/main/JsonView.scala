@@ -8,6 +8,7 @@ import lila.socket.Socket.SocketVersion
 import lila.socket.UserLagCache
 
 final class JsonView(
+    baseUrl: lila.common.config.BaseUrl,
     getLightUser: lila.common.LightUser.GetterSync,
     isOnline: lila.socket.IsOnline
 ) {
@@ -15,7 +16,7 @@ final class JsonView(
   import lila.game.JsonView._
   import Challenge._
 
-  implicit private val RegisteredWrites = OWrites[Registered] { r =>
+  implicit private val RegisteredWrites = OWrites[Challenger.Registered] { r =>
     val light = getLightUser(r.id)
     Json
       .obj(
@@ -30,23 +31,29 @@ final class JsonView(
       .add("lag" -> UserLagCache.getLagRating(r.id))
   }
 
-  def apply(a: AllChallenges)(implicit lang: Lang): JsObject = Json.obj(
-    "in"   -> a.in.map(apply(Direction.In.some)),
-    "out"  -> a.out.map(apply(Direction.Out.some)),
-    "i18n" -> lila.i18n.JsDump.keysToObject(i18nKeys, lang)
-  )
+  def apply(a: AllChallenges)(implicit lang: Lang): JsObject =
+    Json.obj(
+      "in"   -> a.in.map(apply(Direction.In.some)),
+      "out"  -> a.out.map(apply(Direction.Out.some)),
+      "i18n" -> lila.i18n.JsDump.keysToObject(i18nKeys, lang),
+      "reasons" -> JsObject(Challenge.DeclineReason.allExceptBot.map { r =>
+        r.key -> JsString(r.trans.txt())
+      })
+    )
 
-  def show(challenge: Challenge, socketVersion: SocketVersion, direction: Option[Direction])(
-      implicit lang: Lang
-  ) = Json.obj(
-    "challenge"     -> apply(direction)(challenge),
-    "socketVersion" -> socketVersion
-  )
+  def show(challenge: Challenge, socketVersion: SocketVersion, direction: Option[Direction])(implicit
+      lang: Lang
+  ) =
+    Json.obj(
+      "challenge"     -> apply(direction)(challenge),
+      "socketVersion" -> socketVersion
+    )
 
   def apply(direction: Option[Direction])(c: Challenge)(implicit lang: Lang): JsObject =
     Json
       .obj(
         "id"         -> c.id,
+        "url"        -> s"$baseUrl/${c.id}",
         "status"     -> c.status.name,
         "challenger" -> c.challengerUser,
         "destUser"   -> c.destUser,
@@ -76,9 +83,10 @@ final class JsonView(
       )
       .add("direction" -> direction.map(_.name))
       .add("initialFen" -> c.initialFen)
+      .add("declineReason" -> c.declineReason.map(_.trans.txt()))
 
   private def iconChar(c: Challenge) =
-    if (c.variant == chess.variant.FromPosition) '*'
+    if (c.variant == chess.variant.FromPosition) ''
     else c.perfType.iconChar
 
   private val i18nKeys = List(

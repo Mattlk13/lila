@@ -3,7 +3,8 @@
   "version": "2.0.0",
   "private": true,
   "description": "lichess.org lobby",
-  "main": "src/main.js",
+  "type": "module",
+  "module": "src/main.js",
   "keywords": [
     "chess",
     "lichess",
@@ -11,15 +12,18 @@
     "seek"
   ],
   "author": "Thibault Duplessis",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-or-later",
   "devDependencies": {
-    "@build/tsProject": "2.0.0",
-    "@types/jquery": "^2.0",
+    "@build/rollupProject": "2.0.0",
     "@types/lichess": "2.0.0"
   },
   "dependencies": {
-    "chessground": "^7.6",
+    "chessground": "^8.1.2",
     "common": "2.0.0",
-    "snabbdom": "ornicar/snabbdom#0.7.1-lichess"
+    "snabbdom": "^3.0.1"
+  },
+  "scripts": {
+    "dev": "rollup --config",
+    "prod": "rollup --config --config-prod"
   }
 }

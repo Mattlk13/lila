@@ -13,15 +13,18 @@ import lila.memo.CacheApi._
  * overloading mongodb.
  */
 final class TournamentStandingApi(
-    lightUserApi: lila.user.LightUserApi,
     tournamentRepo: TournamentRepo,
     playerRepo: PlayerRepo,
     cached: Cached,
-    cacheApi: lila.memo.CacheApi
-)(implicit ec: scala.concurrent.ExecutionContext, mat: akka.stream.Materializer) {
+    cacheApi: lila.memo.CacheApi,
+    lightUserApi: lila.user.LightUserApi
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    mat: akka.stream.Materializer
+) {
 
   private val workQueue = new WorkQueue(
-    buffer = 512,
+    buffer = 256,
     timeout = 5 seconds,
     name = "tournamentStandingApi",
     parallelism = 6
@@ -34,15 +37,16 @@ final class TournamentStandingApi(
       else computeMaybe(tour.id, page)
     } else compute(tour, page)
 
-  private val first = cacheApi[Tournament.ID, JsObject](16, "tournament.page.first") {
+  private val first = cacheApi[Tournament.ID, JsObject](64, "tournament.page.first") {
     _.expireAfterWrite(1 second)
       .buildAsyncFuture { compute(_, 1) }
   }
 
-  private val createdCache = cacheApi[(Tournament.ID, Int), JsObject](2, "tournament.page.createdCache") {
+  // useful for highly anticipated, highly populated tournaments
+  private val createdCache = cacheApi[(Tournament.ID, Int), JsObject](64, "tournament.page.createdCache") {
     _.expireAfterWrite(15 second)
-      .buildAsyncFuture {
-        case (tourId, page) => computeMaybe(tourId, page)
+      .buildAsyncFuture { case (tourId, page) =>
+        computeMaybe(tourId, page)
       }
   }
 
@@ -54,14 +58,13 @@ final class TournamentStandingApi(
   private def computeMaybe(id: Tournament.ID, page: Int): Fu[JsObject] =
     workQueue {
       compute(id, page)
-    } recover {
-      case _: Exception =>
-        lila.mon.tournament.standingOverload.increment()
-        Json.obj(
-          "failed"  -> true,
-          "page"    -> page,
-          "players" -> JsArray()
-        )
+    } recover { case _: Exception =>
+      lila.mon.tournament.standingOverload.increment()
+      Json.obj(
+        "failed"  -> true,
+        "page"    -> page,
+        "players" -> JsArray()
+      )
     }
 
   private def compute(id: Tournament.ID, page: Int): Fu[JsObject] =
@@ -70,13 +73,14 @@ final class TournamentStandingApi(
   private def compute(tour: Tournament, page: Int): Fu[JsObject] =
     for {
       rankedPlayers <- playerRepo.bestByTourWithRankByPage(tour.id, 10, page max 1)
-      sheets <- rankedPlayers
-        .map { p =>
-          cached.sheet(tour, p.player.userId) dmap { p.player.userId -> _ }
-        }
-        .sequenceFu
-        .dmap(_.toMap)
-      players <- rankedPlayers.map(JsonView.playerJson(lightUserApi, sheets)).sequenceFu
+      sheets <-
+        rankedPlayers
+          .map { p =>
+            cached.sheet(tour, p.player.userId) dmap { p.player.userId -> _ }
+          }
+          .sequenceFu
+          .dmap(_.toMap)
+      players <- rankedPlayers.map(JsonView.playerJson(lightUserApi, sheets, tour.streakable)).sequenceFu
     } yield Json.obj(
       "page"    -> page,
       "players" -> players

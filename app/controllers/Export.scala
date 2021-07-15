@@ -2,68 +2,72 @@ package controllers
 
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import scala.concurrent.duration._
-import play.api.mvc.Result
-
 import chess.Color
+import play.api.mvc.Result
+import scala.concurrent.duration._
+
 import lila.app._
 import lila.common.HTTPRequest
 import lila.game.Pov
+import lila.puzzle.Puzzle.Id
 
 final class Export(env: Env) extends LilaController(env) {
 
-  private val ExportRateLimitGlobal = new lila.memo.RateLimit[String](
-    credits = 240,
-    duration = 1 minute,
-    name = "export image global",
+  private val ExportImageRateLimitGlobal = new lila.memo.RateLimit[String](
+    credits = 600,
+    duration = 1.minute,
     key = "export.image.global"
   )
+  private val ExportGifRateLimitGlobal = new lila.memo.RateLimit[String](
+    credits = 240,
+    duration = 1.minute,
+    key = "export.gif.global"
+  )
 
-  def gif(id: String, color: String) = Open { implicit ctx =>
-    OnlyHumansAndFacebookOrTwitter {
-      ExportRateLimitGlobal("-", msg = HTTPRequest.lastRemoteAddress(ctx.req).value) {
-        OptionFuResult(env.game.gameRepo gameWithInitialFen id) {
-          case (game, initialFen) =>
-            val pov = Pov(game, Color(color) | Color.white)
+  def gif(id: String, color: String) =
+    Open { implicit ctx =>
+      OnlyHumansAndFacebookOrTwitter {
+        ExportGifRateLimitGlobal("-", msg = HTTPRequest.ipAddress(ctx.req).value) {
+          OptionFuResult(env.game.gameRepo gameWithInitialFen id) { case (game, initialFen) =>
+            val pov = Pov(game, Color.fromName(color) | Color.white)
             env.game.gifExport.fromPov(pov, initialFen) map
               stream("image/gif") map
               gameImageCacheSeconds(game)
+          }
+        }(rateLimitedFu)
+      }
+    }
+
+  def legacyGameThumbnail(id: String) =
+    Action {
+      MovedPermanently(routes.Export.gameThumbnail(id).url)
+    }
+
+  def gameThumbnail(id: String) =
+    Open { implicit ctx =>
+      ExportImageRateLimitGlobal("-", msg = HTTPRequest.ipAddress(ctx.req).value) {
+        OptionFuResult(env.game.gameRepo game id) { game =>
+          env.game.gifExport.gameThumbnail(game) map
+            stream("image/gif") map
+            gameImageCacheSeconds(game)
         }
-      }
+      }(rateLimitedFu)
     }
-  }
 
-  def legacyGameThumbnail(id: String) = Action {
-    MovedPermanently(routes.Export.gameThumbnail(id).url)
-  }
-
-  def gameThumbnail(id: String) = Open { implicit ctx =>
-    ExportRateLimitGlobal("-", msg = HTTPRequest.lastRemoteAddress(ctx.req).value) {
-      OptionFuResult(env.game.gameRepo game id) { game =>
-        env.game.gifExport.gameThumbnail(game) map
-          stream("image/gif") map
-          gameImageCacheSeconds(game)
-      }
-    }
-  }
-
-  def legacyPuzzleThumbnail(id: Int) = Action {
-    MovedPermanently(routes.Export.puzzleThumbnail(id).url)
-  }
-
-  def puzzleThumbnail(id: Int) = Open { implicit ctx =>
-    ExportRateLimitGlobal("-", msg = HTTPRequest.lastRemoteAddress(ctx.req).value) {
-      OptionFuResult(env.puzzle.api.puzzle find id) { puzzle =>
-        env.game.gifExport.thumbnail(
-          fen = chess.format.FEN(puzzle.fenAfterInitialMove | puzzle.fen),
-          lastMove = puzzle.initialMove.uci.some,
-          orientation = puzzle.color
-        ) map stream("image/gif") map { res =>
-          res.withHeaders(CACHE_CONTROL -> "max-age=86400")
+  def puzzleThumbnail(id: String) =
+    Open { implicit ctx =>
+      ExportImageRateLimitGlobal("-", msg = HTTPRequest.ipAddress(ctx.req).value) {
+        OptionFuResult(env.puzzle.api.puzzle find Id(id)) { puzzle =>
+          env.game.gifExport.thumbnail(
+            fen = puzzle.fenAfterInitialMove,
+            lastMove = puzzle.line.head.uci.some,
+            orientation = puzzle.color
+          ) map stream("image/gif") map { res =>
+            res.withHeaders(CACHE_CONTROL -> "max-age=1209600")
+          }
         }
-      }
+      }(rateLimitedFu)
     }
-  }
 
   private def gameImageCacheSeconds(game: lila.game.Game)(res: Result): Result = {
     val cacheSeconds =

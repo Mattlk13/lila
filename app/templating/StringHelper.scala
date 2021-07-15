@@ -17,8 +17,6 @@ trait StringHelper { self: NumberHelper =>
 
   def urlencode(str: String): String = java.net.URLEncoder.encode(str, "US-ASCII")
 
-  def when(cond: Boolean, str: String) = cond ?? str
-
   private val NumberFirstRegex = """(\d++)\s(.+)""".r
   private val NumberLastRegex  = """\s(\d++)$""".r.unanchored
 
@@ -46,14 +44,15 @@ trait StringHelper { self: NumberHelper =>
   def addQueryParameter(url: String, key: String, value: Any) =
     if (url contains "?") s"$url&$key=$value" else s"$url?$key=$value"
 
-  def fragList(frags: List[Frag], separator: String = ", "): Frag = frags match {
-    case Nil        => emptyFrag
-    case one :: Nil => one
-    case first :: rest =>
-      RawFrag(
-        frag(first :: rest.map { frag(separator, _) }).render
-      )
-  }
+  def fragList(frags: List[Frag], separator: String = ", "): Frag =
+    frags match {
+      case Nil        => emptyFrag
+      case one :: Nil => one
+      case first :: rest =>
+        RawFrag(
+          frag(first :: rest.map { frag(separator, _) }).render
+        )
+    }
 
   implicit def lilaRichString(str: String): LilaRichString = new LilaRichString(str)
 }

@@ -19,17 +19,18 @@ final class TrouperMap[T <: Trouper](
 
   def tell(id: String, msg: Any): Unit = getOrMake(id) ! msg
 
-  def tellIfPresent(id: String, msg: Any): Unit = getIfPresent(id) foreach (_ ! msg)
+  def tellIfPresent(id: String, msg: => Any): Unit = getIfPresent(id) foreach (_ ! msg)
 
-  def tellAll(msg: Any) = troupers.asMap().asScala.foreach(_._2 ! msg)
+  def tellAll(msg: Any) = troupers.asMap.asScala.foreach(_._2 ! msg)
 
   def tellIds(ids: Seq[String], msg: Any): Unit = ids foreach { tell(_, msg) }
 
   def ask[A](id: String)(makeMsg: Promise[A] => Any): Fu[A] = getOrMake(id).ask(makeMsg)
 
-  def askIfPresent[A](id: String)(makeMsg: Promise[A] => Any): Fu[Option[A]] = getIfPresent(id) ?? {
-    _ ask makeMsg dmap some
-  }
+  def askIfPresent[A](id: String)(makeMsg: Promise[A] => Any): Fu[Option[A]] =
+    getIfPresent(id) ?? {
+      _ ask makeMsg dmap some
+    }
 
   def askIfPresentOrZero[A: Zero](id: String)(makeMsg: Promise[A] => Any): Fu[A] =
     askIfPresent(id)(makeMsg) dmap (~_)
@@ -40,11 +41,11 @@ final class TrouperMap[T <: Trouper](
 
   def kill(id: String): Unit = troupers invalidate id
 
-  def killAll(): Unit = troupers.invalidateAll
+  def killAll(): Unit = troupers.invalidateAll()
 
-  def touch(id: String): Unit = troupers getIfPresent id
+  def touch(id: String): Unit = troupers.getIfPresent(id).unit
 
-  def touchOrMake(id: String): Unit = troupers get id
+  def touchOrMake(id: String): Unit = troupers.get(id).unit
 
   private[this] val troupers: LoadingCache[String, T] =
     lila.common.LilaCache
@@ -60,4 +61,6 @@ final class TrouperMap[T <: Trouper](
       })
 
   def monitor(name: String) = lila.mon.caffeineStats(troupers, name)
+
+  def keys: Set[String] = troupers.asMap.asScala.keySet.toSet
 }

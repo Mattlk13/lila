@@ -1,16 +1,15 @@
 package lila.round
 
+import actorApi.{ GetSocketStatus, SocketStatus }
 import akka.actor._
 import com.softwaremill.macwire._
 import io.methvin.play.autoconfig._
 import play.api.Configuration
 import scala.concurrent.duration._
 
-import actorApi.{ GetSocketStatus, SocketStatus }
-import lila.common.{ Bus, Uptime }
 import lila.common.config._
+import lila.common.{ Bus, Uptime }
 import lila.game.{ Game, GameRepo, Pov }
-import lila.hub.actorApi.map.Tell
 import lila.hub.actorApi.round.{ Abort, Resign }
 import lila.hub.actorApi.simul.GetHostIds
 import lila.hub.actors
@@ -20,9 +19,7 @@ import lila.user.User
 private class RoundConfig(
     @ConfigName("collection.note") val noteColl: CollName,
     @ConfigName("collection.forecast") val forecastColl: CollName,
-    @ConfigName("collection.alarm") val alarmColl: CollName,
-    @ConfigName("animation.duration") val animationDuration: AnimationDuration,
-    @ConfigName("moretime") val moretimeDuration: MoretimeDuration
+    @ConfigName("collection.alarm") val alarmColl: CollName
 )
 
 @Module
@@ -36,7 +33,7 @@ final class Env(
     bookmark: actors.Bookmark,
     tournamentApi: actors.TournamentApi,
     chatApi: lila.chat.ChatApi,
-    fishnetPlayer: lila.fishnet.Player,
+    fishnetPlayer: lila.fishnet.FishnetPlayer,
     crosstableApi: lila.game.CrosstableApi,
     playban: lila.playban.PlaybanApi,
     userJsonView: lila.user.JsonView,
@@ -51,12 +48,16 @@ final class Env(
     evalCache: lila.evalCache.EvalCacheApi,
     remoteSocketApi: lila.socket.RemoteSocket,
     isBotSync: lila.common.LightUser.IsBotSync,
-    slackApi: lila.slack.SlackApi,
+    lightUserSync: lila.common.LightUser.GetterSync,
+    ircApi: lila.irc.IrcApi,
     ratingFactors: () => lila.rating.RatingFactors,
     shutdown: akka.actor.CoordinatedShutdown
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, scheduler: akka.actor.Scheduler) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    scheduler: akka.actor.Scheduler
+) {
 
-  implicit private val moretimeLoader  = durationLoader(MoretimeDuration.apply)
   implicit private val animationLoader = durationLoader(AnimationDuration.apply)
   private val config                   = appConfig.get[RoundConfig]("round")(AutoConfig.loader)
 
@@ -69,8 +70,8 @@ final class Env(
       game.whitePlayer.userId.fold(defaultGoneWeight)(goneWeight) zip
         game.blackPlayer.userId.fold(defaultGoneWeight)(goneWeight)
 
-  private val isSimulHost = new IsSimulHost(
-    userId => Bus.ask[Set[User.ID]]("simulGetHosts")(GetHostIds).dmap(_ contains userId)
+  private val isSimulHost = new IsSimulHost(userId =>
+    Bus.ask[Set[User.ID]]("simulGetHosts")(GetHostIds).dmap(_ contains userId)
   )
 
   private val scheduleExpiration = new ScheduleExpiration(game => {
@@ -87,44 +88,39 @@ final class Env(
 
   lazy val roundSocket: RoundSocket = wire[RoundSocket]
 
+  private def resignAllGamesOf(userId: User.ID) =
+    gameRepo allPlaying userId foreach {
+      _ foreach { pov => tellRound(pov.gameId, Resign(pov.playerId)) }
+    }
+
   Bus.subscribeFuns(
-    "roundMapTell" -> {
-      case Tell(id, msg) => tellRound(id, msg)
+    "accountClose" -> { case lila.hub.actorApi.security.CloseAccount(userId) =>
+      resignAllGamesOf(userId)
     },
-    "roundMapTellAll" -> {
-      case msg => roundSocket.rounds.tellAll(msg)
+    "gameStartId" -> { case Game.Id(gameId) =>
+      onStart(gameId)
     },
-    "accountClose" -> {
-      case lila.hub.actorApi.security.CloseAccount(userId) =>
-        gameRepo.allPlaying(userId) map {
-          _ foreach { pov =>
-            tellRound(pov.gameId, Resign(pov.playerId))
-          }
-        }
+    "selfReport" -> { case RoundSocket.Protocol.In.SelfReport(fullId, ip, userId, name) =>
+      selfReport(userId, ip, fullId, name).unit
     },
-    "gameStartId" -> {
-      case Game.Id(gameId) => onStart(gameId)
-    },
-    "selfReport" -> {
-      case RoundSocket.Protocol.In.SelfReport(fullId, ip, userId, name) =>
-        selfReport(userId, ip, fullId, name)
+    "adjustCheater" -> { case lila.hub.actorApi.mod.MarkCheater(userId, true) =>
+      resignAllGamesOf(userId)
     }
   )
 
-  lazy val tellRound: TellRound = new TellRound(
-    (gameId: Game.ID, msg: Any) => roundSocket.rounds.tell(gameId, msg)
+  lazy val tellRound: TellRound = new TellRound((gameId: Game.ID, msg: Any) =>
+    roundSocket.rounds.tell(gameId, msg)
   )
 
-  lazy val onStart: OnStart = new OnStart(
-    (gameId: Game.ID) =>
-      proxyRepo game gameId foreach {
-        _ foreach { game =>
-          Bus.publish(lila.game.actorApi.StartGame(game), "startGame")
-          game.userIds foreach { userId =>
-            Bus.publish(lila.game.actorApi.UserStartGame(userId, game), s"userStartGame:$userId")
-          }
+  lazy val onStart: OnStart = new OnStart((gameId: Game.ID) =>
+    proxyRepo game gameId foreach {
+      _ foreach { game =>
+        Bus.publish(lila.game.actorApi.StartGame(game), "startGame")
+        game.userIds foreach { userId =>
+          Bus.publish(lila.game.actorApi.StartGame(game), s"userStartGame:$userId")
         }
       }
+    }
   )
 
   lazy val proxyRepo: GameProxyRepo = wire[GameProxyRepo]
@@ -173,13 +169,17 @@ final class Env(
 
   system.actorOf(Props(wire[Titivate]), name = "titivate")
 
-  new CorresAlarm(db(config.alarmColl), isUserPresent, proxyRepo.game _)
+  new CorresAlarm(db(config.alarmColl), isUserPresent, proxyRepo.game)
 
   private lazy val takebacker = wire[Takebacker]
 
   private lazy val moretimer = wire[Moretimer]
 
-  val tvBroadcast = system.actorOf(Props(classOf[TvBroadcast]))
+  val playing = wire[PlayingUsers]
+
+  val tvBroadcast = system.actorOf(Props(wire[TvBroadcast]))
+
+  val apiMoveStream = wire[ApiMoveStream]
 
   def resign(pov: Pov): Unit =
     if (pov.game.abortable) tellRound(pov.gameId, Abort(pov.playerId))

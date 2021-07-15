@@ -6,6 +6,7 @@ import scala.concurrent.duration._
 
 import lila.db.dsl._
 import lila.memo.CacheApi._
+import lila.user.User
 
 final class EventApi(
     coll: Coll,
@@ -21,7 +22,7 @@ final class EventApi(
         lila.i18n.I18nLangPicker.allFromRequestHeaders(req).exists {
           _.language == event.lang.language
         }
-      }
+      }.take(3)
     }
 
   private val promotable = cacheApi.unit[List[Event]] {
@@ -30,7 +31,7 @@ final class EventApi(
   }
 
   def fetchPromotable: Fu[List[Event]] =
-    coll.ext
+    coll
       .find(
         $doc(
           "enabled" -> true,
@@ -38,33 +39,36 @@ final class EventApi(
         )
       )
       .sort($sort asc "startsAt")
-      .list[Event](10)
+      .cursor[Event]()
+      .list(50)
       .dmap {
-        _.filter(_.featureNow) take 3
+        _.filter(_.featureNow) take 10
       }
 
-  def list = coll.ext.find($empty).sort($doc("startsAt" -> -1)).list[Event](50)
+  def list = coll.find($empty).sort($doc("startsAt" -> -1)).cursor[Event]().list(50)
 
   def oneEnabled(id: String) = coll.byId[Event](id).map(_.filter(_.enabled))
 
   def one(id: String) = coll.byId[Event](id)
 
-  def editForm(event: Event) = EventForm.form fill {
-    EventForm.Data make event
-  }
+  def editForm(event: Event) =
+    EventForm.form fill {
+      EventForm.Data make event
+    }
 
-  def update(old: Event, data: EventForm.Data) =
-    coll.update.one($id(old.id), data update old) >>- promotable.invalidateUnit
+  def update(old: Event, data: EventForm.Data, by: User): Fu[Int] =
+    (coll.update.one($id(old.id), data.update(old, by)) >>- promotable.invalidateUnit()).map(_.n)
 
   def createForm = EventForm.form
 
   def create(data: EventForm.Data, userId: String): Fu[Event] = {
     val event = data make userId
-    coll.insert.one(event) >>- promotable.invalidateUnit inject event
+    coll.insert.one(event) >>- promotable.invalidateUnit() inject event
   }
 
-  def clone(old: Event) = old.copy(
-    title = s"${old.title} (clone)",
-    startsAt = DateTime.now plusDays 7
-  )
+  def clone(old: Event) =
+    old.copy(
+      title = s"${old.title} (clone)",
+      startsAt = DateTime.now plusDays 7
+    )
 }

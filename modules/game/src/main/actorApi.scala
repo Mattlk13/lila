@@ -4,7 +4,6 @@ package actorApi
 import lila.user.User
 
 case class StartGame(game: Game)
-case class UserStartGame(userId: String, game: Game)
 
 case class FinishGame(
     game: Game,
@@ -28,8 +27,7 @@ case class MoveGameEvent(
     move: String
 )
 object MoveGameEvent {
-  def makeChan(gameId: Game.ID)          = s"moveEvent:$gameId"
-  def makeBusEvent(event: MoveGameEvent) = lila.common.Bus.Event(event, makeChan(event.game.id))
+  def makeChan(gameId: Game.ID) = s"moveEvent:$gameId"
 }
 
 case class BoardDrawOffer(pov: Pov)

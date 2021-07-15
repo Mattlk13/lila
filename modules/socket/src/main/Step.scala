@@ -1,15 +1,14 @@
 package lila.socket
 
-import chess.format.Uci
+import chess.format.{ FEN, Uci }
 import chess.Pos
 import chess.variant.Crazyhouse
-
 import play.api.libs.json._
 
 case class Step(
     ply: Int,
     move: Option[Step.Move],
-    fen: String,
+    fen: FEN,
     check: Boolean,
     // None when not computed yet
     dests: Option[Map[Pos, List[Pos]]],
@@ -18,7 +17,7 @@ case class Step(
 ) {
 
   // who's color plays next
-  def color = chess.Color(ply % 2 == 0)
+  def color = chess.Color.fromPly(ply)
 
   def toJson = Step.stepJsonWriter writes this
 }
@@ -45,6 +44,7 @@ object Step {
   }
 
   implicit val stepJsonWriter: Writes[Step] = Writes { step =>
+    import lila.common.Json._
     import step._
     Json
       .obj(
@@ -54,14 +54,20 @@ object Step {
         "fen" -> fen
       )
       .add("check", check)
-      .add("dests", dests.map {
-        _.map {
-          case (orig, dests) => s"${orig.piotr}${dests.map(_.piotr).mkString}"
-        }.mkString(" ")
-      })
-      .add("drops", drops.map { drops =>
-        JsString(drops.map(_.key).mkString)
-      })
+      .add(
+        "dests",
+        dests.map {
+          _.map { case (orig, dests) =>
+            s"${orig.piotr}${dests.map(_.piotr).mkString}"
+          }.mkString(" ")
+        }
+      )
+      .add(
+        "drops",
+        drops.map { drops =>
+          JsString(drops.map(_.key).mkString)
+        }
+      )
       .add("crazy", crazyData)
   }
 }

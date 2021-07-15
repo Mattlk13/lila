@@ -33,11 +33,6 @@ private object BSONHandlers {
   implicit val TeamNameHandler   = stringAnyValHandler[TeamJoined.Name](_.value, TeamJoined.Name.apply)
   implicit val TeamJoinedHandler = Macros.handler[TeamJoined]
 
-  implicit val TeamMadeOwnerIdHandler = stringAnyValHandler[TeamMadeOwner.Id](_.value, TeamMadeOwner.Id.apply)
-  implicit val TeamMadeOwnerNameHandler =
-    stringAnyValHandler[TeamMadeOwner.Name](_.value, TeamMadeOwner.Name.apply)
-  implicit val TeamMadeOwnerHandler = Macros.handler[TeamMadeOwner]
-
   implicit val GameEndGameIdHandler = stringAnyValHandler[GameEnd.GameId](_.value, GameEnd.GameId.apply)
   implicit val GameEndOpponentHandler =
     stringAnyValHandler[GameEnd.OpponentId](_.value, GameEnd.OpponentId.apply)
@@ -54,7 +49,7 @@ private object BSONHandlers {
   implicit val IrwinDoneHandler    = Macros.handler[IrwinDone]
   implicit val GenericLinkHandler  = Macros.handler[GenericLink]
 
-  implicit val ColorBSONHandler = BSONBooleanHandler.as[Color](Color.apply, _.white)
+  implicit val ColorBSONHandler = BSONBooleanHandler.as[Color](Color.fromWhite, _.white)
 
   implicit val NotificationContentHandler = new BSON[NotificationContent] {
 
@@ -72,7 +67,6 @@ private object BSONHandlers {
           $doc("invitedBy" -> invitedBy, "studyName" -> studyName, "studyId" -> studyId)
         case p: PrivateMessage             => PrivateMessageHandler.writeTry(p).get
         case t: TeamJoined                 => TeamJoinedHandler.writeTry(t).get
-        case o: TeamMadeOwner              => TeamMadeOwnerHandler.writeTry(o).get
         case x: TitledTournamentInvitation => TitledTournamentInvitationHandler.writeTry(x).get
         case x: GameEnd                    => GameEndHandler.writeTry(x).get
         case x: PlanStart                  => PlanStartHandler.writeTry(x).get
@@ -104,23 +98,23 @@ private object BSONHandlers {
       InvitedToStudy(invitedBy, studyName, studyId)
     }
 
-    def reads(reader: Reader): NotificationContent = reader.str("type") match {
-      case "mention"        => readMentionedNotification(reader)
-      case "invitedStudy"   => readInvitedStudyNotification(reader)
-      case "privateMessage" => PrivateMessageHandler.readTry(reader.doc).get
-      case "teamJoined"     => TeamJoinedHandler.readTry(reader.doc).get
-      case "teamMadeOwner"  => TeamMadeOwnerHandler.readTry(reader.doc).get
-      case "titledTourney"  => TitledTournamentInvitationHandler.readTry(reader.doc).get
-      case "gameEnd"        => GameEndHandler.readTry(reader.doc).get
-      case "planStart"      => PlanStartHandler.readTry(reader.doc).get
-      case "planExpire"     => PlanExpireHandler.readTry(reader.doc).get
-      case "ratingRefund"   => RatingRefundHandler.readTry(reader.doc).get
-      case "reportedBanned" => ReportedBanned
-      case "coachReview"    => CoachReview
-      case "corresAlarm"    => CorresAlarmHandler.readTry(reader.doc).get
-      case "irwinDone"      => IrwinDoneHandler.readTry(reader.doc).get
-      case "genericLink"    => GenericLinkHandler.readTry(reader.doc).get
-    }
+    def reads(reader: Reader): NotificationContent =
+      reader.str("type") match {
+        case "mention"        => readMentionedNotification(reader)
+        case "invitedStudy"   => readInvitedStudyNotification(reader)
+        case "privateMessage" => PrivateMessageHandler.readTry(reader.doc).get
+        case "teamJoined"     => TeamJoinedHandler.readTry(reader.doc).get
+        case "titledTourney"  => TitledTournamentInvitationHandler.readTry(reader.doc).get
+        case "gameEnd"        => GameEndHandler.readTry(reader.doc).get
+        case "planStart"      => PlanStartHandler.readTry(reader.doc).get
+        case "planExpire"     => PlanExpireHandler.readTry(reader.doc).get
+        case "ratingRefund"   => RatingRefundHandler.readTry(reader.doc).get
+        case "reportedBanned" => ReportedBanned
+        case "coachReview"    => CoachReview
+        case "corresAlarm"    => CorresAlarmHandler.readTry(reader.doc).get
+        case "irwinDone"      => IrwinDoneHandler.readTry(reader.doc).get
+        case "genericLink"    => GenericLinkHandler.readTry(reader.doc).get
+      }
 
     def writes(writer: Writer, n: NotificationContent): dsl.Bdoc = writeNotificationContent(n)
   }

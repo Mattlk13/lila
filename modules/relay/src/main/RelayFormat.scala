@@ -2,44 +2,45 @@ package lila.relay
 
 import io.lemonlabs.uri._
 import play.api.libs.json._
-import play.api.libs.ws.WSClient
+import play.api.libs.ws.StandaloneWSClient
 import scala.concurrent.duration._
 
 import lila.study.MultiPgn
 import lila.memo.CacheApi
 import lila.memo.CacheApi._
 
-final private class RelayFormatApi(ws: WSClient, cacheApi: CacheApi)(
-    implicit ec: scala.concurrent.ExecutionContext
+final private class RelayFormatApi(ws: StandaloneWSClient, cacheApi: CacheApi)(implicit
+    ec: scala.concurrent.ExecutionContext
 ) {
 
   import RelayFormat._
-  import Relay.Sync.UpstreamWithRound
+  import RelayRound.Sync.UpstreamUrl
 
-  private val cache = cacheApi[UpstreamWithRound, RelayFormat](8, "relay.format") {
+  private val cache = cacheApi[UpstreamUrl.WithRound, RelayFormat](8, "relay.format") {
     _.refreshAfterWrite(10 minutes)
       .expireAfterAccess(20 minutes)
       .buildAsyncFuture(guessFormat)
   }
 
-  def get(upstream: UpstreamWithRound): Fu[RelayFormat] = cache get upstream
+  def get(upstream: UpstreamUrl.WithRound): Fu[RelayFormat] = cache get upstream
 
-  def refresh(upstream: UpstreamWithRound): Unit = cache invalidate upstream
+  def refresh(upstream: UpstreamUrl.WithRound): Unit = cache invalidate upstream
 
-  private def guessFormat(upstream: UpstreamWithRound): Fu[RelayFormat] = {
+  private def guessFormat(upstream: UpstreamUrl.WithRound): Fu[RelayFormat] = {
 
     val originalUrl = Url parse upstream.url
 
     // http://view.livechesscloud.com/ed5fb586-f549-4029-a470-d590f8e30c76
-    def guessLcc(url: Url): Fu[Option[RelayFormat]] = url.toString match {
-      case Relay.Sync.LccRegex(id) =>
-        guessManyFiles(
-          Url.parse(
-            s"http://1.pool.livechesscloud.com/get/$id/round-${upstream.round | 1}/index.json"
+    def guessLcc(url: Url): Fu[Option[RelayFormat]] =
+      url.toString match {
+        case UpstreamUrl.LccRegex(id) =>
+          guessManyFiles(
+            Url.parse(
+              s"http://1.pool.livechesscloud.com/get/$id/round-${upstream.round | 1}/index.json"
+            )
           )
-        )
-      case _ => fuccess(none)
-    }
+        case _ => fuccess(none)
+      }
 
     def guessSingleFile(url: Url): Fu[Option[RelayFormat]] =
       lila.common.Future.find(
@@ -60,8 +61,8 @@ final private class RelayFormatApi(ws: WSClient, cacheApi: CacheApi)(
           val pgnUrl  = (n: Int) => pgnDoc(replaceLastPart(index, s"game-$n.pgn"))
           looksLikeJson(jsonUrl(1).url).map(_ option jsonUrl) orElse
             looksLikePgn(pgnUrl(1).url).map(_ option pgnUrl) dmap2 {
-            ManyFiles(index, _)
-          }
+              ManyFiles(index, _)
+            }
         }
       }
 
@@ -81,9 +82,10 @@ final private class RelayFormatApi(ws: WSClient, cacheApi: CacheApi)(
         case _                        => none
       }
 
-  private def looksLikePgn(body: String): Boolean = MultiPgn.split(body, 1).value.headOption ?? { pgn =>
-    lila.study.PgnImport(pgn, Nil).isSuccess
-  }
+  private def looksLikePgn(body: String): Boolean =
+    MultiPgn.split(body, 1).value.headOption ?? { pgn =>
+      lila.study.PgnImport(pgn, Nil).isValid
+    }
   private def looksLikePgn(url: Url): Fu[Boolean] = httpGet(url).map { _ exists looksLikePgn }
 
   private def looksLikeJson(body: String): Boolean =

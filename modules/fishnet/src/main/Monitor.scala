@@ -3,14 +3,26 @@ package lila.fishnet
 import scala.concurrent.duration._
 
 final private class Monitor(
-    repo: FishnetRepo
-)(implicit ec: scala.concurrent.ExecutionContext, system: akka.actor.ActorSystem) {
+    repo: FishnetRepo,
+    cacheApi: lila.memo.CacheApi
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: akka.actor.ActorSystem
+) {
+
+  val statusCache = cacheApi.unit[Monitor.Status] {
+    _.refreshAfterWrite(1 minute)
+      .buildAsyncFuture { _ =>
+        repo.status.compute
+      }
+  }
 
   private val monBy = lila.mon.fishnet.analysis.by
 
-  private def sumOf[A](items: List[A])(f: A => Option[Int]) = items.foldLeft(0) {
-    case (acc, a) => acc + f(a).getOrElse(0)
-  }
+  private def sumOf[A](items: List[A])(f: A => Option[Int]) =
+    items.foldLeft(0) { case (acc, a) =>
+      acc + f(a).getOrElse(0)
+    }
 
   private[fishnet] def analysis(
       work: Work.Analysis,
@@ -19,46 +31,45 @@ final private class Monitor(
   ) = {
     Monitor.success(work, client)
 
-    val threads = result.stockfish.options.threadsInt
-    val userId  = client.userId.value
+    val userId = client.userId.value
 
-    result.stockfish.options.hashInt foreach { monBy.hash(userId).update(_) }
-    result.stockfish.options.threadsInt foreach { monBy.threads(userId).update(_) }
+    monBy.totalSecond(userId).increment(sumOf(result.evaluations)(_.time) / 1000)
 
-    monBy.totalSecond(userId).increment(sumOf(result.evaluations)(_.time) * threads.|(1) / 1000)
-    monBy
-      .totalMeganode(userId)
-      .increment(sumOf(result.evaluations) { eval =>
-        eval.nodes ifFalse eval.mateFound
-      } / 1000000)
+    if (result.stockfish.isNnue)
+      monBy
+        .totalMeganode(userId)
+        .increment(sumOf(result.evaluations) { eval =>
+          eval.nodes ifFalse eval.mateFound
+        } / 1000000)
 
     val metaMovesSample = sample(result.evaluations.drop(6).filterNot(_.mateFound), 100)
     def avgOf(f: JsonApi.Request.Evaluation => Option[Int]): Option[Int] = {
-      val (sum, nb) = metaMovesSample.foldLeft(0 -> 0) {
-        case ((sum, nb), move) =>
-          f(move).fold(sum -> nb) { v =>
-            (sum + v, nb + 1)
-          }
+      val (sum, nb) = metaMovesSample.foldLeft(0 -> 0) { case ((sum, nb), move) =>
+        f(move).fold(sum -> nb) { v =>
+          (sum + v, nb + 1)
+        }
       }
       (nb > 0) option (sum / nb)
     }
     avgOf(_.time) foreach { monBy.movetime(userId).record(_) }
-    avgOf(_.nodes) foreach { monBy.node(userId).record(_) }
-    avgOf(_.cappedNps) foreach { monBy.nps(userId).record(_) }
+    if (result.stockfish.isNnue) {
+      avgOf(_.nodes) foreach { monBy.node(userId).record(_) }
+      avgOf(_.cappedNps) foreach { monBy.nps(userId).record(_) }
+    }
     avgOf(_.depth) foreach { monBy.depth(userId).record(_) }
     avgOf(_.pv.size.some) foreach { monBy.pvSize(userId).record(_) }
 
     val significantPvSizes =
-      result.evaluations.filterNot(_.mateFound).filterNot(_.deadDraw).map(_.pv.size)
+      result.evaluations.withFilter(e => !(e.mateFound || e.deadDraw)).map(_.pv.size)
 
-    monBy.pv(userId, false).increment(significantPvSizes.count(_ < 3))
-    monBy.pv(userId, true).increment(significantPvSizes.count(_ >= 6))
+    monBy.pv(userId, isLong = false).increment(significantPvSizes.count(_ < 3))
+    monBy.pv(userId, isLong = true).increment(significantPvSizes.count(_ >= 6))
   }
 
   private def sample[A](elems: List[A], n: Int) =
-    if (elems.size <= n) elems else scala.util.Random shuffle elems take n
+    if (elems.sizeIs <= n) elems else lila.common.ThreadLocalRandom shuffle elems take n
 
-  private def monitorClients(): Unit =
+  private def monitorClients(): Funit =
     repo.allRecentClients map { clients =>
       import lila.mon.fishnet.client._
 
@@ -67,35 +78,32 @@ final private class Monitor(
 
       val instances = clients.flatMap(_.instance)
 
-      instances.map(_.version.value).groupBy(identity).view.mapValues(_.size) foreach {
-        case (v, nb) => version(v).update(nb)
+      instances.groupMapReduce(_.version.value)(_ => 1)(_ + _) foreach { case (v, nb) =>
+        version(v).update(nb)
       }
-      instances.map(_.engines.stockfish.name).groupBy(identity).view.mapValues(_.size) foreach {
-        case (s, nb) => stockfish(s).update(nb)
-      }
-      instances.map(_.python.value).groupBy(identity).view.mapValues(_.size) foreach {
-        case (s, nb) => python(s).update(nb)
-      }
-    } addEffectAnyway scheduleClients
+    }
 
-  private def monitorWork(): Unit = {
+  private def monitorStatus(): Funit =
+    statusCache.get {} map { c =>
+      lila.mon.fishnet.work("queued", "system").update(c.system.queued)
+      lila.mon.fishnet.work("queued", "user").update(c.user.queued)
+      lila.mon.fishnet.work("acquired", "system").update(c.system.acquired)
+      lila.mon.fishnet.work("acquired", "user").update(c.user.acquired)
+      lila.mon.fishnet.oldest("system").update(c.system.oldest)
+      lila.mon.fishnet.oldest("user").update(c.user.oldest)
+      ()
+    }
 
-    import lila.mon.fishnet.work._
-
-    repo.countAnalysis(acquired = false).map { queued.update(_) } >>
-      repo.countAnalysis(acquired = true).map { acquired.update(_) } >>
-      repo.countUserAnalysis.map { forUser.update(_) }
-
-  } addEffectAnyway scheduleWork
-
-  private def scheduleClients = system.scheduler.scheduleOnce(1 minute)(monitorClients)
-  private def scheduleWork    = system.scheduler.scheduleOnce(20 seconds)(monitorWork)
-
-  scheduleClients
-  scheduleWork
+  system.scheduler.scheduleWithFixedDelay(1 minute, 1 minute) { () =>
+    monitorClients() >> monitorStatus()
+    ()
+  }
 }
 
 object Monitor {
+
+  case class StatusFor(acquired: Int, queued: Int, oldest: Int)
+  case class Status(user: StatusFor, system: StatusFor)
 
   private val monResult = lila.mon.fishnet.client.result
 

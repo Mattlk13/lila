@@ -33,7 +33,7 @@ class RawHtmlTest extends Specification {
     }
     "skip buggy url like http://foo@bar" in {
       val url = "http://foo@bar"
-      addLinks(s"""link to $url here""") must not contain ("""href="http://foo"""")
+      addLinks(s"""link to $url here""") must not contain """href="http://foo""""
     }
     "ignore image from untrusted host" in {
       val url = "http://zombo.com/pic.jpg"
@@ -89,7 +89,9 @@ class RawHtmlTest extends Specification {
     }
 
     "handle multiple links" in {
-      addLinks("@foo blah lichess.org") must_== """<a href="/@/foo">@foo</a> blah <a href="/">lichess.org</a>"""
+      addLinks(
+        "@foo blah lichess.org"
+      ) must_== """<a href="/@/foo">@foo</a> blah <a href="/">lichess.org</a>"""
       addLinks("b foo.com blah lichess.org") must_==
         """b <a rel="nofollow noopener noreferrer" href="https://foo.com" target="_blank">foo.com</a> blah <a href="/">lichess.org</a>"""
     }
@@ -131,20 +133,20 @@ class RawHtmlTest extends Specification {
   "markdown links" should {
     "add http links" in {
       val md = "[Example](http://example.com)"
-      markdownLinks(md) must_== """<a href="http://example.com">Example</a>"""
+      justMarkdownLinks(md) must_== """<a href="http://example.com">Example</a>"""
     }
 
     "only allow safe protocols" in {
       val md = "A [link](javascript:powned) that is not safe."
-      markdownLinks(md) must_== md
+      justMarkdownLinks(md) must_== md
     }
 
-    "addBr" in {
-      markdownLinks("\n") must_== "<br />"
+    "not addBr" in {
+      justMarkdownLinks("\n") must_== "\n"
     }
 
-    "escape html" in {
-      markdownLinks("&") must_== "&amp;"
+    "not escape html" in {
+      justMarkdownLinks("&") must_== "&"
     }
   }
 
@@ -168,6 +170,36 @@ class RawHtmlTest extends Specification {
       copyLinkConsistency("lichess.org/@/foo/games")
       copyLinkConsistency("@foo/games")
       copyLinkConsistency("@foo")
+    }
+  }
+
+  "nl2br" should {
+    "convert windows style newlines into <br>" in {
+      nl2br("hello\r\nworld") must_== "hello<br>world"
+      nl2br("\r\nworld") must_== "<br>world"
+      nl2br("hello\r\n") must_== "hello<br>"
+      nl2br("hello\r\nworld\r\nagain") must_== "hello<br>world<br>again"
+    }
+
+    "convert posix style newlines into <br>" in {
+      nl2br("hello\nworld") must_== "hello<br>world"
+      nl2br("\nworld") must_== "<br>world"
+      nl2br("hello\n") must_== "hello<br>"
+      nl2br("hello\nworld\nagain") must_== "hello<br>world<br>again"
+    }
+
+    "not output more than two consecutive <br> chars" in {
+      nl2br("\n\n\n\ndef") must_== "<br><br>def"
+      nl2br("abc\n\n\n\n") must_== "abc<br><br>"
+      nl2br("abc\n\n\n\ndef") must_== "abc<br><br>def"
+      nl2br("abc\n\n\n\ndef\n\n\n\nabc\n\n\n\ndef") must_== "abc<br><br>def<br><br>abc<br><br>def"
+
+      nl2br("\r\n\r\n\r\n\ndef") must_== "<br><br>def"
+      nl2br("abc\r\n\r\n\r\n\r\n") must_== "abc<br><br>"
+      nl2br("abc\r\n\r\n\r\n\r\ndef") must_== "abc<br><br>def"
+      nl2br(
+        "abc\r\n\r\n\r\n\r\ndef\r\n\r\n\r\n\r\nabc\r\n\r\n\r\n\r\ndef"
+      ) must_== "abc<br><br>def<br><br>abc<br><br>def"
     }
   }
 }

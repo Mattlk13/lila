@@ -24,7 +24,6 @@
   <string name="visibleByBothStudentsAndTeachers">Visibile sia dagli insegnanti che dagli studenti della classe</string>
   <string name="teachersOfTheClass">Insegnanti della classe</string>
   <string name="addLichessUsernames">Aggiungi i nomi utente di Lichess per invitarli come insegnanti. Uno per riga.</string>
-  <string name="theyMustFirstApply">Devono prima candidarsi per essere professori di Lichess.</string>
   <string name="resetPassword">Reimposta password</string>
   <string name="makeSureToCopy">Assicurati di copiare o segnarti la password ora. Non sarai più in grado di vederla!</string>
   <string name="passwordX">Password: %s</string>
@@ -51,6 +50,13 @@ Password: %3$s</string>
   <string name="generateANewUsername">Genera un nuovo nome utente</string>
   <string name="welcomeToClass">Benvenuto nella lezione: %s
 Questo è il link per accedere alla lezione.</string>
+  <string name="invitationToClass">Sei invitato a unirti alla classe \"%s\" come studente.</string>
+  <string name="clickToViewInvitation">Clicca sul link per vedere l\'invito:</string>
+  <plurals name="nbPendingInvitations">
+    <item quantity="one">Un invito in sospeso</item>
+    <item quantity="other">%s inviti in sospeso</item>
+  </plurals>
+  <string name="noPendingInvitations">Nessun invito in sospeso</string>
   <string name="onlyVisibleToTeachers">Visibile solo agli insegnanti della classe</string>
   <string name="lastActiveDate">Attivo</string>
   <string name="managed">Gestito</string>
@@ -61,6 +67,10 @@ Questo è il link per accedere alla lezione.</string>
   <string name="releaseDesc1">Un account rilasciato non può essere nuovamente gestito. Lo studente sarà in grado di cambiare la modalità bambino e resettare la password.</string>
   <string name="releaseDesc2">Lo studente rimarrà in classe dopo il rilascio del suo account.</string>
   <string name="realUniqueEmail">Reale e univoco indirizzo email dello studente. Invieremo una email di conferma con un link di rilascio dell\'account.</string>
+  <string name="closeStudent">Chiudi profilo</string>
+  <string name="closeTheAccount">Chiudi il profilo dello studente permanentemente.</string>
+  <string name="closeDesc1">Lo studente non potrà usare di nuovo questo profilo. La chiusura è finale. Assicurati che lo studente comprenda e acconsenta.</string>
+  <string name="closeDesc2">Potresti piuttosto voler dare controllo allo studente sul profilo, così che possa continuare a usarlo.</string>
   <string name="teachers">Insegnanti</string>
   <plurals name="nbTeachers">
     <item quantity="one">Insegnante</item>
@@ -70,6 +80,7 @@ Questo è il link per accedere alla lezione.</string>
     <item quantity="one">Studente</item>
     <item quantity="other">%s studenti</item>
   </plurals>
+  <string name="students">Studenti</string>
   <string name="progress">Progresso</string>
   <string name="noStudents">Non ci sono ancora studenti in classe.</string>
   <string name="noRemovedStudents">Nessuno studente rimosso.</string>
@@ -85,5 +96,4 @@ Questo è il link per accedere alla lezione.</string>
   <string name="newsEdit1">Tutte le news di classe in un unico campo.</string>
   <string name="newsEdit2">Aggiungi le notizie recenti in alto. Non eliminare le notizie precedenti.</string>
   <string name="newsEdit3">Separa le notizie con --- mostrerà una linea orizzontale.</string>
-  <string name="markdownAvailable">%s è disponibile per la sintassi più avanzata.</string>
 </resources>

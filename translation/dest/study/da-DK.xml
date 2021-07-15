@@ -15,6 +15,7 @@
   <string name="dateAddedOldest">Dato tilføjet (ældste)</string>
   <string name="recentlyUpdated">Nyligt opdateret</string>
   <string name="mostPopular">Mest populære</string>
+  <string name="alphabetical">Alfabetisk</string>
   <string name="addNewChapter">Tilføj et nyt kapitel</string>
   <plurals name="nbChapters">
     <item quantity="one">%s kapitel</item>
@@ -58,14 +59,17 @@
   <string name="shareAndExport">Del &amp; eksport</string>
   <string name="cloneStudy">Klon</string>
   <string name="studyPgn">Studie PGN</string>
+  <string name="downloadAllGames">Download alle partier</string>
   <string name="chapterPgn">Kapitel PGN</string>
+  <string name="downloadGame">Download parti</string>
   <string name="studyUrl">Studie URL</string>
   <string name="currentChapterUrl">Nuværende kapitel URL</string>
-  <string name="youCanPasteThisInTheForumToEmbedTheChapter">Du kan indsætte dette i forummet for at indlejre kapitlet</string>
+  <string name="youCanPasteThisInTheForumToEmbed">Du kan indsætte dette i forummet for at indlejre</string>
   <string name="startAtInitialPosition">Start ved indledende position</string>
   <string name="startAtX">Start ved %s</string>
-  <string name="embedThisChapter">Indlejr dette kapitel på din hjemmeside eller blog</string>
-  <string name="readMoreAboutEmbeddingAStudyChapter">Læs mere om at indlejre et studiekapitel</string>
+  <string name="embedInYourWebsite">Indlejr på din hjemmeside eller blog</string>
+  <string name="readMoreAboutEmbedding">Læs mere om indlejring</string>
+  <string name="onlyPublicStudiesCanBeEmbedded">Kun offentlige studier kan indlejres!</string>
   <string name="open">Åbn</string>
   <string name="xBroughtToYouByY">%1$s bragt til dig af %2$s</string>
   <string name="studyNotFound">Studie ikke fundet</string>
@@ -100,7 +104,7 @@
   <string name="urlOfTheGame">URL for partiet</string>
   <string name="loadAGameFromXOrY">Indlæs et parti fra %1$s eller %2$s</string>
   <string name="createChapter">Opret kapitel</string>
-  <string name="configureLiveBroadcast">Konfigurer live-transmission</string>
+  <string name="configureLiveBroadcast">Konfigurer live-udsendelse</string>
   <string name="createStudy">Opret studie</string>
   <string name="editStudy">Rediger studie</string>
   <string name="visibility">Synlighed</string>
@@ -124,4 +128,31 @@
   <string name="deleteStudy">Slet studie</string>
   <string name="deleteTheEntireStudy">Slet hele studiet? Du kan ikke fortryde!</string>
   <string name="whereDoYouWantToStudyThat">Hvor vil du studere det?</string>
+  <string name="goodMove">Godt træk</string>
+  <string name="mistake">Fejl</string>
+  <string name="brilliantMove">Fremragende træk</string>
+  <string name="blunder">Brøler</string>
+  <string name="interestingMove">Interessant træk</string>
+  <string name="dubiousMove" comment="dubiousMove&#10;A questionable move.">Tvivlsomt træk</string>
+  <string name="onlyMove" comment="onlyMove&#10;The only possible move. This is a label that can be placed in a study of a past game. It may not technically be the only move, but the only feasible one.">Eneste mulige træk</string>
+  <string name="zugzwang" comment="zugzwang&#10;What zugzwang is: https://lichess.org/practice/intermediate-tactics/zugzwang/9cKgYrHb/ybYJ9gNa&#10;&#10;This specific string is a label that can be applied to a position in a study, to indicate one side is in zugzwang.">Zugzwang</string>
+  <string name="equalPosition">Lige position</string>
+  <string name="unclearPosition" comment="unclearPosition&#10;It is unclear who is winning or losing.">Uafklaret position</string>
+  <string name="whiteIsSlightlyBetter">Hvid står lidt bedre</string>
+  <string name="blackIsSlightlyBetter">Sort står lidt bedre</string>
+  <string name="whiteIsBetter">Hvid står bedre</string>
+  <string name="blackIsBetter">Sort står bedre</string>
+  <string name="whiteIsWinning">Hvid vinder</string>
+  <string name="blackIsWinning">Sort vinder</string>
+  <string name="novelty" comment="novelty&#10;&#10;A move in the opening that has not been played before.&#10;https://en.wikipedia.org/wiki/Glossary_of_chess#theoretical_novelty">Nyfunden</string>
+  <string name="development" comment="development&#10;Used in studies - shows that the player made a developing move (e.g. pushing pawns to open their bishops in the opening).">Udvikling</string>
+  <string name="initiative">Initiativ</string>
+  <string name="attack" comment="attack&#10;A label that can be applied to a position in a Lichess study. Noun.">Angreb</string>
+  <string name="counterplay" comment="counterplay&#10;A label that can be applied to a position in a Lichess study. Noun.&#10;&#10;Generally describes a defending player who is under attack, and makes an attacking move elsewhere.">Modspil</string>
+  <string name="timeTrouble" comment="timeTrouble&#10;A label that can be applied to a position in a Lichess study. Noun. Indicates that a player had little time to think and make this move (clock was running low).">Tidsproblemer</string>
+  <string name="withCompensation" comment="withCompensation&#10;&#10;Compensation is the short-term positional advantage a player has in exchange for typically material disadvantage. Short term advantages involve initiative and attack.&#10;https://en.wikipedia.org/wiki/Compensation_(chess)">Med kompensation</string>
+  <string name="withTheIdea" comment="withTheIdea&#10;A label that can be applied to a position in a Lichess study. Noun.&#10;&#10;Shows that the player was following the theory around an opening, even after the initial opening moves.">Med ideen</string>
+  <string name="nextChapter">Næste kapitel</string>
+  <string name="prevChapter">Forrige kapitel</string>
+  <string name="studyActions">Studiehandlinger</string>
 </resources>

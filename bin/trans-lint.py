@@ -26,8 +26,10 @@ class Report:
 
 
 def short_lang(lang):
-    if lang in ["ne-NP", "la-LA"]:
+    if lang in ["ne-NP", "la-LA", "nn-NO", "zh-CN", "ur-PK", "zh-TW", "tlh-AA", "ml-IN", "pt-BR", "tt-RU", "de-CH"]:
         return lang.replace("-", "").lower()
+    elif lang == "kab-DZ":
+        return "kaby"
     else:
         return lang.split("-")[0]
 
@@ -35,8 +37,14 @@ def short_lang(lang):
 def western_punctuation(lang):
     return lang not in [
         "zh-TW", "zh-CN", "hi-IN", "ja-JP", "bn-BD", "ar-SA", "th-TH", "ne-NP",
-        "ko-KR", "ur-PK", "hy-AM", "ml-IN", "ka-GE", "he-IL",
+        "ko-KR", "ur-PK", "hy-AM", "ml-IN", "ka-GE", "he-IL", "jbo-EN",
+        "fa-IR", "or-IN", "el-GR", "ur-PK", "uk-UA", "my-MM", "ckb-IR",
+        "ta-IN", "sr-SP", "pa-IN", "mn-MN", "mk-MK",
     ]
+
+
+def ends_with_punctuation(text):
+    return any(text.rstrip().endswith(char) for char in ".!?")
 
 
 def crowdin_q(text):
@@ -49,7 +57,7 @@ class ReportContext:
         self.path = path
         self.el = el
         self.name = name
-        self.text = text
+        self.text = text.replace("\\\"", "\"").replace("\\'", "'")
 
     def lang(self):
         return self.path.stem
@@ -101,6 +109,9 @@ def lint(report, path):
 
 
 def lint_string(ctx, dest, source, allow_missing=0):
+    dest = dest.replace("\\\"", "\"").replace("\\'", "'")
+    source = source.replace("\\\"", "\"").replace("\\'", "'")
+
     if not dest:
         ctx.error("empty translation")
         return
@@ -127,13 +138,21 @@ def lint_string(ctx, dest, source, allow_missing=0):
         if source.count(placeholder) < 1:
             ctx.error(f"unexpected {placeholder}")
 
+    if "%s" in dest:
+        for placeholder in re.findall(r"%\d+\$s", dest):
+            ctx.error(f"mixing placeholder styles: {placeholder} and %s")
+
     for pattern in ["O-O", "SAN", "FEN", "PGN", "K, Q, R, B, N"]:
         m_source = source if pattern.isupper() else source.lower()
         m_dest = dest if pattern.isupper() else dest.lower()
         if pattern in m_source and pattern not in m_dest:
             ctx.notice(f"missing {pattern}")
-        #elif pattern not in m_source and pattern in m_dest:
-        #    ctx.notice(f"unexpected {pattern}")
+
+    if "%$" in dest:
+        ctx.error("invalid %$")
+
+    if "%%" in source and "%%" not in dest:
+        ctx.warning("missing %%")
 
     if "PGN" in source and "PNG" in dest:
         ctx.warning("PNG instead of PGN")
@@ -141,8 +160,8 @@ def lint_string(ctx, dest, source, allow_missing=0):
     if "\n" not in source and "\n" in dest:
         ctx.notice("expected single line string")
 
-    if western_punctuation(ctx.lang()) and source.rstrip().endswith(".") and not dest.rstrip().endswith("."):
-        ctx.warning("translation does not end with dot")
+    if western_punctuation(ctx.lang()) and ends_with_punctuation(source) and not ends_with_punctuation(dest):
+        ctx.notice("translation does not end with punctuation")
 
     if re.match(r"\n", dest):
         ctx.error("has leading newlines")

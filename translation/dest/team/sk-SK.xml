@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="team">Tím</string>
   <string name="teams">Tímy</string>
   <plurals name="nbMembers">
     <item quantity="one">%s člen</item>
@@ -13,10 +14,43 @@
   <string name="noTeamFound">Nenašiel sa tím</string>
   <string name="joinTeam">Vstúpiť do tímu</string>
   <string name="quitTeam">Opustiť tím</string>
-  <string name="anyoneCanJoin">Zdarma pre všetkých</string>
-  <string name="aConfirmationIsRequiredToJoin">Na vstup je potrebné potvrdenie</string>
-  <string name="joiningPolicy">Pravidlá pre vstup</string>
-  <string name="teamLeader">Vedúci tímu</string>
+  <string name="manuallyReviewAdmissionRequests">Manuálne skontrolujte žiadosti o prijatie</string>
+  <string name="manuallyReviewAdmissionRequestsHelp">Ak je táto možnosť začiarknutá, hráči budú musieť napísať žiadosť o pripojenie sa k tímu, ktorú môžete odmietnuť alebo prijať.</string>
+  <plurals name="teamLeaders">
+    <item quantity="one">Líder tímu</item>
+    <item quantity="few">Lídri tímu</item>
+    <item quantity="many">Lídri tímu</item>
+    <item quantity="other">Lídri tímu</item>
+  </plurals>
   <string name="teamBestPlayers">Najlepší hráči</string>
   <string name="teamRecentMembers">Noví členovia tímu</string>
+  <string name="kickSomeone">Vyhodiť niekoho z tímu</string>
+  <string name="whoToKick">Koho chcete vyhodiť z tímu?</string>
+  <plurals name="xJoinRequests">
+    <item quantity="one">%s žiadosť o vstup</item>
+    <item quantity="few">%s žiadosti o vstup</item>
+    <item quantity="many">%s žiadostí o vstup</item>
+    <item quantity="other">%s žiadostí o vstup</item>
+  </plurals>
+  <string name="willBeReviewed">Vaša žiadosť o vstup bude posúdená vedúcim tímu.</string>
+  <string name="beingReviewed">Vaša žiadosť o vstup je posudzovaná vedúcim tímu.</string>
+  <string name="teamBattle">Tímový Súboj</string>
+  <string name="teamBattleOverview">Súboj viacerých tímov, každý hráč získava body pre jeho tím</string>
+  <string name="teamTournament">Tímový turnaj</string>
+  <string name="teamTournamentOverview">Aréna turnaj, do ktorého sa môžu pripojiť iba členovia vášho tímu</string>
+  <string name="messageAllMembers">Správa všetkým členom</string>
+  <string name="messageAllMembersOverview">Poslať súkromnú správu každému členovi tímu</string>
+  <string name="messageAllMembersLongDescription">Poslať súkromnú správu VŠETKÝM členom tímu.
+Toto môžete použiť na zavolanie hráčov do turnaja alebo tímového súboja.
+Hráči, ktorí nemajú radi prijímanie vašich správ, môžu opustiť váš tím.</string>
+  <string name="teamsIlead">Tímy ktoré vediem</string>
+  <string name="youWayWantToLinkOneOfTheseTournaments">Možno by ste chceli prepojiť jeden z týchto nadchádzajúcich turnajov?</string>
+  <string name="usersWhoCanManageThisTeam">Užívatelia, ktorí môžu spravovať tento tím</string>
+  <string name="leadersChat">Čet lídrov</string>
+  <string name="closeTeam">Rozpustiť tím</string>
+  <string name="closeTeamDescription">Nevratne rozpustí tím.</string>
+  <string name="teamPassword">Tímové heslo</string>
+  <string name="teamPasswordDescriptionForLeader">(Voliteľné) Heslo, ktoré musia noví členovia vedieť, aby sa mohli pripojiť do tímu.</string>
+  <string name="incorrectTeamPassword">Nesprávne tímové heslo.</string>
+  <string name="teamAlreadyExists">Tento tím už existuje.</string>
 </resources>

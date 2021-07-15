@@ -14,6 +14,11 @@ trait Stream {
   def is(userId: User.ID): Boolean = streamer.userId == userId
   def twitch                       = serviceName == "twitch"
   def youTube                      = serviceName == "youTube"
+
+  lazy val lang: String = status match {
+    case Stream.LangRegex(code) => code.toLowerCase
+    case _                      => "en"
+  }
 }
 
 object Stream {
@@ -27,24 +32,16 @@ object Stream {
       def name   = user_name
       def isLive = `type` == "live"
     }
-    case class Result(data: Option[List[TwitchStream]]) {
+    case class Pagination(cursor: Option[String])
+    case class Result(data: Option[List[TwitchStream]], pagination: Option[Pagination]) {
       def liveStreams = (~data).filter(_.isLive)
-      def streams(keyword: Keyword, streamers: List[Streamer], alwaysFeatured: List[User.ID]): List[Stream] =
-        liveStreams.collect {
-          case TwitchStream(name, title, _) =>
-            streamers.find { s =>
-              s.twitch.exists(_.userId.toLowerCase == name.toLowerCase) && {
-                title.toLowerCase.contains(keyword.toLowerCase) ||
-                alwaysFeatured.contains(s.userId)
-              }
-            } map { Stream(name, title, _) }
-        }.flatten
     }
     case class Stream(userId: String, status: String, streamer: Streamer) extends lila.streamer.Stream {
       def serviceName = "twitch"
     }
     object Reads {
       implicit private val twitchStreamReads = Json.reads[TwitchStream]
+      implicit private val paginationReads   = Json.reads[Pagination]
       implicit val twitchResultReads         = Json.reads[Result]
     }
   }
@@ -56,7 +53,7 @@ object Stream {
     case class Result(items: List[Item]) {
       def streams(keyword: Keyword, streamers: List[Streamer]): List[Stream] =
         items
-          .filter { item =>
+          .withFilter { item =>
             item.snippet.liveBroadcastContent == "live" &&
             item.snippet.title.toLowerCase.contains(keyword.toLowerCase)
           }
@@ -85,4 +82,6 @@ object Stream {
 
     case class StreamsFetched(list: List[YouTube.Stream], at: DateTime)
   }
+
+  private val LangRegex = """\[(\w\w)\]""".r.unanchored
 }

@@ -7,6 +7,7 @@ import lila.app.ui.ScalatagsTemplate._
 import lila.user.User
 
 import controllers.routes
+import lila.common.HTTPRequest
 
 object message {
 
@@ -20,7 +21,7 @@ object message {
       main(cls := "box box-pad")(
         h1(dataIcon := icon ifTrue back.isEmpty, cls := List("text" -> (icon.isDefined && back.isEmpty)))(
           back map { url =>
-            a(href := url, dataIcon := "I", cls := "text")
+            a(href := url, dataIcon := "", cls := "text")
           },
           title
         ),
@@ -28,21 +29,23 @@ object message {
       )
     }
 
-  def noBot(implicit ctx: Context) = apply("No bot area") {
-    frag("Sorry, bot accounts are not allowed here.")
-  }
+  def noBot(implicit ctx: Context) =
+    apply("No bot area") {
+      frag("Sorry, bot accounts are not allowed here.")
+    }
 
-  def noEngine(implicit ctx: Context) = apply("No engine area") {
-    "Sorry, engine assisted players are not allowed here."
-  }
+  def noEngine(implicit ctx: Context) =
+    apply("No engine area") {
+      "Sorry, engine assisted players are not allowed here."
+    }
 
-  def noBooster(implicit ctx: Context) = apply("No booster area") {
-    "Sorry, boosters and sandbaggers are not allowed here."
-  }
+  def noBooster(implicit ctx: Context) =
+    apply("No booster area") {
+      "Sorry, boosters and sandbaggers are not allowed here."
+    }
 
-  def blacklisted(implicit ctx: Context) = apply("IP address blacklisted") {
-    "Sorry, your IP address has been used to violate the ToS, and is now blacklisted."
-  }
+  def blacklistedMessage(implicit ctx: Context) =
+    s"Sorry, your IP address ${HTTPRequest ipAddress ctx.req} has been used to violate the ToS, and is now blacklisted."
 
   def privateStudy(study: lila.study.Study)(implicit ctx: Context) =
     apply(
@@ -55,16 +58,17 @@ object message {
       )
     )
 
-  def streamingMod(implicit ctx: Context) = apply("Disabled while streaming") {
-    frag(
-      "This moderation feature is disabled while streaming, ",
-      "to avoid leaking sensible information."
-    )
-  }
+  def streamingMod(implicit ctx: Context) =
+    apply("Disabled while streaming") {
+      frag(
+        "This moderation feature is disabled while streaming, ",
+        "to avoid leaking sensible information."
+      )
+    }
 
   def challengeDenied(msg: String)(implicit ctx: Context) =
     apply(
-      title = trans.challengeToPlay.txt(),
+      title = trans.challenge.challengeToPlay.txt(),
       back = routes.Lobby.home.url.some
     )(msg)
 
@@ -80,13 +84,20 @@ object message {
       )
     )
 
-  def teamCreateLimit(implicit ctx: Context) = apply("Cannot create a team") {
-    "You have already created a team this week."
-  }
+  def teamCreateLimit(implicit ctx: Context) =
+    apply("Cannot create a team") {
+      "You have already created a team this week."
+    }
 
-  def authFailed(implicit ctx: Context) = apply("403 - Access denied!") {
-    "You tried to visit a page you're not authorized to access."
-  }
+  def teamJoinLimit(implicit ctx: Context) =
+    apply("Cannot join the team") {
+      "You have already joined too many teams."
+    }
+
+  def authFailed(implicit ctx: Context) =
+    apply("403 - Access denied!") {
+      "You tried to visit a page you're not authorized to access."
+    }
 
   def temporarilyDisabled(implicit ctx: Context) =
     apply("Temporarily disabled")(

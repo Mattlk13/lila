@@ -21,7 +21,7 @@ object checkYourEmail {
       main(
         cls := s"page-small box box-pad email-confirm ${if (form.exists(_.hasErrors)) "error" else "anim"}"
       )(
-        h1(cls := "is-green text", dataIcon := "E")(trans.checkYourEmail()),
+        h1(cls := "is-green text", dataIcon := "")(trans.checkYourEmail()),
         p(trans.weHaveSentYouAnEmailClickTheLink()),
         h2("Not receiving it?"),
         ol(
@@ -40,7 +40,7 @@ object checkYourEmail {
                   value := form.flatMap(_("email").value).getOrElse(email.value),
                   pattern := s"^((?!^${email.value}$$).)*$$"
                 ),
-                embedJsUnsafe("""
+                embedJsUnsafeLoadThen("""
 var email = document.getElementById("new-email");
 var currentError = "This is already your current email.";
 email.setCustomValidity(currentError);

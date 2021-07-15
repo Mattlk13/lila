@@ -2,6 +2,7 @@ package lila.game
 
 import akka.stream.scaladsl._
 import play.api.libs.json._
+import scala.concurrent.duration._
 
 import actorApi.{ FinishGame, StartGame }
 import chess.format.FEN
@@ -10,26 +11,29 @@ import lila.common.Json.jodaWrites
 import lila.game.Game
 import lila.user.User
 
-final class GamesByUsersStream(gameRepo: lila.game.GameRepo)(implicit ec: scala.concurrent.ExecutionContext) {
+final class GamesByUsersStream(gameRepo: lila.game.GameRepo)(implicit
+    ec: scala.concurrent.ExecutionContext
+) {
 
   private val chans = List("startGame", "finishGame")
 
   private val blueprint = Source
-    .queue[Game](32, akka.stream.OverflowStrategy.dropHead)
+    .queue[Game](64, akka.stream.OverflowStrategy.dropHead)
     .mapAsync(1)(gameRepo.withInitialFen)
     .map(gameWithInitialFenWriter.writes)
 
-  def apply(userIds: Set[User.ID]): Source[JsObject, _] =
+  def apply(userIds: Set[User.ID]): Source[JsValue, _] =
     blueprint mapMaterializedValue { queue =>
-      def matches(game: Game) = game.userIds match {
-        case List(u1, u2) if u1 != u2 => userIds(u1) && userIds(u2)
-        case _                        => false
-      }
+      def matches(game: Game) =
+        game.userIds match {
+          case List(u1, u2) if u1 != u2 => userIds(u1) && userIds(u2)
+          case _                        => false
+        }
       val sub = Bus.subscribeFun(chans: _*) {
-        case StartGame(game) if matches(game)        => queue offer game
-        case FinishGame(game, _, _) if matches(game) => queue offer game
+        case StartGame(game) if matches(game)        => queue.offer(game).unit
+        case FinishGame(game, _, _) if matches(game) => queue.offer(game).unit
       }
-      queue.watchCompletion.foreach { _ =>
+      queue.watchCompletion().foreach { _ =>
         Bus.unsubscribe(sub, chans)
       }
     }
@@ -56,15 +60,13 @@ final class GamesByUsersStream(gameRepo: lila.game.GameRepo)(implicit ec: scala.
                 "rating" -> p.rating
               )
               .add("provisional" -> p.provisional)
-              .add("name" -> p.name)
           })
         )
         .add("initialFen" -> initialFen)
         .add("clock" -> g.clock.map { clock =>
           Json.obj(
             "initial"   -> clock.limitSeconds,
-            "increment" -> clock.incrementSeconds,
-            "totalTime" -> clock.estimateTotalSeconds
+            "increment" -> clock.incrementSeconds
           )
         })
         .add("daysPerTurn" -> g.daysPerTurn)

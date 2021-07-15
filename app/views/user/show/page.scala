@@ -1,17 +1,16 @@
 package views.html.user.show
 
+import controllers.routes
 import play.api.data.Form
 
 import lila.api.Context
+import lila.app.mashup.UserInfo
 import lila.app.mashup.UserInfo.Angle
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.paginator.Paginator
-import lila.app.mashup.UserInfo
 import lila.game.Game
 import lila.user.User
-
-import controllers.routes
 
 object page {
 
@@ -25,7 +24,8 @@ object page {
       title = s"${u.username} : ${trans.activity.activity.txt()}",
       openGraph = lila.app.ui
         .OpenGraph(
-          image = staticUrl("images/large_tile.png").some,
+          image = assetUrl("logo/lichess-tile-wide.png").some,
+          twitterImage = assetUrl("logo/lichess-tile.png").some,
           title = u.titleUsernameWithBestRating,
           url = s"$netBaseUrl${routes.User.show(u.username).url}",
           description = describeUser(u)
@@ -34,7 +34,7 @@ object page {
       moreJs = moreJs(info),
       moreCss = frag(
         cssTag("user.show"),
-        isGranted(_.UserSpy) option cssTag("mod.user")
+        isGranted(_.UserModView) option cssTag("mod.user")
       ),
       robots = u.count.game >= 10
     ) {
@@ -53,7 +53,8 @@ object page {
       games: Paginator[Game],
       filters: lila.app.mashup.GameFilterMenu,
       searchForm: Option[Form[_]],
-      social: lila.app.mashup.UserInfo.Social
+      social: lila.app.mashup.UserInfo.Social,
+      notes: Map[Game.ID, String]
   )(implicit ctx: Context) =
     views.html.base.layout(
       title =
@@ -63,7 +64,7 @@ object page {
       moreCss = frag(
         cssTag("user.show"),
         filters.current.name == "search" option cssTag("user.show.search"),
-        isGranted(_.UserSpy) option cssTag("mod.user")
+        isGranted(_.UserModView) option cssTag("mod.user")
       ),
       robots = u.count.game >= 10
     ) {
@@ -71,23 +72,24 @@ object page {
         st.aside(cls := "page-menu__menu")(side(u, info.ranks, none)),
         div(cls := "page-menu__content box user-show")(
           views.html.user.show.header(u, info, Angle.Games(searchForm), social),
-          div(cls := "angle-content")(gamesContent(u, info.nbs, games, filters, filters.current.name))
+          div(cls := "angle-content")(gamesContent(u, info.nbs, games, filters, filters.current.name, notes))
         )
       )
     }
 
-  private def moreJs(info: UserInfo, withSearch: Boolean = false)(implicit ctx: Context) = frag(
-    infiniteScrollTag,
-    jsAt("compiled/user.js"),
-    info.ratingChart.map { ratingChart =>
-      frag(
-        jsTag("chart/ratingHistory.js"),
-        embedJsUnsafe(s"lichess.ratingHistoryChart($ratingChart);")
-      )
-    },
-    withSearch option frag(jsTag("search.js")),
-    isGranted(_.UserSpy) option jsAt("compiled/user-mod.js")
-  )
+  private def moreJs(info: UserInfo, withSearch: Boolean = false)(implicit ctx: Context) =
+    frag(
+      infiniteScrollTag,
+      jsModule("user"),
+      info.ratingChart.map { ratingChart =>
+        frag(
+          jsTag("chart/ratingHistory.js"),
+          embedJsUnsafeLoadThen(s"lichess.ratingHistoryChart($ratingChart)")
+        )
+      },
+      withSearch option jsModule("gameSearch"),
+      isGranted(_.UserModView) option jsModule("mod.user")
+    )
 
   def disabled(u: User)(implicit ctx: Context) =
     views.html.base.layout(title = u.username, robots = false) {

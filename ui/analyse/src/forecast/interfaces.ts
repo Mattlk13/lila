@@ -10,18 +10,17 @@ export interface ForecastStep {
   uci: Uci;
   san: San;
   fen: Fen;
-  check?: boolean;
+  check?: Key;
 }
 
 export interface ForecastCtrl {
-  addNodes(fc);
-  reloadToLastPly();
+  reloadToLastPly(): void;
   truncate(fc: ForecastStep[]): ForecastStep[];
-  playAndSave(node: ForecastStep);
+  playAndSave(node: ForecastStep): void;
   findStartingWithNode(node: ForecastStep): ForecastStep[][];
   isCandidate(fc: ForecastStep[]): boolean;
-  addNodes(fc: ForecastStep[]);
-  removeIndex(index: number);
+  addNodes(fc: ForecastStep[]): void;
+  removeIndex(index: number): void;
   list(): ForecastStep[][];
   loading: Prop<boolean>;
   onMyTurn: boolean;

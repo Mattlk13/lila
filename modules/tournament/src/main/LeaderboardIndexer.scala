@@ -12,14 +12,17 @@ final private class LeaderboardIndexer(
     pairingRepo: PairingRepo,
     playerRepo: PlayerRepo,
     leaderboardRepo: LeaderboardRepo
-)(implicit ec: scala.concurrent.ExecutionContext, mat: akka.stream.Materializer) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    mat: akka.stream.Materializer
+) {
 
   import LeaderboardApi._
   import BSONHandlers._
 
   def generateAll: Funit =
     leaderboardRepo.coll.delete.one($empty) >>
-      tournamentRepo.coll.ext
+      tournamentRepo.coll
         .find(tournamentRepo.finishedSelect)
         .sort($sort desc "startsAt")
         .cursor[Tournament](ReadPreference.secondaryPreferred)
@@ -31,7 +34,7 @@ final private class LeaderboardIndexer(
         .grouped(500)
         .mapAsyncUnordered(1)(saveEntries)
         .toMat(Sink.ignore)(Keep.right)
-        .run
+        .run()
         .void
 
   def indexOne(tour: Tournament): Funit =
@@ -49,12 +52,9 @@ final private class LeaderboardIndexer(
     for {
       nbGames <- pairingRepo.countByTourIdAndUserIds(tour.id)
       players <- playerRepo.bestByTourWithRank(tour.id, nb = 9000, skip = 0)
-    } yield players.flatMap {
-      case RankedPlayer(rank, player) =>
-        for {
-          perfType <- tour.perfType
-          nb       <- nbGames get player.userId
-        } yield Entry(
+    } yield players.flatMap { case RankedPlayer(rank, player) =>
+      nbGames get player.userId map { nb =>
+        Entry(
           id = player._id,
           tourId = tour.id,
           userId = player.userId,
@@ -64,8 +64,9 @@ final private class LeaderboardIndexer(
           rankRatio = Ratio(if (tour.nbPlayers > 0) rank.toDouble / tour.nbPlayers else 0),
           freq = tour.schedule.map(_.freq),
           speed = tour.schedule.map(_.speed),
-          perf = perfType,
+          perf = tour.perfType,
           date = tour.startsAt
         )
+      }
     }
 }

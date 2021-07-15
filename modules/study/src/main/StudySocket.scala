@@ -1,11 +1,12 @@
 package lila.study
 
+import actorApi.Who
+import cats.data.Validated
+import chess.Centis
+import chess.format.pgn.{ Glyph, Glyphs }
 import play.api.libs.json._
 import scala.concurrent.duration._
 
-import actorApi.Who
-import chess.Centis
-import chess.format.pgn.{ Glyph, Glyphs }
 import lila.common.Bus
 import lila.room.RoomSocket.{ Protocol => RP, _ }
 import lila.socket.RemoteSocket.{ Protocol => P, _ }
@@ -17,17 +18,21 @@ import lila.user.User
 final private class StudySocket(
     api: StudyApi,
     jsonView: JsonView,
-    lightStudyCache: LightStudyCache,
     remoteSocketApi: lila.socket.RemoteSocket,
     chatApi: lila.chat.ChatApi
-)(implicit ec: scala.concurrent.ExecutionContext, mode: play.api.Mode) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    mode: play.api.Mode
+) {
 
   import StudySocket._
 
   implicit def roomIdToStudyId(roomId: RoomId)    = Study.Id(roomId.value)
   implicit def studyIdToRoomId(studyId: Study.Id) = RoomId(studyId.value)
 
-  lazy val rooms = makeRoomMap(send, true)
+  lazy val rooms = makeRoomMap(send)
+
+  subscribeChat(rooms, _.Study)
 
   def isPresent(studyId: Study.Id, userId: User.ID): Fu[Boolean] =
     remoteSocketApi.request[Boolean](
@@ -35,25 +40,26 @@ final private class StudySocket(
       _ == "true"
     )
 
-  def onServerEval(studyId: Study.Id, eval: ServerEval.Progress): Unit = eval match {
-    case ServerEval.Progress(chapterId, tree, analysis, division) =>
-      import lila.game.JsonView.divisionWriter
-      import JsonView._
-      send(
-        RP.Out.tellRoom(
-          studyId,
-          makeMessage(
-            "analysisProgress",
-            Json.obj(
-              "analysis" -> analysis,
-              "ch"       -> chapterId,
-              "tree"     -> defaultNodeJsonWriter.writes(tree),
-              "division" -> division
+  def onServerEval(studyId: Study.Id, eval: ServerEval.Progress): Unit =
+    eval match {
+      case ServerEval.Progress(chapterId, tree, analysis, division) =>
+        import lila.game.JsonView.divisionWriter
+        import JsonView._
+        send(
+          RP.Out.tellRoom(
+            studyId,
+            makeMessage(
+              "analysisProgress",
+              Json.obj(
+                "analysis" -> analysis,
+                "ch"       -> chapterId,
+                "tree"     -> defaultNodeJsonWriter.writes(tree),
+                "division" -> division
+              )
             )
           )
         )
-      )
-  }
+    }
 
   private lazy val studyHandler: Handler = {
     case RP.In.ChatSay(roomId, userId, msg) => api.talk(userId, roomId, msg)
@@ -204,31 +210,12 @@ final private class StudySocket(
               isPresent = userId => isPresent(studyId, userId),
               onError = err => send(P.Out.tellSri(w.sri, makeMessage("error", err)))
             )
-          }
+          }(funit)
         case "relaySync" =>
           who foreach { w =>
             Bus.publish(actorApi.RelayToggle(studyId, ~(o \ "d").asOpt[Boolean], w), "relayToggle")
           }
         case t => logger.warn(s"Unhandled study socket message: $t")
-      }
-    case Protocol.In.StudyDoor(moves) =>
-      moves foreach {
-        case (userId, through) =>
-          val studyId = through.fold(identity, identity)
-          lightStudyCache get studyId foreach {
-            _ foreach { study =>
-              Bus.publish(
-                lila.hub.actorApi.study.StudyDoor(
-                  userId = userId,
-                  studyId = studyId.value,
-                  contributor = study contributors userId,
-                  public = study.isPublic,
-                  enters = through.isRight
-                ),
-                "study"
-              )
-            }
-          }
       }
   }
 
@@ -239,25 +226,27 @@ final private class StudySocket(
     _ => _ => none, // the "talk" event is handled by the study API
     localTimeout = Some { (roomId, modId, suspectId) =>
       api.isContributor(roomId, modId) >>& !api.isMember(roomId, suspectId)
-    }
+    },
+    chatBusChan = _.Study
   )
 
-  private def moveOrDrop(studyId: Study.Id, m: AnaAny, opts: MoveOpts)(who: Who) = m.branch match {
-    case scalaz.Success(branch) if branch.ply < Node.MAX_PLIES =>
-      m.chapterId.ifTrue(opts.write) foreach { chapterId =>
-        api.addNode(
-          studyId,
-          Position.Ref(Chapter.Id(chapterId), Path(m.path)),
-          Node.fromBranch(branch) withClock opts.clock,
-          opts
-        )(who)
-      }
-    case _ =>
-  }
+  private def moveOrDrop(studyId: Study.Id, m: AnaAny, opts: MoveOpts)(who: Who) =
+    m.branch match {
+      case Validated.Valid(branch) if branch.ply < Node.MAX_PLIES =>
+        m.chapterId.ifTrue(opts.write) foreach { chapterId =>
+          api.addNode(
+            studyId,
+            Position.Ref(Chapter.Id(chapterId), Path(m.path)),
+            Node.fromBranch(branch) withClock opts.clock,
+            opts
+          )(who)
+        }
+      case _ =>
+    }
 
   private lazy val send: String => Unit = remoteSocketApi.makeSender("study-out").apply _
 
-  remoteSocketApi.subscribe("study-in", Protocol.In.reader)(
+  remoteSocketApi.subscribe("study-in", RP.In.reader)(
     studyHandler orElse rHandler orElse remoteSocketApi.baseHandler
   ) >>- send(P.Out.boot)
 
@@ -325,10 +314,9 @@ final private class StudySocket(
         "w" -> who
       )
     )
-  def reloadMembers(members: StudyMembers)(studyId: Study.Id) = {
-    version("members", members)
-    send(RP.Out.tellRoomUsers(studyId, members.ids, makeMessage("reload")))
-  }
+  def reloadMembers(members: StudyMembers, sendTo: Iterable[User.ID])(studyId: Study.Id) =
+    send(RP.Out.tellRoomUsers(studyId, sendTo, makeMessage("members", members)))
+
   def setComment(pos: Position.Ref, comment: Comment, who: Who) =
     version(
       "setComment",
@@ -374,9 +362,9 @@ final private class StudySocket(
         "w"     -> who
       )
     )
-  def reloadChapters(chapters: List[Chapter.Metadata]) = version("chapters", chapters)
-  def reloadAll                                        = version("reload", JsNull)
-  def changeChapter(pos: Position.Ref, who: Who)       = version("changeChapter", Json.obj("p" -> pos, "w" -> who))
+  private[study] def reloadChapters(chapters: List[Chapter.Metadata]) = version("chapters", chapters)
+  def reloadAll                                                       = version("reload", JsNull)
+  def changeChapter(pos: Position.Ref, who: Who)                      = version("changeChapter", Json.obj("p" -> pos, "w" -> who))
   def updateChapter(chapterId: Chapter.Id, who: Who) =
     version("updateChapter", Json.obj("chapterId" -> chapterId, "w" -> who))
   def descChapter(chapterId: Chapter.Id, desc: Option[String], who: Who) =
@@ -425,7 +413,6 @@ final private class StudySocket(
   private val InviteLimitPerUser = new lila.memo.RateLimit[User.ID](
     credits = 50,
     duration = 24 hour,
-    name = "study invites per user",
     key = "study_invite.user"
   )
 
@@ -437,25 +424,6 @@ object StudySocket {
   object Protocol {
 
     object In {
-
-      case class StudyDoor(through: Map[User.ID, Either[Study.Id, Study.Id]]) extends P.In
-
-      val reader: P.In.Reader = raw =>
-        raw.path match {
-          case "study/door" =>
-            Some(StudyDoor {
-              P.In
-                .commas(raw.args)
-                .view
-                .map(_ split ":")
-                .collect {
-                  case Array(u, s, "+") => u -> Right(Study.Id(s))
-                  case Array(u, s, "-") => u -> Left(Study.Id(s))
-                }
-                .toMap
-            })
-          case _ => RP.In.reader(raw)
-        }
 
       object Data {
         import lila.common.Json._

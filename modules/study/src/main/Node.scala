@@ -22,8 +22,8 @@ sealed trait RootOrNode {
   val score: Option[Score]
   def addChild(node: Node): RootOrNode
   def fullMoveNumber = 1 + ply / 2
-  def mainline: List[Node]
-  def color = chess.Color(ply % 2 == 0)
+  def mainline: Vector[Node]
+  def color = chess.Color.fromPly(ply)
   def moveOption: Option[Uci.WithSan]
 }
 
@@ -70,33 +70,35 @@ case class Node(
 
   def toggleGlyph(glyph: Glyph) = copy(glyphs = glyphs toggle glyph)
 
-  def mainline: List[Node] = this :: children.first.??(_.mainline)
+  def mainline: Vector[Node] = this +: children.first.??(_.mainline)
 
   def updateMainlineLast(f: Node => Node): Node =
     children.first.fold(f(this)) { main =>
       copy(children = children.update(main updateMainlineLast f))
     }
 
-  def clearAnnotations = copy(
-    comments = Comments(Nil),
-    shapes = Shapes(Nil),
-    glyphs = Glyphs.empty,
-    score = none
-  )
+  def clearAnnotations =
+    copy(
+      comments = Comments(Nil),
+      shapes = Shapes(Nil),
+      glyphs = Glyphs.empty,
+      score = none
+    )
 
-  def merge(n: Node): Node = copy(
-    shapes = shapes ++ n.shapes,
-    comments = comments ++ n.comments,
-    gamebook = n.gamebook orElse gamebook,
-    glyphs = glyphs merge n.glyphs,
-    score = n.score orElse score,
-    clock = n.clock orElse clock,
-    crazyData = n.crazyData orElse crazyData,
-    children = n.children.nodes.foldLeft(children) {
-      case (cs, c) => cs addNode c
-    },
-    forceVariation = n.forceVariation || forceVariation
-  )
+  def merge(n: Node): Node =
+    copy(
+      shapes = shapes ++ n.shapes,
+      comments = comments ++ n.comments,
+      gamebook = n.gamebook orElse gamebook,
+      glyphs = glyphs merge n.glyphs,
+      score = n.score orElse score,
+      clock = n.clock orElse clock,
+      crazyData = n.crazyData orElse crazyData,
+      children = n.children.nodes.foldLeft(children) { case (cs, c) =>
+        cs addNode c
+      },
+      forceVariation = n.forceVariation || forceVariation
+    )
 
   def moveOption = move.some
 
@@ -112,64 +114,72 @@ object Node {
     def first      = nodes.headOption
     def variations = nodes drop 1
 
-    def nodeAt(path: Path): Option[Node] = path.split flatMap {
-      case (head, tail) if tail.isEmpty => get(head)
-      case (head, tail)                 => get(head) flatMap (_.children nodeAt tail)
-    }
+    def nodeAt(path: Path): Option[Node] =
+      path.split flatMap {
+        case (head, tail) if tail.isEmpty => get(head)
+        case (head, tail)                 => get(head) flatMap (_.children nodeAt tail)
+      }
 
-    def nodesOn(path: Path): List[(Node, Path)] = path.split ?? {
-      case (head, tail) =>
+    // select all nodes on that path
+    def nodesOn(path: Path): Vector[(Node, Path)] =
+      path.split ?? { case (head, tail) =>
         get(head) ?? { first =>
-          (first, Path(List(head))) :: first.children.nodesOn(tail).map {
-            case (n, p) => (n, p prepend head)
+          (first, Path(Vector(head))) +: first.children.nodesOn(tail).map { case (n, p) =>
+            (n, p prepend head)
           }
         }
-    }
+      }
 
-    def addNodeAt(node: Node, path: Path): Option[Children] = path.split match {
-      case None               => addNode(node).some
-      case Some((head, tail)) => updateChildren(head, _.addNodeAt(node, tail))
-    }
+    def addNodeAt(node: Node, path: Path): Option[Children] =
+      path.split match {
+        case None               => addNode(node).some
+        case Some((head, tail)) => updateChildren(head, _.addNodeAt(node, tail))
+      }
 
-    def addNode(node: Node): Children = get(node.id).fold(Children(nodes :+ node)) { prev =>
-      Children(nodes.filterNot(_.id == node.id) :+ prev.merge(node))
-    }
+    def addNode(node: Node): Children =
+      get(node.id).fold(Children(nodes :+ node)) { prev =>
+        Children(nodes.filterNot(_.id == node.id) :+ prev.merge(node))
+      }
 
-    def deleteNodeAt(path: Path): Option[Children] = path.split flatMap {
-      case (head, Path(Nil)) if has(head) => Children(nodes.filterNot(_.id == head)).some
-      case (_, Path(Nil))                 => none
-      case (head, tail)                   => updateChildren(head, _.deleteNodeAt(tail))
-    }
+    def deleteNodeAt(path: Path): Option[Children] =
+      path.split flatMap {
+        case (head, Path(Nil)) if has(head) => Children(nodes.filterNot(_.id == head)).some
+        case (_, Path(Nil))                 => none
+        case (head, tail)                   => updateChildren(head, _.deleteNodeAt(tail))
+      }
 
-    def promoteToMainlineAt(path: Path): Option[Children] = path.split match {
-      case None => this.some
-      case Some((head, tail)) =>
-        get(head).flatMap { node =>
-          node.withChildren(_.promoteToMainlineAt(tail)).map { promoted =>
-            Children(promoted +: nodes.filterNot(node ==))
+    def promoteToMainlineAt(path: Path): Option[Children] =
+      path.split match {
+        case None => this.some
+        case Some((head, tail)) =>
+          get(head).flatMap { node =>
+            node.withChildren(_.promoteToMainlineAt(tail)).map { promoted =>
+              Children(promoted +: nodes.filterNot(node ==))
+            }
           }
-        }
-    }
+      }
 
-    def promoteUpAt(path: Path): Option[(Children, Boolean)] = path.split match {
-      case None => Some(this -> false)
-      case Some((head, tail)) =>
-        for {
-          node                  <- get(head)
-          mainlineNode          <- nodes.headOption
-          (newChildren, isDone) <- node.children promoteUpAt tail
-          newNode = node.copy(children = newChildren)
-        } yield {
-          if (isDone) update(newNode) -> true
-          else if (newNode.id == mainlineNode.id) update(newNode) -> false
-          else Children(newNode +: nodes.filterNot(newNode ==))   -> true
-        }
-    }
+    def promoteUpAt(path: Path): Option[(Children, Boolean)] =
+      path.split match {
+        case None => Some(this -> false)
+        case Some((head, tail)) =>
+          for {
+            node                  <- get(head)
+            mainlineNode          <- nodes.headOption
+            (newChildren, isDone) <- node.children promoteUpAt tail
+            newNode = node.copy(children = newChildren)
+          } yield {
+            if (isDone) update(newNode) -> true
+            else if (newNode.id == mainlineNode.id) update(newNode) -> false
+            else Children(newNode +: nodes.filterNot(newNode ==))   -> true
+          }
+      }
 
-    def updateAt(path: Path, f: Node => Node): Option[Children] = path.split flatMap {
-      case (head, Path(Nil)) => updateWith(head, n => Some(f(n)))
-      case (head, tail)      => updateChildren(head, _.updateAt(tail, f))
-    }
+    def updateAt(path: Path, f: Node => Node): Option[Children] =
+      path.split flatMap {
+        case (head, Path(Nil)) => updateWith(head, n => Some(f(n)))
+        case (head, tail)      => updateChildren(head, _.updateAt(tail, f))
+      }
 
     def get(id: UciCharPair): Option[Node] = nodes.find(_.id == id)
 
@@ -180,11 +190,12 @@ object Node {
 
     def has(id: UciCharPair): Boolean = nodes.exists(_.id == id)
 
-    def updateAllWith(op: Node => Node): Children = Children {
-      nodes.map { n =>
-        op(n.copy(children = n.children.updateAllWith(op)))
+    def updateAllWith(op: Node => Node): Children =
+      Children {
+        nodes.map { n =>
+          op(n.copy(children = n.children.updateAllWith(op)))
+        }
       }
-    }
 
     def updateWith(id: UciCharPair, op: Node => Option[Node]): Option[Children] =
       get(id) flatMap op map update
@@ -206,22 +217,15 @@ object Node {
         case x => x
       })
 
-    // List(0, 0, 1, 0, 2)
-    def pathToIndexes(path: Path): Option[List[Int]] =
-      path.split.fold(List.empty[Int].some) {
-        case (head, tail) =>
-          getNodeAndIndex(head) flatMap {
-            case (node, index) => node.children.pathToIndexes(tail).map(rest => index :: rest)
-          }
+    def countRecursive: Int =
+      nodes.foldLeft(nodes.size) { case (count, n) =>
+        count + n.children.countRecursive
       }
 
-    def countRecursive: Int = nodes.foldLeft(nodes.size) {
-      case (count, n) => count + n.children.countRecursive
-    }
-
-    def lastMainlineNode: Option[Node] = nodes.headOption map { first =>
-      first.children.lastMainlineNode | first
-    }
+    def lastMainlineNode: Option[Node] =
+      nodes.headOption map { first =>
+        first.children.lastMainlineNode | first
+      }
 
     override def toString = nodes.mkString(", ")
   }
@@ -286,25 +290,27 @@ object Node {
     private def updateChildrenAt(path: Path, f: Node => Node): Option[Root] =
       withChildren(_.updateAt(path, f))
 
-    def updateMainlineLast(f: Node => Node): Root = children.first.fold(this) { main =>
-      copy(children = children.update(main updateMainlineLast f))
-    }
+    def updateMainlineLast(f: Node => Node): Root =
+      children.first.fold(this) { main =>
+        copy(children = children.update(main updateMainlineLast f))
+      }
 
-    lazy val mainline: List[Node] = children.first.??(_.mainline)
+    lazy val mainline: Vector[Node] = children.first.??(_.mainline)
 
     def lastMainlinePly = Chapter.Ply(mainline.lastOption.??(_.ply))
 
-    def lastMainlinePlyOf(path: Path) = Chapter.Ply {
-      mainline
-        .zip(path.ids)
-        .takeWhile {
-          case (node, id) => node.id == id
-        }
-        .lastOption
-        .?? {
-          case (node, _) => node.ply
-        }
-    }
+    def lastMainlinePlyOf(path: Path) =
+      Chapter.Ply {
+        mainline
+          .zip(path.ids)
+          .takeWhile { case (node, id) =>
+            node.id == id
+          }
+          .lastOption
+          .?? { case (node, _) =>
+            node.ply
+          }
+      }
 
     def mainlinePath = Path(mainline.map(_.id))
 
@@ -317,34 +323,54 @@ object Node {
 
   object Root {
 
-    def default(variant: chess.variant.Variant) = Root(
-      ply = 0,
-      fen = FEN(variant.initialFen),
-      check = false,
-      clock = none,
-      crazyData = variant.crazyhouse option Crazyhouse.Data.init,
-      children = emptyChildren
-    )
+    def default(variant: chess.variant.Variant) =
+      Root(
+        ply = 0,
+        fen = variant.initialFen,
+        check = false,
+        clock = none,
+        crazyData = variant.crazyhouse option Crazyhouse.Data.init,
+        children = emptyChildren
+      )
 
-    def fromRoot(b: lila.tree.Root): Root = Root(
-      ply = b.ply,
-      fen = FEN(b.fen),
-      check = b.check,
-      clock = b.clock,
-      crazyData = b.crazyData,
-      children = Children(b.children.view.map(fromBranch).toVector)
-    )
+    def fromRoot(b: lila.tree.Root): Root =
+      Root(
+        ply = b.ply,
+        fen = b.fen,
+        check = b.check,
+        clock = b.clock,
+        crazyData = b.crazyData,
+        children = Children(b.children.view.map(fromBranch).toVector)
+      )
   }
 
-  def fromBranch(b: lila.tree.Branch): Node = Node(
-    id = b.id,
-    ply = b.ply,
-    move = b.move,
-    fen = FEN(b.fen),
-    check = b.check,
-    crazyData = b.crazyData,
-    clock = b.clock,
-    children = Children(b.children.view.map(fromBranch).toVector),
-    forceVariation = false
-  )
+  def fromBranch(b: lila.tree.Branch): Node =
+    Node(
+      id = b.id,
+      ply = b.ply,
+      move = b.move,
+      fen = b.fen,
+      check = b.check,
+      crazyData = b.crazyData,
+      clock = b.clock,
+      children = Children(b.children.view.map(fromBranch).toVector),
+      forceVariation = false
+    )
+
+  object BsonFields {
+    val ply            = "p"
+    val uci            = "u"
+    val san            = "s"
+    val fen            = "f"
+    val check          = "c"
+    val shapes         = "h"
+    val comments       = "co"
+    val gamebook       = "ga"
+    val glyphs         = "g"
+    val score          = "e"
+    val clock          = "l"
+    val crazy          = "z"
+    val forceVariation = "fv"
+    val order          = "o"
+  }
 }

@@ -12,17 +12,15 @@ object Bus {
   type Channel    = String
   type Subscriber = Tellable
 
-  def publish(payload: Any, channel: Channel): Unit = {
-    publish(Bus.Event(payload, channel))
-  }
+  def publish(payload: Any, channel: Channel): Unit = bus.publish(payload, channel)
 
   def subscribe = bus.subscribe _
 
-  def subscribe(ref: ActorRef, to: Channel) = bus.subscribe(Tellable(ref), to)
+  def subscribe(ref: ActorRef, to: Channel) = bus.subscribe(Tellable.Actor(ref), to)
 
   def subscribe(subscriber: Tellable, to: Channel*)   = to foreach { bus.subscribe(subscriber, _) }
-  def subscribe(ref: ActorRef, to: Channel*)          = to foreach { bus.subscribe(Tellable(ref), _) }
-  def subscribe(ref: ActorRef, to: Iterable[Channel]) = to foreach { bus.subscribe(Tellable(ref), _) }
+  def subscribe(ref: ActorRef, to: Channel*)          = to foreach { bus.subscribe(Tellable.Actor(ref), _) }
+  def subscribe(ref: ActorRef, to: Iterable[Channel]) = to foreach { bus.subscribe(Tellable.Actor(ref), _) }
 
   def subscribeFun(to: Channel*)(f: PartialFunction[Any, Unit]): Tellable = {
     val t = lila.common.Tellable(f)
@@ -31,82 +29,84 @@ object Bus {
   }
 
   def subscribeFuns(subscriptions: (Channel, PartialFunction[Any, Unit])*): Unit =
-    subscriptions foreach {
-      case (channel, subscriber) => subscribeFun(channel)(subscriber)
+    subscriptions foreach { case (channel, subscriber) =>
+      subscribeFun(channel)(subscriber)
     }
 
   def unsubscribe                               = bus.unsubscribe _
-  def unsubscribe(ref: ActorRef, from: Channel) = bus.unsubscribe(Tellable(ref), from)
+  def unsubscribe(ref: ActorRef, from: Channel) = bus.unsubscribe(Tellable.Actor(ref), from)
 
-  def unsubscribe(subscriber: Tellable, from: Iterable[Channel]) = from foreach {
-    bus.unsubscribe(subscriber, _)
-  }
-  def unsubscribe(ref: ActorRef, from: Iterable[Channel]) = from foreach { bus.unsubscribe(Tellable(ref), _) }
+  def unsubscribe(subscriber: Tellable, from: Iterable[Channel]) =
+    from foreach {
+      bus.unsubscribe(subscriber, _)
+    }
+  def unsubscribe(ref: ActorRef, from: Iterable[Channel]) =
+    from foreach {
+      bus.unsubscribe(Tellable.Actor(ref), _)
+    }
 
-  def publish(event: Event): Unit = bus.publish(event.payload, event.channel)
-
-  def ask[A](channel: Channel, timeout: FiniteDuration = 1.second)(makeMsg: Promise[A] => Any)(
-      implicit
+  def ask[A](channel: Channel, timeout: FiniteDuration = 2.second)(makeMsg: Promise[A] => Any)(implicit
       ec: scala.concurrent.ExecutionContext,
       system: ActorSystem
   ): Fu[A] = {
-    val promise = Promise[A]
+    val promise = Promise[A]()
     val msg     = makeMsg(promise)
     publish(msg, channel)
-    promise.future.withTimeout(
-      timeout,
-      Bus.AskTimeout(s"Bus.ask timeout: $channel $msg")
-    )
+    promise.future
+      .withTimeout(
+        timeout,
+        Bus.AskTimeout(s"Bus.ask timeout: $channel $msg")
+      )
+      .monSuccess(_.bus.ask(s"${channel}_${msg.getClass}"))
   }
 
   private val bus = new EventBus[Any, Channel, Tellable](
-    initialCapacity = 65535,
+    initialCapacity = 4096,
     publish = (tellable, event) => tellable ! event
   )
 
-  def keys      = bus.keys
-  def size      = bus.size
-  def destroy() = bus.destroy
+  def size = bus.size
 
   case class AskTimeout(message: String) extends lila.base.LilaException
 }
 
-final private class EventBus[E, C, Subscriber](
+final private class EventBus[Event, Channel, Subscriber](
     initialCapacity: Int,
-    publish: (Subscriber, E) => Unit
+    publish: (Subscriber, Event) => Unit
 ) {
 
   import java.util.concurrent.ConcurrentHashMap
 
-  private val entries = new ConcurrentHashMap[C, Set[Subscriber]](initialCapacity)
-  private var alive   = true
+  private val entries = new ConcurrentHashMap[Channel, Set[Subscriber]](initialCapacity)
 
-  def subscribe(subscriber: Subscriber, channel: C): Unit =
-    if (alive)
-      entries.compute(channel, (_: C, subs: Set[Subscriber]) => {
-        Option(subs).fold(Set(subscriber))(_ + subscriber)
-      })
+  def subscribe(subscriber: Subscriber, channel: Channel): Unit =
+    entries
+      .compute(
+        channel,
+        (_: Channel, subs: Set[Subscriber]) => {
+          Option(subs).fold(Set(subscriber))(_ + subscriber)
+        }
+      )
+      .unit
 
-  def unsubscribe(subscriber: Subscriber, channel: C): Unit =
-    if (alive)
-      entries.computeIfPresent(channel, (_: C, subs: Set[Subscriber]) => {
-        val newSubs = subs - subscriber
-        if (newSubs.isEmpty) null
-        else newSubs
-      })
+  def unsubscribe(subscriber: Subscriber, channel: Channel): Unit =
+    entries
+      .computeIfPresent(
+        channel,
+        (_: Channel, subs: Set[Subscriber]) => {
+          val newSubs = subs - subscriber
+          if (newSubs.isEmpty) null
+          else newSubs
+        }
+      )
+      .unit
 
-  def publish(event: E, channel: C): Unit =
+  def publish(event: Event, channel: Channel): Unit =
     Option(entries get channel) foreach {
       _ foreach {
         publish(_, event)
       }
     }
 
-  def keys: Set[C]       = entries.keySet.asScala.toSet
-  def size               = entries.size
-  def sizeOf(channel: C) = Option(entries get channel).fold(0)(_.size)
-  def destroy() = {
-    alive = false
-    entries.clear()
-  }
+  def size = entries.size
 }

@@ -12,7 +12,10 @@ import lila.user.User
 final private class MsgNotify(
     colls: MsgColls,
     notifyApi: lila.notify.NotifyApi
-)(implicit ec: scala.concurrent.ExecutionContext, scheduler: akka.actor.Scheduler) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    scheduler: akka.actor.Scheduler
+) {
 
   import BsonHandlers._
 
@@ -49,19 +52,22 @@ final private class MsgNotify(
       .sequenceFu
       .void
 
-  private def schedule(threadId: MsgThread.Id): Unit = delayed.compute(
-    threadId,
-    (id, canc) => {
-      Option(canc).foreach(_.cancel)
-      scheduler.scheduleOnce(delay) {
-        delayed remove id
-        doNotify(threadId)
-      }
-    }
-  )
+  private def schedule(threadId: MsgThread.Id): Unit =
+    delayed
+      .compute(
+        threadId,
+        (id, canc) => {
+          Option(canc).foreach(_.cancel())
+          scheduler.scheduleOnce(delay) {
+            delayed remove id
+            doNotify(threadId).unit
+          }
+        }
+      )
+      .unit
 
   private def cancel(threadId: MsgThread.Id): Boolean =
-    Option(delayed remove threadId).map(_.cancel).isDefined
+    Option(delayed remove threadId).map(_.cancel()).isDefined
 
   private def doNotify(threadId: MsgThread.Id): Funit =
     colls.thread.byId[MsgThread](threadId.value) flatMap {

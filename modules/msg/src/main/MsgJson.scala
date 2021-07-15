@@ -20,12 +20,13 @@ final class MsgJson(
       JsArray(threads map renderThread)
     }
 
-  def convo(c: MsgConvo): JsObject = Json.obj(
-    "user"      -> renderContact(c.contact),
-    "msgs"      -> c.msgs.map(renderMsg),
-    "relations" -> c.relations,
-    "postable"  -> c.postable
-  )
+  def convo(c: MsgConvo): JsObject =
+    Json.obj(
+      "user"      -> renderContact(c.contact),
+      "msgs"      -> c.msgs.map(renderMsg),
+      "relations" -> c.relations,
+      "postable"  -> c.postable
+    )
 
   def renderMsg(msg: Msg): JsObject =
     Json
@@ -46,9 +47,8 @@ final class MsgJson(
 
   private def withContacts(me: User, threads: List[MsgThread]): Fu[List[MsgThread.WithContact]] =
     lightUserApi.asyncMany(threads.map(_ other me)) map { users =>
-      threads.zip(users).map {
-        case (thread, userOption) =>
-          MsgThread.WithContact(thread, userOption | LightUser.fallback(thread other me))
+      threads.zip(users).map { case (thread, userOption) =>
+        MsgThread.WithContact(thread, userOption | LightUser.fallback(thread other me))
       }
     }
 

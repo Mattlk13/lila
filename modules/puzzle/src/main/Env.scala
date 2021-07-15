@@ -1,28 +1,20 @@
 package lila.puzzle
 
-import akka.actor.ActorSystem
 import com.softwaremill.macwire._
 import io.methvin.play.autoconfig._
 import play.api.Configuration
-import reactivemongo.api.MongoConnection.ParsedURI
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 import lila.common.config._
-import lila.db.DbConfig.uriLoader
+import lila.db.AsyncColl
 
 @Module
 private class PuzzleConfig(
-    @ConfigName("mongodb.uri") val mongoUri: ParsedURI,
+    @ConfigName("mongodb.uri") val mongoUri: String,
     @ConfigName("collection.puzzle") val puzzleColl: CollName,
     @ConfigName("collection.round") val roundColl: CollName,
-    @ConfigName("collection.vote") val voteColl: CollName,
-    @ConfigName("collection.head") val headColl: CollName,
-    @ConfigName("api.token") val apiToken: Secret,
-    @ConfigName("animation.duration") val animationDuration: FiniteDuration,
-    @ConfigName("selector.puzzle_id_min") val puzzleIdMin: Int
+    @ConfigName("collection.path") val pathColl: CollName
 )
-
-case class RoundRepo(coll: lila.db.AsyncColl)
 
 @Module
 final class Env(
@@ -34,74 +26,66 @@ final class Env(
     gameRepo: lila.game.GameRepo,
     userRepo: lila.user.UserRepo,
     mongo: lila.db.Env
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: akka.actor.ActorSystem,
+    mode: play.api.Mode
+) {
 
   private val config = appConfig.get[PuzzleConfig]("puzzle")(AutoConfig.loader)
 
-  private lazy val db    = mongo.asyncDb("puzzle", config.mongoUri)
-  private def puzzleColl = db(config.puzzleColl)
-  private def roundColl  = db(config.roundColl)
-  private def voteColl   = db(config.voteColl)
-  private def headColl   = db(config.headColl)
+  private lazy val db = mongo.asyncDb("puzzle", config.mongoUri)
 
-  private lazy val gameJson = wire[GameJson]
+  lazy val colls = new PuzzleColls(
+    puzzle = db(config.puzzleColl),
+    round = db(config.roundColl),
+    path = db(config.pathColl)
+  )
+
+  private lazy val gameJson: GameJson = wire[GameJson]
 
   lazy val jsonView = wire[JsonView]
 
-  lazy val api = new PuzzleApi(
-    puzzleColl = puzzleColl,
-    roundColl = roundColl,
-    voteColl = voteColl,
-    headColl = headColl,
-    cacheApi = cacheApi
-  )
+  private lazy val pathApi = wire[PuzzlePathApi]
 
-  lazy val roundRepo = RoundRepo(roundColl)
+  private lazy val trustApi = wire[PuzzleTrustApi]
 
-  lazy val finisher = new Finisher(
-    historyApi = historyApi,
-    userRepo = userRepo,
-    api = api,
-    puzzleColl = puzzleColl
-  )
+  private lazy val countApi = wire[PuzzleCountApi]
 
-  lazy val selector = new Selector(
-    puzzleColl = puzzleColl,
-    api = api,
-    puzzleIdMin = config.puzzleIdMin
-  )
+  lazy val api: PuzzleApi = wire[PuzzleApi]
 
-  lazy val batch = new PuzzleBatch(
-    puzzleColl = puzzleColl,
-    api = api,
-    finisher = finisher,
-    puzzleIdMin = config.puzzleIdMin
-  )
+  lazy val session: PuzzleSessionApi = wire[PuzzleSessionApi]
 
-  lazy val userInfos = new UserInfosApi(
-    roundColl = roundColl,
-    currentPuzzleId = api.head.currentPuzzleId
-  )
+  lazy val anon: PuzzleAnon = wire[PuzzleAnon]
 
-  lazy val forms = DataForm
+  lazy val batch: PuzzleBatch = wire[PuzzleBatch]
 
-  lazy val daily = new Daily(
-    puzzleColl,
-    renderer,
-    cacheApi = cacheApi
-  )
+  lazy val finisher = wire[PuzzleFinisher]
 
-  lazy val activity = new PuzzleActivity(
-    puzzleColl = puzzleColl,
-    roundColl = roundColl
-  )
+  lazy val forms = PuzzleForm
 
-  def cli = new lila.common.Cli {
-    def process = {
-      case "puzzle" :: "disable" :: id :: Nil =>
-        id.toIntOption ?? { id =>
-          api.puzzle disable id inject "Done"
-        }
+  lazy val daily = wire[DailyPuzzle]
+
+  lazy val activity = wire[PuzzleActivity]
+
+  lazy val dashboard = wire[PuzzleDashboardApi]
+
+  lazy val replay = wire[PuzzleReplayApi]
+
+  lazy val history = wire[PuzzleHistoryApi]
+
+  lazy val streak = wire[PuzzleStreakApi]
+
+  if (mode == play.api.Mode.Prod)
+    system.scheduler.scheduleAtFixedRate(1 hour, 1 hour) { () =>
+      pathApi.isStale foreach { stale =>
+        if (stale) logger.error("Puzzle paths appear to be stale! check that the regen cron is up")
+      }
     }
-  }
 }
+
+final class PuzzleColls(
+    val puzzle: AsyncColl,
+    val round: AsyncColl,
+    val path: AsyncColl
+)

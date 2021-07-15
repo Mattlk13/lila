@@ -1,32 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="preferences">Seçimlər</string>
-  <string name="gameDisplay">Oyun görünüşü</string>
-  <string name="pieceAnimation">Daş Animasiyaları</string>
-  <string name="materialDifference">Material farkı</string>
-  <string name="boardHighlights">Taxta xəbərdarlıqları (son həmlə və şah çəkmə)</string>
-  <string name="pieceDestinations">Daş istiqamətlərə (qaydalara uyğun hücumlar)</string>
-  <string name="boardCoordinates">Taxta kordinatları</string>
-  <string name="moveListWhilePlaying">Oynarken siyahısı keçin</string>
-  <string name="pgnPieceNotation">Gediş qeydi</string>
-  <string name="chessPieceSymbol">Şaxmat fiqur simvolu</string>
+  <string name="preferences">Tərcihlər</string>
+  <string name="gameDisplay">Oyun ekranı</string>
+  <string name="pieceAnimation">Fiqur animasiyası</string>
+  <string name="materialDifference">Material fərqi</string>
+  <string name="boardHighlights">Lövhə xəbərdarlıqları (son gediş və şah vermə)</string>
+  <string name="pieceDestinations">Fiqurun gedə biləcəyi xanalar (qanuni gediş və öngedişlər)</string>
+  <string name="boardCoordinates">Lövhə koordinantları (A-H, 1-8)</string>
+  <string name="moveListWhilePlaying">Oyun zamanı notasiyanı göstər</string>
+  <string name="pgnPieceNotation">Şahmat notasiyası</string>
+  <string name="chessPieceSymbol">Şahmat fiqur simvolu</string>
   <string name="pgnLetter">Hərf (K, Q, R, B, N)</string>
-  <string name="blindfoldChess">Gözübağli şahmat (görünməz fiqurlar)</string>
-  <string name="chessClock">Şahmat saat</string>
-  <string name="tenthsOfSeconds">Son 10 saniyə</string>
-  <string name="whenTimeRemainingLessThanTenSeconds">Qalan zaman &lt; 10 saniyə</string>
-  <string name="horizontalGreenProgressBars">Yaşıl üfüqi tərəqqi bar</string>
+  <string name="zenMode" comment="zenMode&#10;&#10;This is not the religious meaning. Turning this option on takes away make elements of the user interface.&#10;&#10;Can also translate as 'Focus mode' as one example.">Zen rejimi</string>
+  <string name="displayBoardResizeHandle">Lövhə ölçüləndirmə tutacağını göstər</string>
+  <string name="onlyOnInitialPosition">Yalnız başlanğıc pozisiyada</string>
+  <string name="blindfoldChess">Gözübağlı şahmat (görünməz fiqurlar)</string>
+  <string name="chessClock">Şahmat saatı</string>
+  <string name="tenthsOfSeconds">Saniyənin onda biri</string>
+  <string name="whenTimeRemainingLessThanTenSeconds" comment="whenTimeRemainingLessThanTenSeconds&#10;&#10;The &amp;lt; symbol is not required (you can write it as a word), just do NOT use &lt; in its place.&#10;&#10;Technical information: &lt; is a reserved character in HTML, which is why it cannot be used.">10 saniyədən az vaxt qalanda</string>
+  <string name="horizontalGreenProgressBars">Üfüqi yaşıl inkişaf sətri</string>
   <string name="soundWhenTimeGetsCritical">Zaman azaldığında səslə xəbərdarlıq</string>
   <string name="giveMoreTime">Vaxt ver</string>
-  <string name="howDoYouMovePieces">Fiqurlarla gediş necə edilir?</string>
-  <string name="premovesPlayingDuringOpponentTurn">Ön hücumlar (Rəqib hücum etmədən hücum təyin)</string>
-  <string name="takebacksWithOpponentApproval">Geri Alma (rəqib razılığı ilə)</string>
-  <string name="inCasualGamesOnly">Yalnız adi oyunlarda</string>
-  <string name="promoteToQueenAutomatically">Avtomatik Queen təşviq</string>
-  <string name="whenPremoving">Ön hücum edərkən</string>
-  <string name="whenTimeRemainingLessThanThirtySeconds">Qalan zaman &lt; 30 saniyə</string>
+  <string name="gameBehavior" comment="gameBehavior&#10;&#10;In the user settings page, &quot;Game behavior&quot; is the title of the tab for configuring how the player can interact with the game.">Oyun seçimləri</string>
+  <string name="howDoYouMovePieces">Fiqurları necə hərəkət etdirəcəksiniz?</string>
+  <string name="clickTwoSquares">İki xanaya klikləyərək</string>
+  <string name="dragPiece">Fiquru sürüşdürərək</string>
+  <string name="bothClicksAndDrag">Hər ikisi</string>
+  <string name="premovesPlayingDuringOpponentTurn">Öngedişlər (oyun növbəsi rəqibdə olarkən oyna)</string>
+  <string name="takebacksWithOpponentApproval">Geri qaytarma (rəqib razılığı ilə)</string>
+  <string name="inCasualGamesOnly">Yalnız reytinqsiz oyunlarda</string>
+  <string name="promoteToQueenAutomatically">Avtomatik Vəzirə çıx</string>
+  <string name="whenPremoving">Ön gediş edərkən</string>
+  <string name="claimDrawOnThreefoldRepetitionAutomatically">Üç dəfə təkrarlanan oyunda avtomatik heç-heçə təklif et</string>
+  <string name="whenTimeRemainingLessThanThirtySeconds">Qalan vaxt 30 saniyədən az olanda</string>
   <string name="moveConfirmation">Gediş təsdiqi</string>
-  <string name="inCorrespondenceGames">Qiyabi oyunlar</string>
-  <string name="correspondenceAndUnlimited">Müxbir və hədsiz</string>
-  <string name="yourPreferencesHaveBeenSaved">Seçimləriniz qeyd edildi.</string>
+  <string name="inCorrespondenceGames">Yazışmalı oyunlar</string>
+  <string name="correspondenceAndUnlimited">Yazışmalı və vaxtsız</string>
+  <string name="confirmResignationAndDrawOffers">Məğlubiyyət və heç-heçə təkliflərini təsdiqlə</string>
+  <string name="castleByMovingTheKingTwoSquaresOrOntoTheRook">Qala qurma metodu</string>
+  <string name="castleByMovingTwoSquares">Şahı iki xana hərəkət etdirərək</string>
+  <string name="castleByMovingOntoTheRook">Şahı topa tərəf gətirərək</string>
+  <string name="inputMovesWithTheKeyboard">Gedişləri klaviatura ilə daxil et</string>
+  <string name="snapArrowsToValidMoves" comment="snapArrowsToValidMoves&#10;&#10;The 'arrows' are for quick annotations you can do on the board, by holding right mouse button. With this setting enabled, it means the arrows will align themselves to places were pieces can move.">Etibarlı gedişlər üçün oxları göstər</string>
+  <string name="sayGgWpAfterLosingOrDrawing" comment="sayGgWpAfterLosingOrDrawing&#10;&#10;When enabled, this setting will automatically send 'Good game, well played' to your opponent if you are lose or draw the game. It's meant as a courtesy message.&#10;&#10;The message will be sent in ENGLISH.&#10;&#10;It is up to you how to deal with this. For example, you may want to put '(message will be sent in English)' in your translated text as one example. Or you can leave the actual English text and put a brief translation in your own language.">Məğlub olduqda və ya heç-heçə etdikdə \"Yaxşı oyun idi, yaxşı oynadın\" deyin</string>
+  <string name="yourPreferencesHaveBeenSaved">Tərcihləriniz saxlanıldı.</string>
 </resources>

@@ -1,2 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources></resources>
+<resources>
+  <string name="emailConfirm_subject">Сфидар кæн дæ lichess.org аккаунт, %s</string>
+  <string name="emailConfirm_click" comment="emailConfirm_click&#10;&#10;Part of the confirmation email upon registering for a Lichess account.&#10;&#10;The unique reset link is presented just after this string.">Дæ Lichess аккаунт цæмæй скусын кæнай, æрæлхъив дæнцæгыл:</string>
+  <string name="emailConfirm_ignore">Дæхи Lichess-ы кæд регистраци нæ кодтай, уæд ацы фыстæг ницæмæ дар.</string>
+  <string name="passwordReset_subject">Раппар дæ lichess.org пароль, %s</string>
+  <string name="passwordReset_intro">Мах райстам бафæрст дæ аккаунты паролы раппæрыныл.</string>
+  <string name="passwordReset_clickOrIgnore">Ды кæд уыцы бафæрст скодтай, уæд æрæлхъив уыцы дæнцæгыл. Кæд нæ, уæд ницæмæ дар уыцы фыстаг.</string>
+  <string name="emailChange_subject">Сфидар кæн дæ ног пост, %s</string>
+  <string name="emailChange_intro">Ды бафарстай дæ посты ивынад.</string>
+  <string name="emailChange_click">Цæмæй дæ пост сфидар кæнай, æрæлхъив уыцы дæнцæгыл:</string>
+  <string name="welcome_subject">Æгас цу lichess.org-мæ, %s</string>
+  <string name="welcome_text">Æнтыстджынæй дæ lichess.org аккаунт сарæзтай.
+
+Мæнæ ам ис дæ профилы фарс: %1$s. Сфæлындын æй дæ бон у %2$s.
+
+Хъæлдзаг у, æмæ дæ фигурæтæ ныхмæлæууæджы къаролмæ цæмæй сæ фæндаг æдзухдæр ссарой!</string>
+  <string name="logInToLichess">Бацу lichess.org-мæ, %s</string>
+  <string name="common_orPaste">(Æлхъивын нæ кусы? Бафæлвар æй дæ браузермæ бавæрын!)</string>
+  <string name="common_note">Уый у сервисы фыстæг, дæ %s спайдакæнынмæ баст кæй у, ахæм.</string>
+  <string name="common_contact">Махимæ цæмæй хи сбæттын, %s пайда кæн.</string>
+</resources>

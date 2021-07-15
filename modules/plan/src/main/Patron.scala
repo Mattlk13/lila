@@ -2,6 +2,8 @@ package lila.plan
 
 import org.joda.time.DateTime
 
+import lila.user.User
+
 case class Patron(
     _id: Patron.UserId,
     stripe: Option[Patron.Stripe] = none,
@@ -18,31 +20,31 @@ case class Patron(
 
   def canLevelUp = lastLevelUp.exists(_.isBefore(DateTime.now.minusDays(25)))
 
-  def levelUpNow = copy(
-    lastLevelUp = Some(DateTime.now)
-  )
+  def levelUpIfPossible =
+    copy(
+      lastLevelUp = if (canLevelUp) Some(DateTime.now) else lastLevelUp orElse Some(DateTime.now)
+    )
 
-  def levelUpIfPossible = copy(
-    lastLevelUp = if (canLevelUp) Some(DateTime.now) else lastLevelUp
-  )
-
-  def expireInOneMonth: Patron = copy(
-    expiresAt = DateTime.now.plusMonths(1).plusDays(7).some
-  )
+  def expireInOneMonth: Patron =
+    copy(
+      expiresAt = DateTime.now.plusMonths(1).plusDays(1).some
+    )
 
   def expireInOneMonth(cond: Boolean): Patron =
     if (cond) expireInOneMonth
     else copy(expiresAt = none)
 
-  def removeStripe = copy(
-    stripe = none,
-    expiresAt = none
-  )
+  def removeStripe =
+    copy(
+      stripe = none,
+      expiresAt = none
+    )
 
-  def removePayPal = copy(
-    payPal = none,
-    expiresAt = none
-  )
+  def removePayPal =
+    copy(
+      payPal = none,
+      expiresAt = none
+    )
 
   def isDefined = stripe.isDefined || payPal.isDefined
 
@@ -68,5 +70,5 @@ object Patron {
     case class SubId(value: String) extends AnyVal
   }
 
-  case class Free(at: DateTime)
+  case class Free(at: DateTime, by: Option[User.ID])
 }

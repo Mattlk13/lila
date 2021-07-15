@@ -72,9 +72,10 @@ case class Study(
 
   def topicsOrEmpty = topics | StudyTopics.empty
 
-  def addTopics(ts: StudyTopics) = copy(
-    topics = topics.fold(ts)(_ ++ ts).some
-  )
+  def addTopics(ts: StudyTopics) =
+    copy(
+      topics = topics.fold(ts)(_ ++ ts).some
+    )
 }
 
 object Study {
@@ -88,7 +89,6 @@ object Study {
   implicit val nameIso = lila.common.Iso.string[Name](Name.apply, _.value)
 
   case class IdName(_id: Id, name: Name) {
-
     def id = _id
   }
 
@@ -108,13 +108,14 @@ object Study {
 
   case class Likes(value: Int) extends AnyVal
   case class Liking(likes: Likes, me: Boolean)
-  val emptyLiking = Liking(Likes(0), false)
+  val emptyLiking = Liking(Likes(0), me = false)
 
   case class Rank(value: DateTime) extends AnyVal
   object Rank {
-    def compute(likes: Likes, createdAt: DateTime) = Rank {
-      createdAt plusHours likesToHours(likes)
-    }
+    def compute(likes: Likes, createdAt: DateTime) =
+      Rank {
+        createdAt plusHours likesToHours(likes)
+      }
     private def likesToHours(likes: Likes): Int =
       if (likes.value < 1) 0
       else (5 * math.log(likes.value) + 1).toInt.min(likes.value) * 24
@@ -139,7 +140,7 @@ object Study {
       description: String
   ) {
     import Settings._
-    def vis = Visibility.byKey get visibility getOrElse Visibility.Public
+    def vis = Visibility.byKey.getOrElse(visibility, Visibility.Public)
     def settings =
       for {
         comp <- UserSelection.byKey get computer
@@ -165,7 +166,7 @@ object Study {
 
   val idSize = 8
 
-  def makeId = Id(scala.util.Random.alphanumeric take idSize mkString)
+  def makeId = Id(lila.common.ThreadLocalRandom nextString idSize)
 
   def make(
       user: User,

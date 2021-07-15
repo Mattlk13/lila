@@ -7,16 +7,19 @@ import lila.i18n.{ I18nKeys => trans }
 
 object jsI18n {
 
-  def apply(g: lila.game.Game)(implicit lang: Lang) = i18nJsObject {
-    baseTranslations ++ {
-      if (g.isCorrespondence) correspondenceTranslations
-      else realtimeTranslations
-    } ++ {
-      g.variant.exotic ?? variantTranslations
-    } ++ {
-      g.isTournament ?? tournamentTranslations
+  def apply(g: lila.game.Game)(implicit lang: Lang) =
+    i18nJsObject {
+      baseTranslations ++ {
+        if (g.isCorrespondence) correspondenceTranslations
+        else realtimeTranslations
+      } ++ {
+        g.variant.exotic ?? variantTranslations
+      } ++ {
+        g.isTournament ?? tournamentTranslations
+      } ++ {
+        g.isSwiss ?? swissTranslations
+      }
     }
-  }
 
   private val correspondenceTranslations = Vector(
     trans.oneDay,
@@ -38,7 +41,13 @@ object jsI18n {
     trans.standing
   ).map(_.key)
 
+  private val swissTranslations = Vector(
+    trans.backToTournament,
+    trans.viewTournament
+  ).map(_.key)
+
   private val baseTranslations = Vector(
+    trans.anonymous,
     trans.flipBoard,
     trans.aiNameLevelAiLevel,
     trans.yourTurn,
@@ -59,7 +68,7 @@ object jsI18n {
     trans.decline,
     trans.takebackPropositionSent,
     trans.yourOpponentProposesATakeback,
-    trans.thisPlayerUsesChessComputerAssistance,
+    trans.thisAccountViolatedTos,
     trans.gameAborted,
     trans.checkmate,
     trans.whiteResigned,
@@ -68,7 +77,8 @@ object jsI18n {
     trans.whiteLeftTheGame,
     trans.blackLeftTheGame,
     trans.draw,
-    trans.timeOut,
+    trans.whiteTimeOut,
+    trans.blackTimeOut,
     trans.whiteIsVictorious,
     trans.blackIsVictorious,
     trans.withdraw,

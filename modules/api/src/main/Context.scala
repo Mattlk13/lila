@@ -1,15 +1,13 @@
 package lila.api
 
-import play.api.mvc.RequestHeader
 import play.api.i18n.Lang
+import play.api.mvc.RequestHeader
 
 import lila.common.{ HTTPRequest, Nonce }
 import lila.pref.Pref
-import lila.relation.actorApi.OnlineFriends
 import lila.user.{ BodyUserContext, HeaderUserContext, UserContext }
 
 case class PageData(
-    onlineFriends: OnlineFriends,
     teamNbRequests: Int,
     nbChallenges: Int,
     nbNotifications: Int,
@@ -24,18 +22,18 @@ case class PageData(
 
 object PageData {
 
-  def anon(req: RequestHeader, nonce: Option[Nonce], blindMode: Boolean = false) = PageData(
-    OnlineFriends.empty,
-    teamNbRequests = 0,
-    nbChallenges = 0,
-    nbNotifications = 0,
-    lila.pref.RequestPref fromRequest req,
-    blindMode = blindMode,
-    hasFingerprint = false,
-    hasClas = false,
-    inquiry = none,
-    nonce = nonce
-  )
+  def anon(req: RequestHeader, nonce: Option[Nonce], blindMode: Boolean = false) =
+    PageData(
+      teamNbRequests = 0,
+      nbChallenges = 0,
+      nbNotifications = 0,
+      lila.pref.RequestPref fromRequest req,
+      blindMode = blindMode,
+      hasFingerprint = false,
+      hasClas = false,
+      inquiry = none,
+      nonce = nonce
+    )
 
   def error(req: RequestHeader, nonce: Option[Nonce]) = anon(req, nonce).copy(error = true)
 }
@@ -47,8 +45,6 @@ sealed trait Context extends lila.user.UserContextWrapper {
 
   def lang = userContext.lang
 
-  def onlineFriends = pageData.onlineFriends
-
   def teamNbRequests  = pageData.teamNbRequests
   def nbChallenges    = pageData.nbChallenges
   def nbNotifications = pageData.nbNotifications
@@ -57,7 +53,6 @@ sealed trait Context extends lila.user.UserContextWrapper {
   def noBlind         = !blind
   def nonce           = pageData.nonce
   def hasClas         = pageData.hasClas
-  def hasInbox        = me.exists(u => !u.kid || hasClas)
 
   def currentTheme = lila.pref.Theme(pref.theme)
 
@@ -69,9 +64,10 @@ sealed trait Context extends lila.user.UserContextWrapper {
 
   def currentSoundSet = lila.pref.SoundSet(pref.soundSet)
 
-  lazy val currentBg = if (pref.transp) "transp" else if (pref.dark) "dark" else "light"
-
-  def transpBgImg = currentBg == "transp" option pref.bgImgOrDefault
+  lazy val currentBg =
+    if (pref.bg == Pref.Bg.TRANSPARENT) "transp"
+    else if (pref.bg == Pref.Bg.LIGHT) "light"
+    else "dark"
 
   lazy val mobileApiVersion = Mobile.Api requestVersion req
 

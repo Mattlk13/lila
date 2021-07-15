@@ -17,8 +17,7 @@ object emailConfirmHelp {
   def apply(form: Form[_], status: Option[Status])(implicit ctx: Context) =
     views.html.base.layout(
       title = title,
-      moreCss = cssTag("email-confirm"),
-      moreJs = jsTag("emailConfirmHelp.js")
+      moreCss = cssTag("email-confirm")
     )(
       frag(
         main(cls := "page-small box box-pad email-confirm-help")(
@@ -55,14 +54,19 @@ object emailConfirmHelp {
                   p(
                     "It can take some time to arrive.",
                     br,
-                    strong("Wait 10 minutes and refresh your email inbox.")
+                    strong("Wait 5 minutes and refresh your email inbox.")
                   ),
                   p("Also check your spam folder, it might end up there. If so, mark it as NOT spam."),
                   p("If everything else fails, then send us this email:"),
                   hr,
                   p(i(s"Hello, please confirm my account: $name")),
                   hr,
-                  p("Copy and paste the above text and send it to ", contactEmail),
+                  p(
+                    "Copy and paste the above text and send it to ",
+                    a(href := s"mailto:$contactEmailInClear?subject=Confirm account $name")(
+                      contactEmailInClear
+                    )
+                  ),
                   p("We will come back to you shortly to help you complete your signup.")
                 )
               case Confirmed(name) =>
@@ -72,14 +76,9 @@ object emailConfirmHelp {
                   p("You do not need a confirmation email.")
                 )
               case Closed(name) =>
-                frag(
-                  p("The account ", strong(name), " is closed.")
-                )
+                p("The account ", strong(name), " is closed.")
               case NoEmail(name) =>
-                frag(
-                  p("The account ", strong(name), " doesn't have an email."),
-                  p("Visit the ", a(href := routes.Main.contact)("contact page"), ".")
-                )
+                p("The account ", strong(name), " was registered without an email.")
             }
           )
         )

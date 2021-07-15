@@ -2,21 +2,21 @@ import * as xhr from '../studyXhr';
 import { prop } from 'common';
 import { storedProp } from 'common/storage';
 import makeSuccess from './studyPracticeSuccess';
-import makeSound from './sound';
 import { readOnlyProp } from '../../util';
 import { StudyPracticeData, Goal, StudyPracticeCtrl } from './interfaces';
 import { StudyData, StudyCtrl } from '../interfaces';
 import AnalyseCtrl from '../../ctrl';
 
-export default function(root: AnalyseCtrl, studyData: StudyData, data: StudyPracticeData): StudyPracticeCtrl {
-
+export default function (root: AnalyseCtrl, studyData: StudyData, data: StudyPracticeData): StudyPracticeCtrl {
   const goal = prop<Goal>(root.data.practiceGoal!),
-  nbMoves = prop(0),
-  // null = ongoing, true = win, false = fail
-  success = prop<boolean | null>(null),
-  sound = makeSound(),
-  analysisUrl = prop(''),
-  autoNext = storedProp('practice-auto-next', true);
+    nbMoves = prop(0),
+    // null = ongoing, true = win, false = fail
+    success = prop<boolean | null>(null),
+    analysisUrl = prop(''),
+    autoNext = storedProp('practice-auto-next', true);
+
+  lichess.sound.loadOggOrMp3('practiceSuccess', `${lichess.sound.baseUrl}/other/energy3`);
+  lichess.sound.loadOggOrMp3('practiceFailure', `${lichess.sound.baseUrl}/other/failure2`);
 
   function onLoad() {
     root.showAutoShapes = readOnlyProp(true);
@@ -59,27 +59,22 @@ export default function(root: AnalyseCtrl, studyData: StudyData, data: StudyPrac
 
   function onVictory(): void {
     saveNbMoves();
-    sound.success();
-    if (autoNext()) setTimeout(goToNext, 1000);
+    lichess.sound.play('practiceSuccess');
+    if (studyData.chapter.practice && autoNext()) setTimeout(getStudy().goToNextChapter, 1000);
   }
 
   function saveNbMoves(): void {
     const chapterId = getStudy().currentChapter().id,
-    former = data.completion[chapterId];
+      former = data.completion[chapterId];
     if (typeof former === 'undefined' || nbMoves() < former) {
       data.completion[chapterId] = nbMoves();
       xhr.practiceComplete(chapterId, nbMoves());
     }
   }
 
-  function goToNext() {
-    const next = getStudy().nextChapter();
-    if (next) getStudy().setChapter(next.id);
-  }
-
   function onFailure(): void {
     root.node.fail = true;
-    sound.failure();
+    lichess.sound.play('practiceFailure');
   }
 
   return {
@@ -104,6 +99,5 @@ export default function(root: AnalyseCtrl, studyData: StudyData, data: StudyPrac
     isWhite: root.bottomIsWhite,
     analysisUrl,
     autoNext,
-    goToNext
   };
 }

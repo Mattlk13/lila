@@ -9,8 +9,7 @@ import CacheApi._
 import lila.db.BSON.BSONJodaDateTimeHandler
 import lila.db.dsl._
 
-/**
-  * To avoid recomputing very expensive values after deploy
+/** To avoid recomputing very expensive values after deploy
   */
 final class MongoCache[K, V: BSONHandler] private (
     name: String,
@@ -28,7 +27,7 @@ final class MongoCache[K, V: BSONHandler] private (
     val dbKey = makeDbKey(k)
     coll.one[Entry]($id(dbKey)) flatMap {
       case None =>
-        lila.mon.mongoCache.request(name, false).increment()
+        lila.mon.mongoCache.request(name, hit = false).increment()
         loader(k)
           .flatMap { v =>
             coll.update.one(
@@ -39,7 +38,7 @@ final class MongoCache[K, V: BSONHandler] private (
           }
           .mon(_.mongoCache.compute(name))
       case Some(entry) =>
-        lila.mon.mongoCache.request(name, true).increment()
+        lila.mon.mongoCache.request(name, hit = true).increment()
         fuccess(entry.v)
     }
   }
@@ -82,7 +81,7 @@ object MongoCache {
         keyToString,
         (wrapper: LoaderWrapper[K, V]) =>
           build(wrapper)(
-            scaffeine(mode).recordStats.initialCapacity(cacheApi.actualCapacity(initialCapacity))
+            scaffeine(mode).recordStats().initialCapacity(cacheApi.actualCapacity(initialCapacity))
           ),
         coll
       )
@@ -96,12 +95,24 @@ object MongoCache {
         dbTtl: FiniteDuration
     )(
         build: LoaderWrapper[Unit, V] => Builder => AsyncLoadingCache[Unit, V]
-    ): MongoCache[Unit, V] = new MongoCache(
-      name,
-      dbTtl,
-      _ => "",
-      wrapper => build(wrapper)(scaffeine(mode).initialCapacity(1)),
-      coll
-    )
+    ): MongoCache[Unit, V] =
+      new MongoCache(
+        name,
+        dbTtl,
+        _ => "",
+        wrapper => build(wrapper)(scaffeine(mode).initialCapacity(1)),
+        coll
+      )
+
+    // no in-heap cache
+    def only[K, V: BSONHandler](
+        name: String,
+        dbTtl: FiniteDuration,
+        keyToString: K => String
+    )(f: K => Fu[V]): MongoCache[K, V] =
+      apply[K, V](8, name, dbTtl, keyToString) { loader =>
+        _.expireAfterWrite(1 second)
+          .buildAsyncFuture(loader(f))
+      }
   }
 }

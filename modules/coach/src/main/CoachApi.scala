@@ -1,18 +1,20 @@
 package lila.coach
 
 import org.joda.time.DateTime
+import scala.concurrent.duration._
 
 import lila.db.dsl._
 import lila.db.Photographer
 import lila.notify.{ Notification, NotifyApi }
 import lila.security.Granter
-import lila.user.{ User, UserRepo }
+import lila.user.{ Holder, User, UserRepo }
 
 final class CoachApi(
     coachColl: Coll,
     reviewColl: Coll,
     userRepo: UserRepo,
     photographer: Photographer,
+    cacheApi: lila.memo.CacheApi,
     notifyApi: NotifyApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
@@ -23,21 +25,23 @@ final class CoachApi(
   def find(username: String): Fu[Option[Coach.WithUser]] =
     userRepo named username flatMap { _ ?? find }
 
-  def find(user: User): Fu[Option[Coach.WithUser]] = Granter(_.Coach)(user) ?? {
-    byId(Coach.Id(user.id)) dmap {
-      _ map withUser(user)
+  def find(user: User): Fu[Option[Coach.WithUser]] =
+    Granter(_.Coach)(user) ?? {
+      byId(Coach.Id(user.id)) dmap {
+        _ map withUser(user)
+      }
     }
-  }
 
-  def findOrInit(user: User): Fu[Option[Coach.WithUser]] = Granter(_.Coach)(user) ?? {
-    find(user) orElse {
-      val c = Coach.WithUser(Coach make user, user)
-      coachColl.insert.one(c.coach) inject c.some
+  def findOrInit(coach: Holder): Fu[Option[Coach.WithUser]] =
+    Granter.is(_.Coach)(coach) ?? {
+      find(coach.user) orElse {
+        val c = Coach.WithUser(Coach make coach.user, coach.user)
+        coachColl.insert.one(c.coach) inject c.some
+      }
     }
-  }
 
   def isListedCoach(user: User): Fu[Boolean] =
-    Granter(_.Coach)(user) ?? coachColl.exists($id(user.id) ++ $doc("listed" -> true))
+    Granter(_.Coach)(user) ?? user.enabled ?? user.marks.clean ?? coachColl.exists($id(user.id))
 
   def setSeenAt(user: User): Funit =
     Granter(_.Coach)(user) ?? coachColl.update.one($id(user.id), $set("user.seenAt" -> DateTime.now)).void
@@ -63,24 +67,33 @@ final class CoachApi(
   def setNbReviews(id: Coach.Id, nb: Int): Funit =
     coachColl.update.one($id(id), $set("nbReviews" -> nb)).void
 
-  private[coach] def toggleApproved(username: String, value: Boolean): Fu[String] =
-    coachColl.update.one(
-      $id(User.normalize(username)),
-      $set("approved" -> value)
-    ) dmap { result =>
-      if (result.n > 0) "Done!"
-      else "No such coach"
-    }
-
-  def remove(userId: User.ID) = coachColl.updateField($id(userId), "listed", false)
-
-  def uploadPicture(c: Coach.WithUser, picture: Photographer.Uploaded): Funit =
-    photographer(c.coach.id.value, picture).flatMap { pic =>
+  def uploadPicture(c: Coach.WithUser, picture: Photographer.Uploaded, by: User): Funit =
+    photographer(c.coach.id.value, picture, createdBy = by.id).flatMap { pic =>
       coachColl.update.one($id(c.coach.id), $set("picturePath" -> pic.path)).void
     }
 
   def deletePicture(c: Coach.WithUser): Funit =
     coachColl.update.one($id(c.coach.id), $unset("picturePath")).void
+
+  private val languagesCache = cacheApi.unit[Set[String]] {
+    _.refreshAfterWrite(1 hour)
+      .buildAsyncFuture { _ =>
+        coachColl.secondaryPreferred.distinctEasy[String, Set]("languages", $empty)
+      }
+  }
+  def allLanguages: Fu[Set[String]] = languagesCache.get {}
+
+  private val countriesCache = cacheApi.unit[Set[String]] {
+    _.refreshAfterWrite(1 hour)
+      .buildAsyncFuture { _ =>
+        userRepo.coll.secondaryPreferred
+          .distinctEasy[String, Set](
+            "profile.country",
+            $doc("roles" -> lila.security.Permission.Coach.dbKey, "enabled" -> true)
+          )
+      }
+  }
+  def allCountries: Fu[Set[String]] = countriesCache.get {}
 
   private def withUser(user: User)(coach: Coach) = Coach.WithUser(coach, user)
 
@@ -165,7 +178,7 @@ final class CoachApi(
 
     def deleteAllBy(userId: User.ID): Funit =
       for {
-        reviews <- reviewColl.ext.find($doc("userId" -> userId)).list[CoachReview]
+        reviews <- reviewColl.list[CoachReview]($doc("userId" -> userId))
         _ <- reviews.map { review =>
           reviewColl.delete.one($doc("userId" -> review.userId)).void
         }.sequenceFu
@@ -173,9 +186,10 @@ final class CoachApi(
       } yield ()
 
     private def findRecent(selector: Bdoc): Fu[CoachReview.Reviews] =
-      reviewColl.ext
+      reviewColl
         .find(selector)
         .sort($sort desc "createdAt")
-        .list[CoachReview](100) map CoachReview.Reviews.apply
+        .cursor[CoachReview]()
+        .list(100) map CoachReview.Reviews.apply
   }
 }

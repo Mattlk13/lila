@@ -5,7 +5,6 @@ import Game.BSONFields._
 import reactivemongo.api.bson._
 import scala.util.Try
 
-import Blurs.BlursBSONWriter
 import chess.Centis
 import lila.db.BSON.BSONJodaDateTimeHandler
 import lila.db.ByteArray
@@ -58,9 +57,10 @@ object GameDiff {
         times    = history(color)
       } yield (clk.limit, times, g.flagged has color)
 
-    def clockHistoryToBytes(o: Option[ClockHistorySide]) = o.flatMap {
-      case (x, y, z) => ByteArrayBSONHandler.writeOpt(BinaryFormat.clockHistory.writeSide(x, y, z))
-    }
+    def clockHistoryToBytes(o: Option[ClockHistorySide]) =
+      o.flatMap { case (x, y, z) =>
+        ByteArrayBSONHandler.writeOpt(BinaryFormat.clockHistory.writeSide(x, y, z))
+      }
 
     if (a.variant.standard) dTry(huffmanPgn, _.pgnMoves, writeBytes compose PgnStorage.Huffman.encode)
     else {
@@ -96,14 +96,14 @@ object GameDiff {
           BSONHandlers.clockBSONWrite(a.createdAt, c).toOption
         }
     )
+    dTry(drawOffers, _.drawOffers, BSONHandlers.gameDrawOffersHandler.writeTry)
     for (i <- 0 to 1) {
       import Player.BSONFields._
       val name                   = s"p$i."
       val player: Game => Player = if (i == 0) (_.whitePlayer) else (_.blackPlayer)
-      dOpt(s"$name$lastDrawOffer", player(_).lastDrawOffer, (l: Option[Int]) => l flatMap w.intO)
       dOpt(s"$name$isOfferingDraw", player(_).isOfferingDraw, w.boolO)
       dOpt(s"$name$proposeTakebackAt", player(_).proposeTakebackAt, w.intO)
-      dTry(s"$name$blursBits", player(_).blurs, BlursBSONWriter.writeTry)
+      dTry(s"$name$blursBits", player(_).blurs, Blurs.BlursBSONHandler.writeTry)
     }
     dTry(movedAt, _.movedAt, BSONJodaDateTimeHandler.writeTry)
 
@@ -114,8 +114,9 @@ object GameDiff {
 
   private val writeBytes = ByteArrayBSONHandler.writeTry _
 
-  private def makeCastleLastMove(g: Game) = CastleLastMove(
-    lastMove = g.history.lastMove,
-    castles = g.history.castles
-  )
+  private def makeCastleLastMove(g: Game) =
+    CastleLastMove(
+      lastMove = g.history.lastMove,
+      castles = g.history.castles
+    )
 }

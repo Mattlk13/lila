@@ -4,6 +4,8 @@ import lila.user.User
 
 import org.joda.time.DateTime
 
+import lila.common.SecureRandom
+
 case class Student(
     _id: Student.Id, // userId:clasId
     userId: User.ID,
@@ -26,18 +28,19 @@ case class Student(
 
 object Student {
 
-  def id(userId: User.ID, clasId: Clas.Id) = Id(s"${userId}:${clasId}")
+  def id(userId: User.ID, clasId: Clas.Id) = Id(s"$userId:$clasId")
 
-  def make(user: User, clas: Clas, teacherId: Teacher.Id, realName: String, managed: Boolean) = Student(
-    _id = id(user.id, clas.id),
-    userId = user.id,
-    clasId = clas.id,
-    realName = realName,
-    notes = "",
-    managed = managed,
-    created = Clas.Recorded(teacherId, DateTime.now),
-    archived = none
-  )
+  def make(user: User, clas: Clas, teacherId: User.ID, realName: String, managed: Boolean) =
+    Student(
+      _id = id(user.id, clas.id),
+      userId = user.id,
+      clasId = clas.id,
+      realName = realName,
+      notes = "",
+      managed = managed,
+      created = Clas.Recorded(teacherId, DateTime.now),
+      archived = none
+    )
 
   case class Id(value: String) extends AnyVal with StringValue
 
@@ -45,15 +48,17 @@ object Student {
 
   case class WithPassword(student: Student, password: User.ClearPassword)
 
+  case class ManagedInfo(createdBy: User, clas: Clas)
+
   private[clas] object password {
 
-    private val random     = new java.security.SecureRandom()
     private val chars      = ('2' to '9') ++ (('a' to 'z').toSet - 'l') mkString
-    private val nbChars    = chars.size
-    private def secureChar = chars(random nextInt nbChars)
+    private val nbChars    = chars.length
+    private def secureChar = chars(SecureRandom nextInt nbChars)
 
-    def generate = User.ClearPassword {
-      new String(Array.fill(7)(secureChar))
-    }
+    def generate =
+      User.ClearPassword {
+        new String(Array.fill(7)(secureChar))
+      }
   }
 }

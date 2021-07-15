@@ -26,18 +26,17 @@ object pref {
           input(
             st.id := s"$prefix$id",
             checked option st.checked,
-            cls := checked option "active",
-            `type` := "radio",
+            tpe := "radio",
             value := v._1.toString,
             name := field.name
           ),
           label(`for` := s"$prefix$id")(v._2)
         )
-      } toList
+      }.toList
     )
 
-  def apply(u: lila.user.User, form: play.api.data.Form[_], categ: lila.pref.PrefCateg)(
-      implicit ctx: Context
+  def apply(u: lila.user.User, form: play.api.data.Form[_], categ: lila.pref.PrefCateg)(implicit
+      ctx: Context
   ) =
     account.layout(
       title = s"${bits.categName(categ)} - ${u.username} - ${preferences.txt()}",
@@ -143,6 +142,18 @@ object pref {
             setting(
               inputMovesWithTheKeyboard(),
               radios(form("behavior.keyboardMove"), booleanChoices)
+            ),
+            setting(
+              snapArrowsToValidMoves(),
+              radios(form("behavior.arrowSnap"), booleanChoices)
+            )(cls := "arrow-snap"),
+            setting(
+              sayGgWpAfterLosingOrDrawing(),
+              radios(form("behavior.courtesy"), booleanChoices)
+            ),
+            setting(
+              scrollOnTheBoardToReplayMoves(),
+              radios(form("behavior.scrollMoves"), booleanChoices)
             )
           ),
           categFieldset(PrefCateg.Privacy, categ)(
@@ -163,11 +174,15 @@ object pref {
               radios(form("studyInvite"), translatedStudyInviteChoices)
             ),
             setting(
+              trans.receiveForumNotifications(),
+              radios(form("mention"), booleanChoices)
+            ),
+            setting(
               trans.shareYourInsightsData(),
               radios(form("insightShare"), translatedInsightShareChoices)
             )
           ),
-          p(cls := "saved text none", dataIcon := "E")(yourPreferencesHaveBeenSaved())
+          p(cls := "saved text none", dataIcon := "")(yourPreferencesHaveBeenSaved())
         )
       )
     }

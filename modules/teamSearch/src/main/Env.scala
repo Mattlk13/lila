@@ -18,7 +18,10 @@ final class Env(
     appConfig: Configuration,
     makeClient: Index => ESClient,
     teamRepo: lila.team.TeamRepo
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem
+) {
 
   private val config = appConfig.get[TeamSearchConfig]("teamSearch")(AutoConfig.loader)
 
@@ -32,18 +35,19 @@ final class Env(
 
   def apply(text: String, page: Int) = paginatorBuilder(Query(text), page)
 
-  def cli = new lila.common.Cli {
-    def process = {
-      case "team" :: "search" :: "reset" :: Nil => api.reset inject "done"
+  def cli =
+    new lila.common.Cli {
+      def process = { case "team" :: "search" :: "reset" :: Nil =>
+        api.reset inject "done"
+      }
     }
-  }
 
   system.actorOf(
     Props(new Actor {
       import lila.team.actorApi._
       def receive = {
-        case InsertTeam(team) => api store team
-        case RemoveTeam(id)   => client deleteById Id(id)
+        case InsertTeam(team) => api.store(team).unit
+        case RemoveTeam(id)   => client.deleteById(Id(id)).unit
       }
     }),
     name = config.actorName

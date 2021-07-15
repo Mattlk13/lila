@@ -3,6 +3,7 @@ package lila.study
 import chess.format.{ FEN, Uci }
 import chess.Pos
 import play.api.libs.json._
+import scala.util.chaining._
 
 import lila.common.Json._
 import lila.socket.Socket.Sri
@@ -52,7 +53,7 @@ final class JsonView(
             .add("description", currentChapter.description)
             .add("serverEval", currentChapter.serverEval)
             .add("relay", currentChapter.relay)(relayWrites)
-            .|>(addChapterMode(currentChapter))
+            .pipe(addChapterMode(currentChapter))
         )
         .add("description", study.description)
     }
@@ -65,18 +66,19 @@ final class JsonView(
         "name"        -> c.name,
         "orientation" -> c.setup.orientation
       )
-      .add("description", c.description) |> addChapterMode(c)
+      .add("description", c.description) pipe addChapterMode(c)
 
-  def pagerData(s: Study.WithChaptersAndLiked) = Json.obj(
-    "id"        -> s.study.id.value,
-    "name"      -> s.study.name.value,
-    "liked"     -> s.liked,
-    "likes"     -> s.study.likes.value,
-    "updatedAt" -> s.study.updatedAt,
-    "owner"     -> lightUserApi.sync(s.study.ownerId),
-    "chapters"  -> s.chapters.take(4),
-    "members"   -> s.study.members.members.values.take(4)
-  )
+  def pagerData(s: Study.WithChaptersAndLiked) =
+    Json.obj(
+      "id"        -> s.study.id.value,
+      "name"      -> s.study.name.value,
+      "liked"     -> s.liked,
+      "likes"     -> s.study.likes.value,
+      "updatedAt" -> s.study.updatedAt,
+      "owner"     -> lightUserApi.sync(s.study.ownerId),
+      "chapters"  -> s.chapters.take(4),
+      "members"   -> s.study.members.members.values.take(4)
+    )
 
   private def addChapterMode(c: Chapter)(js: JsObject): JsObject =
     js.add("practice", c.isPractice)
@@ -87,7 +89,7 @@ final class JsonView(
     JsString(r.id)
   }
   implicit private[study] val memberWrites: Writes[StudyMember] = Writes[StudyMember] { m =>
-    Json.obj("user" -> lightUserApi.sync(m.id), "role" -> m.role)
+    Json.obj("user" -> lightUserApi.syncFallback(m.id), "role" -> m.role)
   }
 
   implicit private[study] val membersWrites: Writes[StudyMembers] = Writes[StudyMembers] { m =>
@@ -129,7 +131,7 @@ object JsonView {
     JsString(u.uci)
   }
   implicit private val posReader: Reads[Pos] = Reads[Pos] { v =>
-    (v.asOpt[String] flatMap Pos.posAt).fold[JsResult[Pos]](JsError(Nil))(JsSuccess(_))
+    (v.asOpt[String] flatMap Pos.fromKey).fold[JsResult[Pos]](JsError(Nil))(JsSuccess(_))
   }
   implicit private[study] val pathWrites: Writes[Path] = Writes[Path] { p =>
     JsString(p.toString)
@@ -185,7 +187,10 @@ object JsonView {
   }
   implicit private val chapterSetupWrites = Json.writes[Chapter.Setup]
   implicit private[study] val chapterMetadataWrites = OWrites[Chapter.Metadata] { c =>
-    Json.obj("id" -> c._id, "name" -> c.name)
+    Json
+      .obj("id" -> c._id, "name" -> c.name)
+      .add("ongoing", c.looksOngoing)
+      .add("res" -> c.resultStr)
   }
 
   implicit private[study] val positionRefWrites: Writes[Position.Ref] = Json.writes[Position.Ref]

@@ -2,6 +2,7 @@ package lila.analyse
 
 import chess.format.pgn.Glyph
 import lila.tree.Eval._
+import scala.util.chaining._
 
 sealed trait Advice {
   def judgment: Advice.Judgement
@@ -22,12 +23,12 @@ sealed trait Advice {
         case MateAdvice(seq, _, _, _) => seq.desc
         case CpAdvice(judgment, _, _) => judgment.toString
       }) + "." + {
-      withBestMove ?? {
-        info.variation.headOption ?? { move =>
-          s" $move was best."
+        withBestMove ?? {
+          info.variation.headOption ?? { move =>
+            s" $move was best."
+          }
         }
       }
-    }
 
   def evalComment: Option[String] = {
     List(prev.evalComment, info.evalComment).flatten mkString " → "
@@ -72,7 +73,7 @@ private[analyse] object CpAdvice {
       infoCp <- info.cp map (_.ceiled.centipawns)
       prevWinningChances    = cpWinningChances(cp)
       currentWinningChances = cpWinningChances(infoCp)
-      delta = (currentWinningChances - prevWinningChances) |> { d =>
+      delta = (currentWinningChances - prevWinningChances) pipe { d =>
         info.color.fold(-d, d)
       }
       judgement <- winningChanceJudgements find { case (d, _) => d <= delta } map (_._2)

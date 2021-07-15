@@ -3,10 +3,13 @@ package lila.activity
 import org.joda.time.{ DateTime, Interval }
 import reactivemongo.api.ReadPreference
 
+import lila.common.Heapsort
 import lila.db.dsl._
 import lila.game.LightPov
 import lila.practice.PracticeStructure
 import lila.user.User
+import lila.tournament.LeaderboardApi
+import lila.swiss.Swiss
 
 final class ActivityReadApi(
     coll: Coll,
@@ -15,7 +18,8 @@ final class ActivityReadApi(
     postApi: lila.forum.PostApi,
     simulApi: lila.simul.SimulApi,
     studyApi: lila.study.StudyApi,
-    tourLeaderApi: lila.tournament.LeaderboardApi
+    tourLeaderApi: lila.tournament.LeaderboardApi,
+    swissApi: lila.swiss.SwissApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
   import BSONHandlers._
@@ -27,12 +31,14 @@ final class ActivityReadApi(
 
   def recent(u: User, nb: Int = recentNb): Fu[Vector[ActivityView]] =
     for {
-      activities <- coll.ext
-        .find(regexId(u.id))
-        .sort($sort desc "_id")
-        .vector[Activity](nb, ReadPreference.secondaryPreferred)
-        .dmap(_.filterNot(_.isEmpty))
-        .mon(_.user segment "activity.raws")
+      activities <-
+        coll
+          .find(regexId(u.id))
+          .sort($sort desc "_id")
+          .cursor[Activity](ReadPreference.secondaryPreferred)
+          .vector(nb)
+          .dmap(_.filterNot(_.isEmpty))
+          .mon(_.user segment "activity.raws")
       practiceStructure <- activities.exists(_.practice.isDefined) ?? {
         practiceApi.structure.get dmap some
       }
@@ -51,8 +57,8 @@ final class ActivityReadApi(
       practice = (for {
         p      <- a.practice
         struct <- practiceStructure
-      } yield p.value flatMap {
-        case (studyId, nb) => struct study studyId map (_ -> nb)
+      } yield p.value flatMap { case (studyId, nb) =>
+        struct study studyId map (_ -> nb)
       } toMap)
       postView = posts.map { p =>
         p.groupBy(_.topic)
@@ -74,16 +80,18 @@ final class ActivityReadApi(
           }
         }
       }
-      simuls <- a.simuls
-        .?? { simuls =>
-          simulApi byIds simuls.value.map(_.value) dmap some
-        }
-        .map(_ filter (_.nonEmpty))
-      studies <- a.studies
-        .?? { studies =>
-          studyApi publicIdNames studies.value dmap some
-        }
-        .map(_ filter (_.nonEmpty))
+      simuls <-
+        a.simuls
+          .?? { simuls =>
+            simulApi byIds simuls.value.map(_.value) dmap some
+          }
+          .dmap(_.filter(_.nonEmpty))
+      studies <-
+        a.studies
+          .?? { studies =>
+            studyApi publicIdNames studies.value dmap some
+          }
+          .dmap(_.filter(_.nonEmpty))
       tours <- a.games.exists(_.hasNonCorres) ?? {
         val dateRange = a.date -> a.date.plusDays(1)
         tourLeaderApi
@@ -91,15 +99,28 @@ final class ActivityReadApi(
           .dmap { entries =>
             entries.nonEmpty option ActivityView.Tours(
               nb = entries.size,
-              best = entries.sortBy(_.rankRatio.value).take(activities.maxSubEntries)
+              best = Heapsort.topN(
+                entries,
+                activities.maxSubEntries,
+                Ordering.by[LeaderboardApi.Entry, Double](-_.rankRatio.value)
+              )
             )
           }
           .mon(_.user segment "activity.tours")
       }
+      swisses <-
+        a.swisses
+          .?? { swisses =>
+            toSwissesView(swisses.value).dmap(_.some.filter(_.nonEmpty))
+          }
+
     } yield ActivityView(
       interval = a.interval,
       games = a.games,
       puzzles = a.puzzles,
+      storm = a.storm,
+      racer = a.racer,
+      streak = a.streak,
       practice = practice,
       posts = postView,
       simuls = simuls,
@@ -110,15 +131,37 @@ final class ActivityReadApi(
       studies = studies,
       teams = a.teams,
       tours = tours,
+      swisses = swisses,
       stream = a.stream
     )
+
+  def recentSwissRanks(userId: User.ID): Fu[List[(Swiss.IdName, Int)]] =
+    coll
+      .find(regexId(userId) ++ $doc(BSONHandlers.ActivityFields.swisses $exists true))
+      .sort($sort desc "_id")
+      .cursor[Activity](ReadPreference.secondaryPreferred)
+      .list(10)
+      .flatMap { activities =>
+        toSwissesView(activities.flatMap(_.swisses.??(_.value)))
+      }
+
+  private def toSwissesView(swisses: List[activities.SwissRank]): Fu[List[(Swiss.IdName, Int)]] =
+    swissApi
+      .idNames(swisses.map(_.id))
+      .map {
+        _.flatMap { idName =>
+          swisses.find(_.id == idName.id) map { s =>
+            (idName, s.rank)
+          }
+        }
+      }
 
   private def addSignup(at: DateTime, recent: Vector[ActivityView]) = {
     val (found, views) = recent.foldLeft(false -> Vector.empty[ActivityView]) {
       case ((false, as), a) if a.interval contains at => (true, as :+ a.copy(signup = true))
       case ((found, as), a)                           => (found, as :+ a)
     }
-    if (!found && views.size < recentNb && DateTime.now.minusDays(8).isBefore(at))
+    if (!found && views.sizeIs < recentNb && DateTime.now.minusDays(8).isBefore(at))
       views :+ ActivityView(
         interval = new Interval(at.withTimeAtStartOfDay, at.withTimeAtStartOfDay plusDays 1),
         signup = true

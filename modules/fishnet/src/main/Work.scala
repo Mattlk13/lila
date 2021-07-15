@@ -43,7 +43,7 @@ object Work {
     override def toString = s"by $userId at $date"
   }
 
-  case class Game(
+  private[fishnet] case class Game(
       id: String, // can be a study chapter ID, if studyId is set
       initialFen: Option[FEN],
       studyId: Option[String],
@@ -55,7 +55,7 @@ object Work {
   }
 
   case class Sender(
-      userId: Option[String],
+      userId: lila.user.User.ID,
       ip: Option[IpAddress],
       mod: Boolean,
       system: Boolean
@@ -63,7 +63,7 @@ object Work {
 
     override def toString =
       if (system) lila.user.User.lichessId
-      else userId orElse ip.map(_.value) getOrElse "unknown"
+      else userId
   }
 
   case class Clock(wtime: Int, btime: Int, inc: Int)
@@ -89,15 +89,16 @@ object Work {
 
     def skill = Client.Skill.Analysis
 
-    def assignTo(client: Client) = copy(
-      acquired = Acquired(
-        clientKey = client.key,
-        userId = client.userId,
-        date = DateTime.now
-      ).some,
-      lastTryByKey = client.key.some,
-      tries = tries + 1
-    )
+    def assignTo(client: Client) =
+      copy(
+        acquired = Acquired(
+          clientKey = client.key,
+          userId = client.userId,
+          date = DateTime.now
+        ).some,
+        lastTryByKey = client.key.some,
+        tries = tries + 1
+      )
 
     def timeout = copy(acquired = none)
     def invalid = copy(acquired = none)
@@ -112,5 +113,5 @@ object Work {
     override def toString = s"id:$id game:${game.id} tries:$tries requestedBy:$sender acquired:$acquired"
   }
 
-  def makeId = Id(scala.util.Random.alphanumeric take 8 mkString)
+  def makeId = Id(lila.common.ThreadLocalRandom nextString 8)
 }

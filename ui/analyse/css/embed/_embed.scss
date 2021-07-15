@@ -14,7 +14,8 @@ $mq-col1: 9999px;
 
 .chapter-name {
   @extend %roboto;
-  padding: .3em;
+
+  padding: 0.3em;
   border-bottom: $border;
   background: $c-bg-zebra;
   text-align: center;
@@ -23,4 +24,21 @@ $mq-col1: 9999px;
 cg-board {
   border-radius: 0;
   box-shadow: none;
+}
+
+.analyse .gamebook {
+  .comment {
+    margin: 0 2vw;
+  }
+
+  &-embed {
+    @extend %popup-shadow;
+    z-index: z('cg__board.overlay');
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: block;
+    padding: 2em 4em;
+  }
 }

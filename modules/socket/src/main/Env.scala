@@ -10,7 +10,10 @@ final class Env(
     appConfig: Configuration,
     shutdown: CoordinatedShutdown,
     notification: lila.hub.actors.Notification
-)(implicit ec: scala.concurrent.ExecutionContext, akka: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    akka: ActorSystem
+) {
 
   private val RedisUri = appConfig.get[String]("socket.redis.uri")
 
@@ -22,5 +25,5 @@ final class Env(
 
   val onlineIds = new OnlineIds(() => remoteSocket.onlineUserIds.get)
 
-  val isOnline = new IsOnline(userId => onlineIds() contains userId)
+  val isOnline = new IsOnline(userId => remoteSocket.onlineUserIds.get contains userId)
 }

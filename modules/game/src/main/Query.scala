@@ -34,7 +34,9 @@ object Query {
 
   val notFinished: Bdoc = F.status $lte Status.Started.id
 
-  def analysed(an: Boolean): Bdoc = F.analysed $eq an
+  def analysed(an: Boolean): Bdoc =
+    if (an) F.analysed $eq true
+    else F.analysed $ne true
 
   val frozen: Bdoc = F.status $gte Status.Mate.id
 
@@ -61,31 +63,34 @@ object Query {
 
   def nowPlayingVs(u1: String, u2: String) = $doc(F.playingUids $all List(u1, u2))
 
-  def nowPlayingVs(userIds: Iterable[String]) = $doc(
-    F.playingUids $in userIds, // as to use the index
-    s"${F.playingUids}.0" $in userIds,
-    s"${F.playingUids}.1" $in userIds
-  )
+  def nowPlayingVs(userIds: Iterable[String]) =
+    $doc(
+      F.playingUids $in userIds, // as to use the index
+      s"${F.playingUids}.0" $in userIds,
+      s"${F.playingUids}.1" $in userIds
+    )
 
   // use the us index
   def win(u: String) = user(u) ++ $doc(F.winnerId -> u)
 
-  def loss(u: String) = user(u) ++ $doc(
-    F.status $in Status.finishedWithWinner.map(_.id),
-    F.winnerId -> $doc(
-      "$exists" -> true,
-      "$ne"     -> u
+  def loss(u: String) =
+    user(u) ++ $doc(
+      F.status $in Status.finishedWithWinner.map(_.id),
+      F.winnerId -> $doc(
+        "$exists" -> true,
+        "$ne"     -> u
+      )
     )
-  )
 
   def opponents(u1: User, u2: User) =
     $doc(F.playerUids $all List(u1, u2).sortBy(_.count.game).map(_.id))
 
-  def opponents(userIds: Iterable[String]) = $doc(
-    F.playerUids $in userIds, // as to use the index
-    s"${F.playerUids}.0" $in userIds,
-    s"${F.playerUids}.1" $in userIds
-  )
+  def opponents(userIds: Iterable[String]) =
+    $doc(
+      F.playerUids $in userIds, // as to use the index
+      s"${F.playerUids}.0" $in userIds,
+      s"${F.playerUids}.1" $in userIds
+    )
 
   val noProvisional: Bdoc = $doc(
     "p0.p" $exists false,
@@ -119,12 +124,15 @@ object Query {
   def createdSince(d: DateTime): Bdoc =
     F.createdAt $gt d
 
-  def createdBetween(since: Option[DateTime], until: Option[DateTime]): Bdoc = (since, until) match {
-    case (Some(since), None)        => createdSince(since)
-    case (None, Some(until))        => F.createdAt $lt until
-    case (Some(since), Some(until)) => F.createdAt $gt since $lt until
-    case _                          => $empty
-  }
+  def createdBetween(since: Option[DateTime], until: Option[DateTime]): Bdoc =
+    (since, until) match {
+      case (Some(since), None)        => createdSince(since)
+      case (None, Some(until))        => F.createdAt $lt until
+      case (Some(since), Some(until)) => F.createdAt $gt since $lt until
+      case _                          => $empty
+    }
+
+  val notSimul = F.simulId $exists false
 
   val sortCreated: Bdoc           = $sort desc F.createdAt
   val sortChronological: Bdoc     = $sort asc F.createdAt

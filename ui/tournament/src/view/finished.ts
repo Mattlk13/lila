@@ -1,5 +1,4 @@
-import { h } from 'snabbdom'
-import { VNode } from 'snabbdom/vnode';
+import { h, VNode } from 'snabbdom';
 import TournamentController from '../ctrl';
 import { TournamentData, MaybeVNodes } from '../interfaces';
 import * as pagination from '../pagination';
@@ -11,15 +10,18 @@ import teamInfo from './teamInfo';
 import { numberRow } from './util';
 
 function confetti(data: TournamentData): VNode | undefined {
-  if (data.me && data.isRecentlyFinished && window.lichess.once('tournament.end.canvas.' + data.id))
+  if (data.me && data.isRecentlyFinished && lichess.once('tournament.end.canvas.' + data.id))
     return h('canvas#confetti', {
       hook: {
-        insert: _ => window.lichess.loadScript('javascripts/confetti.js')
-      }
+        insert: _ => lichess.loadScript('javascripts/confetti.js'),
+      },
     });
+  return undefined;
 }
 
-function stats(data: TournamentData, noarg: any): VNode {
+function stats(data: TournamentData, trans: Trans): VNode | undefined {
+  if (!data.stats) return undefined;
+  const noarg = trans.noarg;
   const tableData = [
     numberRow(noarg('averageElo'), data.stats.averageRating, 'raw'),
     numberRow(noarg('gamesPlayed'), data.stats.games),
@@ -30,13 +32,72 @@ function stats(data: TournamentData, noarg: any): VNode {
   ];
 
   if (data.berserkable) {
-    const berserkRate = [data.stats.berserks / 2, data.stats.games];
-    tableData.push(numberRow(noarg('berserkRate'), berserkRate, 'percent'))
+    tableData.push(numberRow(noarg('berserkRate'), [data.stats.berserks / 2, data.stats.games], 'percent'));
   }
 
   return h('div.tour__stats', [
     h('h2', noarg('tournamentComplete')),
-    h('table', tableData)
+    h('table', tableData),
+    h('div.tour__stats__links', [
+      ...(data.teamBattle
+        ? [
+            h(
+              'a',
+              {
+                attrs: {
+                  href: `/tournament/${data.id}/teams`,
+                },
+              },
+              trans('viewAllXTeams', Object.keys(data.teamBattle.teams).length)
+            ),
+            h('br'),
+          ]
+        : []),
+      h(
+        'a.text',
+        {
+          attrs: {
+            'data-icon': '',
+            href: `/api/tournament/${data.id}/games`,
+            download: true,
+          },
+        },
+        'Download all games'
+      ),
+      h(
+        'a.text',
+        {
+          attrs: {
+            'data-icon': '',
+            href: `/api/tournament/${data.id}/results`,
+            download: true,
+          },
+        },
+        'Download results as NDJSON'
+      ),
+      h(
+        'a.text',
+        {
+          attrs: {
+            'data-icon': '',
+            href: `/api/tournament/${data.id}/results?as=csv`,
+            download: true,
+          },
+        },
+        'Download results as CSV'
+      ),
+      h('br'),
+      h(
+        'a.text',
+        {
+          attrs: {
+            'data-icon': '',
+            href: 'https://lichess.org/api#tag/Arena-tournaments',
+          },
+        },
+        'Arena API documentation'
+      ),
+    ]),
   ]);
 }
 
@@ -46,22 +107,16 @@ export function main(ctrl: TournamentController): MaybeVNodes {
   const pag = pagination.players(ctrl);
   const teamS = teamStanding(ctrl, 'finished');
   return [
-    ...(teamS ? [header(ctrl), teamS] : [
-      h('div.big_top', [
-        confetti(ctrl.data),
-        header(ctrl),
-        podium(ctrl)
-      ])
-    ]),
+    ...(teamS ? [header(ctrl), teamS] : [h('div.podium-wrap', [confetti(ctrl.data), header(ctrl), podium(ctrl)])]),
     controls(ctrl, pag),
-    standing(ctrl, pag)
+    standing(ctrl, pag),
   ];
 }
 
 export function table(ctrl: TournamentController): VNode | undefined {
-  return ctrl.playerInfo.id ? playerInfo(ctrl) : (
-    ctrl.teamInfo.requested ? teamInfo(ctrl) : (
-      stats ? stats(ctrl.data, ctrl.trans.noarg) : undefined
-    )
-  );
+  return ctrl.playerInfo.id
+    ? playerInfo(ctrl)
+    : ctrl.teamInfo.requested
+    ? teamInfo(ctrl)
+    : stats(ctrl.data, ctrl.trans);
 }

@@ -17,14 +17,13 @@ object index {
     views.html.base.layout(
       title = s"${learnChess.txt()} - ${byPlaying.txt()}",
       moreJs = frag(
-        jsAt(s"compiled/lichess.learn${isProd ?? (".min")}.js"),
-        embedJsUnsafe(s"""$$(function() {
-LichessLearn(document.getElementById('learn-app'), ${safeJsonValue(
+        jsModule("learn"),
+        embedJsUnsafeLoadThen(s"""LichessLearn(document.getElementById('learn-app'), ${safeJsonValue(
           Json.obj(
             "data" -> data,
             "i18n" -> i18nJsObject(i18nKeys)
           )
-        )})})""")
+        )})""")
       ),
       moreCss = cssTag("learn"),
       openGraph = lila.app.ui
@@ -34,13 +33,16 @@ LichessLearn(document.getElementById('learn-app'), ${safeJsonValue(
           url = s"$netBaseUrl${routes.Learn.index}"
         )
         .some,
-      zoomable = true
+      zoomable = true,
+      chessground = false
     ) {
       main(id := "learn-app")
     }
 
   private val i18nKeys: List[lila.i18n.MessageKey] =
     List(
+      learnChess,
+      byPlaying,
       menu,
       progressX,
       resetMyProgress,
@@ -172,6 +174,8 @@ LichessLearn(document.getElementById('learn-app'), ${safeJsonValue(
       pieceValueIntro,
       queenOverBishop,
       takeThePieceWithTheHighestValue,
+      pieceValueLegal,
+      pieceValueExchange,
       pieceValueComplete,
       checkInTwo,
       twoMovesToGiveCheck,

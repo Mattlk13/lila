@@ -14,25 +14,28 @@ private class StreamerConfig(
     @ConfigName("paginator.max_per_page") val paginatorMaxPerPage: MaxPerPage,
     @ConfigName("streaming.keyword") val keyword: Stream.Keyword,
     @ConfigName("streaming.google.api_key") val googleApiKey: Secret,
-    @ConfigName("streaming.twitch.client_id") val twitchClientId: Secret
+    @ConfigName("streaming.twitch") val twitchConfig: TwitchConfig
 )
+private class TwitchConfig(@ConfigName("client_id") val clientId: String, val secret: Secret)
 
 @Module
 final class Env(
     appConfig: Configuration,
-    ws: play.api.libs.ws.WSClient,
+    ws: play.api.libs.ws.StandaloneWSClient,
     settingStore: lila.memo.SettingStore.Builder,
-    renderer: lila.hub.actors.Renderer,
     isOnline: lila.socket.IsOnline,
     cacheApi: lila.memo.CacheApi,
     notifyApi: lila.notify.NotifyApi,
-    lightUserApi: lila.user.LightUserApi,
     userRepo: lila.user.UserRepo,
     timeline: lila.hub.actors.Timeline,
     db: lila.db.Db,
     imageRepo: lila.db.ImageRepo
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem
+) {
 
+  implicit private val twitchLoader  = AutoConfig.loader[TwitchConfig]
   implicit private val keywordLoader = strLoader(Stream.Keyword.apply)
   private val config                 = appConfig.get[StreamerConfig]("streamer")(AutoConfig.loader)
 
@@ -41,44 +44,51 @@ final class Env(
   private lazy val photographer = new lila.db.Photographer(imageRepo, "streamer")
 
   lazy val alwaysFeaturedSetting = {
-    import lila.memo.SettingStore.Strings._
-    import lila.common.Strings
-    settingStore[Strings](
+    import lila.memo.SettingStore.UserIds._
+    import lila.common.UserIds
+    settingStore[UserIds](
       "streamerAlwaysFeatured",
-      default = Strings(Nil),
+      default = UserIds(Nil),
       text =
         "Twitch streamers who get featured without the keyword - lichess usernames separated by a comma".some
     )
   }
 
+  lazy val homepageMaxSetting =
+    settingStore[Int](
+      "streamerHomepageMax",
+      default = 6,
+      text = "Max streamers on homepage".some
+    )
+
   lazy val api: StreamerApi = wire[StreamerApi]
 
   lazy val pager = wire[StreamerPager]
+
+  private lazy val twitchApi: TwitchApi = wire[TwitchApi]
 
   private val streamingActor = system.actorOf(
     Props(
       new Streaming(
         ws = ws,
-        renderer = renderer,
         api = api,
         isOnline = isOnline,
         timeline = timeline,
         keyword = config.keyword,
         alwaysFeatured = alwaysFeaturedSetting.get _,
         googleApiKey = config.googleApiKey,
-        twitchClientId = config.twitchClientId,
-        lightUserApi = lightUserApi
+        twitchApi = twitchApi
       )
     )
   )
 
   lazy val liveStreamApi = wire[LiveStreamApi]
 
-  lila.common.Bus.subscribeFun("adjustCheater") {
-    case lila.hub.actorApi.mod.MarkCheater(userId, true) => api demote userId
+  lila.common.Bus.subscribeFun("adjustCheater") { case lila.hub.actorApi.mod.MarkCheater(userId, true) =>
+    api.demote(userId).unit
   }
 
   system.scheduler.scheduleWithFixedDelay(1 hour, 1 day) { () =>
-    api.autoDemoteFakes
+    api.autoDemoteFakes.unit
   }
 }

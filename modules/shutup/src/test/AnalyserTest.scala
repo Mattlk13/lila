@@ -44,14 +44,18 @@ class AnalyserTest extends Specification {
         "kuntings"
       )
     }
+    "find phrases" in {
+      find("I think you suck") must_== List("you suck")
+      find("you should suck my") must_== List("suck my")
+    }
     "50 shades of fuck" in {
       find("fuck fffuuk fektard feak fak phuk") must_== List("fuck", "fffuuk", "fektard", "fak", "phuk")
     }
     "compute ratio" in {
       ratio("fuck that shit") must_== 2d / 3
       ratio("Beat them cunting nigger faggots with a communist dick") must_== 4d / 9
-      ratio("hello there") must_== 0
-      ratio("") must_== 0
+      ratio("hello there") must_== 0d
+      ratio("") must_== 0d
     }
     "chessbot variations" in {
       find("foo chessbot bar") must_== List("chessbot")

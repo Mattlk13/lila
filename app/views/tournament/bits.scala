@@ -4,6 +4,7 @@ import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.i18n.{ I18nKeys => trans }
+import lila.tournament.Tournament
 
 import controllers.routes
 
@@ -19,11 +20,11 @@ object bits {
         p(trans.tournamentMayHaveBeenCanceled()),
         br,
         br,
-        a(href := routes.Tournament.home())(trans.returnToTournamentsHomepage())
+        a(href := routes.Tournament.home)(trans.returnToTournamentsHomepage())
       )
     }
 
-  def enterable(tours: List[lila.tournament.Tournament]) =
+  def enterable(tours: List[Tournament]) =
     table(cls := "tournaments")(
       tours map { tour =>
         tr(
@@ -36,10 +37,18 @@ object bits {
             td(momentFromNow(s.at))
           },
           td(tour.durationString),
-          td(dataIcon := "r", cls := "text")(tour.nbPlayers)
+          td(dataIcon := "", cls := "text")(tour.nbPlayers)
         )
       }
     )
+
+  def userPrizeDisclaimer(ownerId: lila.user.User.ID) =
+    !env.prizeTournamentMakers.get().value.contains(ownerId) option
+      div(cls := "tour__prize")(
+        "This tournament is not organized by Lichess.",
+        br,
+        "If it has prizes, Lichess is not responsible for paying them."
+      )
 
   def jsI18n(implicit ctx: Context) = i18nJsObject(i18nKeys)
 
@@ -66,9 +75,10 @@ object bits {
     trans.blackWins,
     trans.draws,
     trans.nextXTournament,
-    trans.viewMoreTournaments,
     trans.averageOpponent,
     trans.ratedTournament,
-    trans.casualTournament
+    trans.casualTournament,
+    trans.password,
+    trans.arena.viewAllXTeams
   ).map(_.key)
 }

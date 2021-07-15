@@ -10,6 +10,11 @@ export type ExplorerDb = 'lichess' | 'masters';
 
 export type ExplorerSpeed = 'bullet' | 'blitz' | 'rapid' | 'classical';
 
+export interface ExplorerOpts {
+  endpoint: string;
+  tablebaseEndpoint: string;
+}
+
 export interface ExplorerConfigData {
   open: Prop<boolean>;
   db: {
@@ -28,12 +33,12 @@ export interface ExplorerConfigData {
 
 export interface ExplorerConfigCtrl {
   trans: Trans;
-  redraw();
+  redraw(): void;
   data: ExplorerConfigData;
-  toggleOpen();
-  toggleDb(db: ExplorerDb);
-  toggleRating(rating: number);
-  toggleSpeed(speed: string);
+  toggleOpen(): void;
+  toggleDb(db: ExplorerDb): void;
+  toggleRating(rating: number): void;
+  toggleSpeed(speed: string): void;
   fullHouse(): boolean;
 }
 
@@ -71,9 +76,9 @@ interface OpeningPlayer {
 
 export interface TablebaseData extends ExplorerData {
   moves: TablebaseMoveStats[];
-  wdl: number | null,
-  dtz: number | null,
-  dtm: number | null,
+  wdl: number | null;
+  dtz: number | null;
+  dtm: number | null;
   checkmate: boolean;
   stalemate: boolean;
   variant_win: boolean;
@@ -103,12 +108,18 @@ export interface TablebaseMoveStats extends MoveStats {
   insufficient_material: boolean;
   zeroing: boolean;
 }
+export interface TablebaseMoveStatsWithDtz extends TablebaseMoveStats {
+  dtz: number;
+}
 
 export function isOpening(m: ExplorerData): m is OpeningData {
   return !!m.isOpening;
 }
 export function isTablebase(m: ExplorerData): m is TablebaseData {
   return !!m.tablebase;
+}
+export function hasDtz(m: TablebaseMoveStats): m is TablebaseMoveStatsWithDtz {
+  return m.dtz !== null;
 }
 
 export interface SimpleTablebaseHit {
@@ -121,17 +132,17 @@ export interface ExplorerCtrl {
   allowed: Prop<boolean>;
   loading: Prop<boolean>;
   enabled: Prop<boolean>;
-  failing: Prop<boolean>;
+  failing: Prop<Error | null>;
   movesAway: Prop<number>;
   config: ExplorerConfigCtrl;
   withGames: boolean;
   gameMenu: Prop<string | null>;
   current(): ExplorerData | undefined;
   hovering: Prop<Hovering | null>;
-  setNode();
-  toggle();
-  disable();
-  setHovering(fen: Fen, uci: Uci | null);
-  fetchMasterOpening(fen: Fen): JQueryPromise<OpeningData>;
-  fetchTablebaseHit(fen: Fen): JQueryPromise<SimpleTablebaseHit>;
+  setNode(): void;
+  toggle(): void;
+  disable(): void;
+  setHovering(fen: Fen, uci: Uci | null): void;
+  fetchMasterOpening(fen: Fen): Promise<OpeningData>;
+  fetchTablebaseHit(fen: Fen): Promise<SimpleTablebaseHit>;
 }

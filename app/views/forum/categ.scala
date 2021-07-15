@@ -18,13 +18,13 @@ object categ {
         .OpenGraph(
           title = "Lichess community forum",
           url = s"$netBaseUrl${routes.ForumCateg.index.url}",
-          description = "Chess discussions and feedback about lichess development"
+          description = "Chess discussions and feedback about Lichess development"
         )
         .some
     ) {
       main(cls := "forum index box")(
         div(cls := "box__top")(
-          h1(dataIcon := "d", cls := "text")("Lichess Forum"),
+          h1(dataIcon := "", cls := "text")("Lichess Forum"),
           bits.searchForm()
         ),
         showCategs(categs.filterNot(_.categ.isTeam)),
@@ -47,30 +47,30 @@ object categ {
       a(
         href := routes.ForumTopic.form(categ.slug),
         cls := "button button-empty button-green text",
-        dataIcon := "m"
+        dataIcon := ""
       )(
         trans.createANewTopic()
       )
-    def showTopic(sticky: Boolean)(topic: lila.forum.TopicView) = tr(cls := List("sticky" -> sticky))(
-      td(cls := "subject")(
-        a(href := routes.ForumTopic.show(categ.slug, topic.slug))(topic.name)
-      ),
-      td(cls := "right")(topic.views.localize),
-      td(cls := "right")(topic.nbReplies.localize),
-      td(
-        topic.lastPost.map { post =>
-          frag(
-            a(href := s"${routes.ForumTopic.show(categ.slug, topic.slug, topic.lastPage)}#${post.number}")(
-              momentFromNow(post.createdAt)
-            ),
-            br,
-            authorLink(post)
-          )
-        }
+    def showTopic(sticky: Boolean)(topic: lila.forum.TopicView) =
+      tr(cls := List("sticky" -> sticky))(
+        td(cls := "subject")(
+          a(href := routes.ForumTopic.show(categ.slug, topic.slug))(topic.name)
+        ),
+        td(cls := "right")(topic.nbReplies.localize),
+        td(
+          topic.lastPost.map { post =>
+            frag(
+              a(href := s"${routes.ForumTopic.show(categ.slug, topic.slug, topic.lastPage)}#${post.number}")(
+                momentFromNow(post.createdAt)
+              ),
+              br,
+              trans.by(authorLink(post))
+            )
+          }
+        )
       )
-    )
     val bar = div(cls := "bar")(
-      bits.pagination(routes.ForumCateg.show(categ.slug, 1), topics, showPost = false),
+      views.html.base.bits.paginationByQuery(routes.ForumCateg.show(categ.slug, 1), topics, showPost = false),
       newTopicButton
     )
 
@@ -89,7 +89,7 @@ object categ {
         h1(
           a(
             href := categ.team.fold(routes.ForumCateg.index)(routes.Team.show(_)),
-            dataIcon := "I",
+            dataIcon := "",
             cls := "text"
           ),
           categ.team.fold(frag(categ.name))(teamIdToName)
@@ -99,14 +99,13 @@ object categ {
           thead(
             tr(
               th,
-              th(cls := "right")(trans.views()),
               th(cls := "right")(trans.replies()),
               th(trans.lastPost())
             )
           ),
           tbody(
-            stickyPosts map showTopic(true),
-            topics.currentPageResults map showTopic(false)
+            stickyPosts map showTopic(sticky = true),
+            topics.currentPageResults map showTopic(sticky = false)
           )
         ),
         bar
@@ -134,15 +133,14 @@ object categ {
             td(cls := "right")(categ.nbTopics.localize),
             td(cls := "right")(categ.nbPosts.localize),
             td(
-              categ.lastPost.map {
-                case (topic, post, page) =>
-                  frag(
-                    a(href := s"${routes.ForumTopic.show(categ.slug, topic.slug, page)}#${post.number}")(
-                      momentFromNow(post.createdAt)
-                    ),
-                    br,
-                    trans.by(authorName(post))
-                  )
+              categ.lastPost.map { case (topic, post, page) =>
+                frag(
+                  a(href := s"${routes.ForumTopic.show(categ.slug, topic.slug, page)}#${post.number}")(
+                    momentFromNow(post.createdAt)
+                  ),
+                  br,
+                  trans.by(authorLink(post))
+                )
               }
             )
           )

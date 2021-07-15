@@ -1,14 +1,18 @@
 package lila.plan
 
 import org.joda.time.DateTime
-import ornicar.scalalib.Random
+import cats.implicits._
+
+import lila.user.User
 
 case class Charge(
     _id: String, // random
-    userId: Option[String],
+    userId: Option[User.ID],
+    giftTo: Option[User.ID] = none,
     stripe: Option[Charge.Stripe] = none,
     payPal: Option[Charge.PayPal] = none,
-    cents: Cents,
+    money: Money,
+    usd: Usd,
     date: DateTime
 ) {
 
@@ -22,24 +26,29 @@ case class Charge(
     else if (isPayPal) "paypal"
     else "???"
 
-  def lifetimeWorthy = cents >= Cents.lifetime
+  def toGift = (userId, giftTo) mapN { Charge.Gift(_, _, date) }
 }
 
 object Charge {
 
   def make(
-      userId: Option[String],
+      userId: Option[User.ID],
+      giftTo: Option[User.ID],
       stripe: Option[Charge.Stripe] = none,
       payPal: Option[Charge.PayPal] = none,
-      cents: Cents
-  ) = Charge(
-    _id = Random nextString 8,
-    userId = userId,
-    stripe = stripe,
-    payPal = payPal,
-    cents = cents,
-    date = DateTime.now
-  )
+      money: Money,
+      usd: Usd
+  ) =
+    Charge(
+      _id = lila.common.ThreadLocalRandom nextString 8,
+      userId = userId,
+      giftTo = giftTo,
+      stripe = stripe,
+      payPal = payPal,
+      money = money,
+      usd = usd,
+      date = DateTime.now
+    )
 
   case class Stripe(
       chargeId: ChargeId,
@@ -53,4 +62,6 @@ object Charge {
       txnId: Option[String],
       subId: Option[String]
   )
+
+  case class Gift(from: User.ID, to: User.ID, date: DateTime)
 }

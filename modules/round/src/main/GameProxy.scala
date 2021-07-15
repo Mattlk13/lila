@@ -21,18 +21,19 @@ final private class GameProxy(
   def save(progress: Progress): Funit = {
     set(progress.game)
     dirtyProgress = dirtyProgress.fold(progress.dropEvents)(_ withGame progress.game).some
-    if (shouldFlushProgress(progress)) flushProgress
-    else fuccess(scheduleFlushProgress)
+    if (shouldFlushProgress(progress)) flushProgress()
+    else fuccess(scheduleFlushProgress())
   }
 
-  def update(f: Game => Game): Funit = withGame { g =>
-    fuccess(set(f(g)))
-  }
+  def update(f: Game => Game): Funit =
+    withGame { g =>
+      fuccess(set(f(g)))
+    }
 
   private[round] def saveAndFlush(progress: Progress): Funit = {
     set(progress.game)
     dirtyProgress = dirtyProgress.fold(progress)(_ withGame progress.game).some
-    flushProgress
+    flushProgress()
   }
 
   private def set(game: Game): Unit = {
@@ -53,20 +54,24 @@ final private class GameProxy(
   def withPov[A](playerId: Game.PlayerId)(f: Option[Pov] => Fu[A]): Fu[A] =
     withGame(g => f(Pov(g, playerId.value)))
 
-  def withGame[A](f: Game => Fu[A]): Fu[A] = cache.value match {
-    case Some(Success(Some(g))) => f(g)
-    case Some(Success(None))    => fufail(s"No proxy game: $id")
-    case _ =>
-      cache flatMap {
-        case None    => fufail(s"No proxy game: $id")
-        case Some(g) => f(g)
-      }
-  }
+  def withGame[A](f: Game => Fu[A]): Fu[A] =
+    cache.value match {
+      case Some(Success(Some(g))) => f(g)
+      case Some(Success(None))    => fufail(s"No proxy game: $id")
+      case _ =>
+        cache flatMap {
+          case None    => fufail(s"No proxy game: $id")
+          case Some(g) => f(g)
+        }
+    }
 
-  def withGameOptionSync[A](f: Game => A): Option[A] = cache.value match {
-    case Some(Success(Some(g))) => Some(f(g))
-    case _                      => None
-  }
+  def withGameOptionSync[A](f: Game => A): Option[A] =
+    cache.value match {
+      case Some(Success(Some(g))) => Some(f(g))
+      case _                      => None
+    }
+
+  def terminate() = flushProgress()
 
   // internals
 
@@ -78,12 +83,12 @@ final private class GameProxy(
       p.game.hasCorrespondenceClock && !p.game.hasAi && p.game.rated
     )
 
-  private def scheduleFlushProgress() = {
+  private def scheduleFlushProgress(): Unit = {
     scheduledFlush.cancel()
-    scheduledFlush = scheduler.scheduleOnce(scheduleDelay)(flushProgress)
+    scheduledFlush = scheduler.scheduleOnce(scheduleDelay) { flushProgress().unit }
   }
 
-  private def flushProgress = {
+  private def flushProgress(): Funit = {
     scheduledFlush.cancel()
     dirtyProgress ?? gameRepo.update addEffect { _ =>
       dirtyProgress = none

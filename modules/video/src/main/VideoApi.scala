@@ -30,7 +30,7 @@ final private[video] class VideoApi(
     userOption match {
       case None =>
         fuccess {
-          videos map { VideoView(_, false) }
+          videos map { VideoView(_, view = false) }
         }
       case Some(user) =>
         view.seenVideoIds(user, videos) map { ids =>
@@ -45,7 +45,7 @@ final private[video] class VideoApi(
     private val maxPerPage = lila.common.config.MaxPerPage(18)
 
     def find(id: Video.ID): Fu[Option[Video]] =
-      videoColl.ext.find($id(id)).one[Video]
+      videoColl.find($id(id)).one[Video]
 
     def search(user: Option[User], query: String, page: Int): Fu[Paginator[VideoView]] = {
       val q = query.split(' ').map { word =>
@@ -89,19 +89,20 @@ final private[video] class VideoApi(
         .void
 
     def allIds: Fu[List[Video.ID]] =
-      videoColl.distinctEasy[String, List]("_id", $empty)
+      videoColl.distinctEasy[String, List]("_id", $empty, ReadPreference.secondaryPreferred)
 
-    def popular(user: Option[User], page: Int): Fu[Paginator[VideoView]] = Paginator(
-      adapter = new Adapter[Video](
-        collection = videoColl,
-        selector = $empty,
-        projection = none,
-        sort = $doc("metadata.likes" -> -1),
-        readPreference = ReadPreference.secondaryPreferred
-      ) mapFutureList videoViews(user),
-      currentPage = page,
-      maxPerPage = maxPerPage
-    )
+    def popular(user: Option[User], page: Int): Fu[Paginator[VideoView]] =
+      Paginator(
+        adapter = new Adapter[Video](
+          collection = videoColl,
+          selector = $empty,
+          projection = none,
+          sort = $doc("metadata.likes" -> -1),
+          readPreference = ReadPreference.secondaryPreferred
+        ) mapFutureList videoViews(user),
+        currentPage = page,
+        maxPerPage = maxPerPage
+      )
 
     def byTags(user: Option[User], tags: List[Tag], page: Int): Fu[Paginator[VideoView]] =
       if (tags.isEmpty) popular(user, page)
@@ -164,19 +165,19 @@ final private[video] class VideoApi(
 
     object count {
 
-      private val cache = cacheApi.unit[Int] {
+      private val cache = cacheApi.unit[Long] {
         _.refreshAfterWrite(3 hours)
           .buildAsyncFuture(_ => videoColl.countAll)
       }
 
-      def apply: Fu[Int] = cache.getUnit
+      def apply: Fu[Long] = cache.getUnit
     }
   }
 
   object view {
 
     def find(videoId: Video.ID, userId: String): Fu[Option[View]] =
-      viewColl.ext
+      viewColl
         .find(
           $doc(
             View.BSONFields.id -> View.makeId(videoId, userId)
@@ -200,7 +201,8 @@ final private[video] class VideoApi(
         View.BSONFields.videoId,
         $inIds(videos.map { v =>
           View.makeId(v.id, user.id)
-        })
+        }),
+        ReadPreference.secondaryPreferred
       )
   }
 
@@ -218,7 +220,8 @@ final private[video] class VideoApi(
           val allPaths =
             if (filterTags.isEmpty) allPopular map { tags =>
               tags.filterNot(_.isNumeric)
-            } else
+            }
+            else
               videoColl
                 .aggregateList(
                   maxDocs = Int.MaxValue,
@@ -233,21 +236,20 @@ final private[video] class VideoApi(
                 }
                 .dmap { _.flatMap(_.asOpt[TagNb]) }
 
-          allPopular zip allPaths map {
-            case (all, paths) =>
-              val tags = all map { t =>
-                paths find (_._id == t._id) getOrElse TagNb(t._id, 0)
-              } filterNot (_.empty) take max
-              val missing = filterTags filterNot { t =>
-                tags exists (_.tag == t)
-              }
-              val list = tags.take(max - missing.size) ::: missing.flatMap { t =>
-                all find (_.tag == t)
-              }
-              list.sortBy { t =>
-                if (filterTags contains t.tag) Int.MinValue
-                else -t.nb
-              }
+          allPopular zip allPaths map { case (all, paths) =>
+            val tags = all map { t =>
+              paths find (_._id == t._id) getOrElse TagNb(t._id, 0)
+            } filterNot (_.empty) take max
+            val missing = filterTags filterNot { t =>
+              tags exists (_.tag == t)
+            }
+            val list = tags.take(max - missing.size) ::: missing.flatMap { t =>
+              all find (_.tag == t)
+            }
+            list.sortBy { t =>
+              if (filterTags contains t.tag) Int.MinValue
+              else -t.nb
+            }
           }
         }
     }

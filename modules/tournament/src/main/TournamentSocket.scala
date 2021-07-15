@@ -13,20 +13,18 @@ import lila.socket.Socket.makeMessage
 import lila.user.User
 
 final private class TournamentSocket(
+    repo: TournamentRepo,
     remoteSocketApi: lila.socket.RemoteSocket,
     chat: lila.chat.ChatApi
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, mode: play.api.Mode) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    mode: play.api.Mode
+) {
 
   private val allWaitingUsers = new ConcurrentHashMap[Tournament.ID, WaitingUsers.WithNext](64)
 
-  private val reloadThrottler = system.actorOf(
-    Props(
-      new LateMultiThrottler(
-        executionTimeout = 1.seconds.some,
-        logger = logger
-      )
-    )
-  )
+  private val reloadThrottler = LateMultiThrottler(executionTimeout = 1.seconds.some, logger = logger)
 
   def reload(tourId: Tournament.ID): Unit =
     reloadThrottler ! LateMultiThrottler.work(
@@ -48,7 +46,7 @@ final private class TournamentSocket(
 
   def getWaitingUsers(tour: Tournament): Fu[WaitingUsers] = {
     send(Protocol.Out.getWaitingUsers(RoomId(tour.id), tour.name()(lila.i18n.defaultLang)))
-    val promise = Promise[WaitingUsers]
+    val promise = Promise[WaitingUsers]()
     allWaitingUsers.compute(
       tour.id,
       (_: Tournament.ID, cur: WaitingUsers.WithNext) =>
@@ -65,14 +63,25 @@ final private class TournamentSocket(
     reload(tourId)
   }
 
-  lazy val rooms = makeRoomMap(send, true)
+  lazy val rooms = makeRoomMap(send)
+
+  subscribeChat(rooms, _.Tournament)
 
   private lazy val handler: Handler =
-    roomHandler(rooms, chat, logger, roomId => _.Tournament(roomId.value).some)
+    roomHandler(
+      rooms,
+      chat,
+      logger,
+      roomId => _.Tournament(roomId.value).some,
+      chatBusChan = _.Tournament,
+      localTimeout = Some { (roomId, modId, _) =>
+        repo.fetchCreatedBy(roomId.value).map(_ has modId)
+      }
+    )
 
-  private lazy val tourHandler: Handler = {
-    case Protocol.In.WaitingUsers(roomId, users) =>
-      allWaitingUsers.computeIfPresent(
+  private lazy val tourHandler: Handler = { case Protocol.In.WaitingUsers(roomId, users) =>
+    allWaitingUsers
+      .computeIfPresent(
         roomId.value,
         (_: Tournament.ID, cur: WaitingUsers.WithNext) => {
           val newWaiting = cur.waiting.update(users)
@@ -80,6 +89,7 @@ final private class TournamentSocket(
           WaitingUsers.WithNext(newWaiting, none)
         }
       )
+      .unit
   }
 
   private lazy val send: String => Unit = remoteSocketApi.makeSender("tour-out").apply _
@@ -99,9 +109,8 @@ final private class TournamentSocket(
       val tourReader: P.In.Reader = raw =>
         raw.path match {
           case "tour/waiting" =>
-            raw.get(2) {
-              case Array(roomId, users) =>
-                WaitingUsers(RoomId(roomId), P.In.commas(users).toSet).some
+            raw.get(2) { case Array(roomId, users) =>
+              WaitingUsers(RoomId(roomId), P.In.commas(users).toSet).some
             }
           case _ => none
         }

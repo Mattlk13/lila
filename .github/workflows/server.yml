@@ -3,44 +3,53 @@ name: Build server
 on:
   push:
     paths:
-    - '.github/workflows/server.yml'
-    - 'app/**'
-    - 'conf/**'
-    - 'modules/**'
-    - 'project/**'
-    - 'translation/**'
-    - 'build.sbt'
+      - '.github/workflows/server.yml'
+      - 'app/**'
+      - 'conf/**'
+      - 'modules/**'
+      - 'project/**'
+      - 'translation/**'
+      - 'build.sbt'
+      - 'lila'
+      - 'conf/application.conf.default'
+      - '.sbtopts.default'
     branches-ignore:
-    - 'l10n_master'
+      - 'l10n_master'
   pull_request:
     paths:
-    - '.github/workflows/server.yml'
-    - 'app/**'
-    - 'conf/**'
-    - 'modules/**'
-    - 'project/**'
-    - 'translation/source/**'
-    - 'build.sbt'
+      - '.github/workflows/server.yml'
+      - 'app/**'
+      - 'conf/**'
+      - 'modules/**'
+      - 'project/**'
+      - 'translation/source/**'
+      - 'build.sbt'
+      - 'lila'
+      - 'conf/application.conf.default'
+      - '.sbtopts.default'
 
 jobs:
-  server:
+  openjdk14:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - run: echo "autoformat=false" > ~/.scalariform.conf
-    - uses: actions/cache@v1
-      with:
-        path: ~/.ivy2/cache
-        key: ${{ runner.os }}-20200309-ivy2
-    - uses: olafurpg/setup-scala@49fc8c734ef6916b4e1da8ba8d81bb26a2b46a06 # v7
-      with:
-        java-version: openjdk@1.11
-    - run: ./lila test
-    - run: ./lila -Depoll=true dist
-    - run: unzip target/universal/lila-3.0.zip
-    - run: cp LICENSE COPYING.md README.md lila-3.0 && git log -n 1 --pretty=oneline > lila-3.0/commit.txt
-    - run: du -d2 -h ~
-    - uses: actions/upload-artifact@v1
-      with:
-        name: lila-server
-        path: lila-3.0
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/project/build.properties') }}-${{ hashFiles('**/build.sbt') }}-${{ hashFiles('**/project/Dependencies.scala') }}
+      - uses: actions/setup-java@v2
+        with:
+          distribution: zulu
+          java-version: 14.0.1
+      - run: TZ=UTC git log -1 --date=iso-strict-local --pretty='format:app.version.commit = "%h"%napp.version.date = "%ad"%napp.version.message = """%s"""%n' | tee conf/version.conf
+      - run: ./lila -Depoll=true "test;stage"
+      - run: cp LICENSE COPYING.md README.md target/universal/stage && git log -n 1 --pretty=oneline > target/universal/stage/commit.txt
+      - run: cd target/universal/stage && tar -cvpJf ../../../lila-3.0.tar.xz . && cd -
+        env:
+          XZ_OPT: '-0'
+      - uses: actions/upload-artifact@v1
+        with:
+          name: lila-server
+          path: lila-3.0.tar.xz

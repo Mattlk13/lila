@@ -18,7 +18,7 @@ case class Forecast(
     nextMove(g, lastMove) map { move =>
       copy(
         steps = steps.collect {
-          case (fst :: snd :: rest)
+          case fst :: snd :: rest
               if rest.nonEmpty && g.turns == fst.ply && fst.is(lastMove) && snd.is(move) =>
             rest
         },
@@ -29,17 +29,18 @@ case class Forecast(
   // accept up to 30 lines of 30 moves each
   def truncate = copy(steps = steps.take(30).map(_ take 30))
 
-  private def nextMove(g: Game, last: Move) = steps.foldLeft(none[Uci.Move]) {
-    case (None, fst :: snd :: _) if g.turns == fst.ply && fst.is(last) => snd.uciMove
-    case (move, _)                                                     => move
-  }
+  private def nextMove(g: Game, last: Move) =
+    steps.foldLeft(none[Uci.Move]) {
+      case (None, fst :: snd :: _) if g.turns == fst.ply && fst.is(last) => snd.uciMove
+      case (move, _)                                                     => move
+    }
 }
 
 object Forecast {
 
   type Steps = List[List[Step]]
 
-  def maxPlies(steps: Steps): Int = ~steps.map(_.size).sortBy(-_).lastOption
+  def maxPlies(steps: Steps): Int = steps.foldLeft(0)(_ max _.size)
 
   case class Step(
       ply: Int,

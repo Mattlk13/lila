@@ -24,7 +24,7 @@ final class ForecastApi(coll: Coll, tellRound: TellRound)(implicit ec: scala.con
         $id(pov.fullId),
         Forecast(
           _id = pov.fullId,
-          steps = steps,
+          steps = steps.filter(_.nonEmpty),
           date = DateTime.now
         ).truncate,
         upsert = true
@@ -32,11 +32,12 @@ final class ForecastApi(coll: Coll, tellRound: TellRound)(implicit ec: scala.con
       .void
   }
 
-  def save(pov: Pov, steps: Forecast.Steps): Funit = firstStep(steps) match {
-    case None                                         => coll.delete.one($id(pov.fullId)).void
-    case Some(step) if pov.game.turns == step.ply - 1 => saveSteps(pov, steps)
-    case _                                            => fufail(Forecast.OutOfSync)
-  }
+  def save(pov: Pov, steps: Forecast.Steps): Funit =
+    firstStep(steps) match {
+      case None                                         => coll.delete.one($id(pov.fullId)).void
+      case Some(step) if pov.game.turns == step.ply - 1 => saveSteps(pov, steps)
+      case _                                            => fufail(Forecast.OutOfSync)
+    }
 
   def playAndSave(
       pov: Pov,
@@ -46,7 +47,7 @@ final class ForecastApi(coll: Coll, tellRound: TellRound)(implicit ec: scala.con
     if (!pov.isMyTurn) funit
     else
       Uci.Move(uciMove).fold[Funit](fufail(s"Invalid move $uciMove on $pov")) { uci =>
-        val promise = Promise[Unit]
+        val promise = Promise[Unit]()
         tellRound(
           pov.gameId,
           actorApi.round.HumanPlay(
@@ -60,7 +61,7 @@ final class ForecastApi(coll: Coll, tellRound: TellRound)(implicit ec: scala.con
       }
 
   def loadForDisplay(pov: Pov): Fu[Option[Forecast]] =
-    pov.forecastable ?? coll.ext.find($id(pov.fullId)).one[Forecast] flatMap {
+    pov.forecastable ?? coll.byId[Forecast](pov.fullId) flatMap {
       case None => fuccess(none)
       case Some(fc) =>
         if (firstStep(fc.steps).exists(_.ply != pov.game.turns + 1)) clearPov(pov) inject none
@@ -68,25 +69,26 @@ final class ForecastApi(coll: Coll, tellRound: TellRound)(implicit ec: scala.con
     }
 
   def loadForPlay(pov: Pov): Fu[Option[Forecast]] =
-    pov.game.forecastable ?? coll.ext.find($id(pov.fullId)).one[Forecast] flatMap {
+    pov.game.forecastable ?? coll.byId[Forecast](pov.fullId) flatMap {
       case None => fuccess(none)
       case Some(fc) =>
         if (firstStep(fc.steps).exists(_.ply != pov.game.turns)) clearPov(pov) inject none
         else fuccess(fc.some)
     }
 
-  def nextMove(g: Game, last: chess.Move): Fu[Option[Uci.Move]] = g.forecastable ?? {
-    loadForPlay(Pov player g) flatMap {
-      case None => fuccess(none)
-      case Some(fc) =>
-        fc(g, last) match {
-          case Some((newFc, uciMove)) if newFc.steps.nonEmpty =>
-            coll.update.one($id(fc._id), newFc) inject uciMove.some
-          case Some((_, uciMove)) => clearPov(Pov player g) inject uciMove.some
-          case _                  => clearPov(Pov player g) inject none
-        }
+  def nextMove(g: Game, last: chess.Move): Fu[Option[Uci.Move]] =
+    g.forecastable ?? {
+      loadForPlay(Pov player g) flatMap {
+        case None => fuccess(none)
+        case Some(fc) =>
+          fc(g, last) match {
+            case Some((newFc, uciMove)) if newFc.steps.nonEmpty =>
+              coll.update.one($id(fc._id), newFc) inject uciMove.some
+            case Some((_, uciMove)) => clearPov(Pov player g) inject uciMove.some
+            case _                  => clearPov(Pov player g) inject none
+          }
+      }
     }
-  }
 
   private def firstStep(steps: Forecast.Steps) = steps.headOption.flatMap(_.headOption)
 

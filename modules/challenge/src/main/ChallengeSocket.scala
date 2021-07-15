@@ -8,19 +8,22 @@ import lila.socket.RemoteSocket.{ Protocol => P, _ }
 final private class ChallengeSocket(
     api: ChallengeApi,
     remoteSocketApi: lila.socket.RemoteSocket
-)(implicit ec: scala.concurrent.ExecutionContext, mode: play.api.Mode) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    mode: play.api.Mode
+) {
 
   import ChallengeSocket._
 
   def reload(challengeId: Challenge.ID): Unit =
     rooms.tell(challengeId, NotifyVersion("reload", JsNull))
 
-  lazy val rooms = makeRoomMap(send, false)
-
   private lazy val send: String => Unit = remoteSocketApi.makeSender("chal-out").apply _
 
-  private lazy val challengeHandler: Handler = {
-    case Protocol.In.OwnerPings(ids) => ids foreach api.ping
+  lazy val rooms = makeRoomMap(send)
+
+  private lazy val challengeHandler: Handler = { case Protocol.In.OwnerPings(ids) =>
+    ids foreach api.ping
   }
 
   remoteSocketApi.subscribe("chal-in", Protocol.In.reader)(

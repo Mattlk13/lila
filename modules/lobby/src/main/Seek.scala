@@ -2,7 +2,6 @@ package lila.lobby
 
 import chess.{ Mode, Speed }
 import org.joda.time.DateTime
-import ornicar.scalalib.Random
 import play.api.libs.json._
 import play.api.i18n.Lang
 
@@ -36,9 +35,10 @@ case class Seek(
       (realColor compatibleWith h.realColor) &&
       ratingRangeCompatibleWith(h) && h.ratingRangeCompatibleWith(this)
 
-  private def ratingRangeCompatibleWith(s: Seek) = realRatingRange.fold(true) { range =>
-    s.rating ?? range.contains
-  }
+  private def ratingRangeCompatibleWith(s: Seek) =
+    realRatingRange.fold(true) { range =>
+      s.rating ?? range.contains
+    }
 
   private def compatibilityProperties = (variant, mode, daysPerTurn)
 
@@ -48,26 +48,21 @@ case class Seek(
 
   def rating = perf.map(_.rating)
 
-  def render(implicit lang: Lang): JsObject =
+  def render: JsObject =
     Json
       .obj(
         "id"       -> _id,
         "username" -> user.username,
         "rating"   -> rating,
-        "variant" -> Json.obj(
-          "key"   -> realVariant.key,
-          "short" -> realVariant.shortName,
-          "name"  -> realVariant.name
-        ),
-        "mode"  -> realMode.id,
-        "days"  -> daysPerTurn,
-        "color" -> chess.Color(color).??(_.name),
-        "perf" -> Json.obj(
-          "icon" -> perfType.map(_.iconChar.toString),
-          "name" -> perfType.map(_.trans)
-        )
+        "variant"  -> Json.obj("key" -> realVariant.key),
+        "mode"     -> realMode.id,
+        "color"    -> chess.Color.fromName(color).??(_.name)
       )
-      .add("provisional" -> perf.map(_.provisional).filter(identity))
+      .add("days" -> daysPerTurn)
+      .add("perf" -> perfType.map { pt =>
+        Json.obj("key" -> pt.key)
+      })
+      .add("provisional" -> perf.exists(_.provisional))
 
   lazy val perfType = PerfPicker.perfType(Speed.Correspondence, realVariant, daysPerTurn)
 }
@@ -84,27 +79,29 @@ object Seek {
       user: User,
       ratingRange: RatingRange,
       blocking: Set[String]
-  ): Seek = new Seek(
-    _id = Random nextString idSize,
-    variant = variant.id,
-    daysPerTurn = daysPerTurn,
-    mode = mode.id,
-    color = color,
-    user = LobbyUser.make(user, blocking),
-    ratingRange = ratingRange.toString,
-    createdAt = DateTime.now
-  )
+  ): Seek =
+    new Seek(
+      _id = lila.common.ThreadLocalRandom nextString idSize,
+      variant = variant.id,
+      daysPerTurn = daysPerTurn,
+      mode = mode.id,
+      color = color,
+      user = LobbyUser.make(user, blocking),
+      ratingRange = ratingRange.toString,
+      createdAt = DateTime.now
+    )
 
-  def renew(seek: Seek) = new Seek(
-    _id = Random nextString idSize,
-    variant = seek.variant,
-    daysPerTurn = seek.daysPerTurn,
-    mode = seek.mode,
-    color = seek.color,
-    user = seek.user,
-    ratingRange = seek.ratingRange,
-    createdAt = DateTime.now
-  )
+  def renew(seek: Seek) =
+    new Seek(
+      _id = lila.common.ThreadLocalRandom nextString idSize,
+      variant = seek.variant,
+      daysPerTurn = seek.daysPerTurn,
+      mode = seek.mode,
+      color = seek.color,
+      user = seek.user,
+      ratingRange = seek.ratingRange,
+      createdAt = DateTime.now
+    )
 
   import reactivemongo.api.bson._
   import lila.db.BSON.BSONJodaDateTimeHandler

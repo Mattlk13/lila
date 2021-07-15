@@ -16,7 +16,6 @@ final private[api] class UserApi(
     userRepo: lila.user.UserRepo,
     prefApi: lila.pref.PrefApi,
     liveStreamApi: lila.streamer.LiveStreamApi,
-    onlineDoing: lila.relation.OnlineDoing,
     gameProxyRepo: lila.round.GameProxyRepo,
     net: NetConfig
 )(implicit ec: scala.concurrent.ExecutionContext) {
@@ -28,9 +27,10 @@ final private[api] class UserApi(
     addPlayingStreaming(jsonView(u), u.id) ++
       Json.obj("url" -> makeUrl(s"@/${u.username}")) // for app BC
 
-  def extended(username: String, as: Option[User]): Fu[Option[JsObject]] = userRepo named username flatMap {
-    _ ?? { extended(_, as) dmap some }
-  }
+  def extended(username: String, as: Option[User]): Fu[Option[JsObject]] =
+    userRepo named username flatMap {
+      _ ?? { extended(_, as) dmap some }
+    }
 
   def extended(u: User, as: Option[User]): Fu[JsObject] =
     if (u.disabled) fuccess {
@@ -39,7 +39,8 @@ final private[api] class UserApi(
         "username" -> u.username,
         "closed"   -> true
       )
-    } else {
+    }
+    else {
       gameProxyRepo.urgentGames(u).dmap(_.headOption) zip
         (as.filter(u !=) ?? { me =>
           crosstableApi.nbGames(me.id, u.id)
@@ -57,8 +58,10 @@ final private[api] class UserApi(
           .map(_.map { cr =>
             math.round(cr * 100)
           }) map {
-        case gameOption ~ nbGamesWithMe ~ following ~ followers ~ followable ~ relation ~
-              isFollowed ~ nbBookmarks ~ nbPlaying ~ nbImported ~ completionRate =>
+          // format: off
+            case ((((((((((gameOption,nbGamesWithMe),following),followers),followable),
+              relation),isFollowed),nbBookmarks),nbPlaying),nbImported),completionRate)=>
+            // format: on
           jsonView(u) ++ {
             Json
               .obj(
@@ -93,12 +96,11 @@ final private[api] class UserApi(
                 )
               )
           }.noNull
-      }
+        }
     }
 
   private def addPlayingStreaming(js: JsObject, id: User.ID) =
-    js.add("playing", onlineDoing.isPlaying(id))
-      .add("streaming", liveStreamApi.isStreaming(id))
+    js.add("streaming", liveStreamApi.isStreaming(id))
 
   private def makeUrl(path: String): String = s"${net.baseUrl}/$path"
 }

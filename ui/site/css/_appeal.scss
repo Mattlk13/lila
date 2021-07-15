@@ -1,0 +1,96 @@
+.appeal {
+  h1 {
+    @extend %flex-between;
+
+    .actions {
+      font-size: 1.5rem;
+    }
+  }
+
+  .mz-section--others {
+    margin-bottom: 3em;
+  }
+
+  &__help {
+    margin-bottom: 2em;
+  }
+
+  &__status {
+    @extend %box-radius;
+
+    padding: 1em 1.5em;
+    margin-bottom: 2em;
+    background: $c-bg-zebra;
+
+    &::before {
+      @extend %data-icon;
+
+      content: '';
+      font-size: 2em;
+      margin-right: 0.4em;
+    }
+  }
+
+  &__msg {
+    padding: 1.5em;
+    margin-bottom: 2em;
+
+    &__header {
+      @extend %flex-between;
+
+      margin-bottom: 2em;
+    }
+
+    &--mod {
+      background: $c-bg-zebra;
+    }
+
+    &--suspect {
+      border-right: 10px solid $c-bg-zebra;
+    }
+
+    img {
+      max-width: 100%;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    padding-top: 2em;
+    border-top: $border;
+    margin-top: 2em;
+
+    .button {
+      margin-right: 1em;
+    }
+  }
+
+  .appeal-presets {
+    margin-right: 1em;
+  }
+
+  &__rules {
+    @extend %box-radius;
+    margin-top: 3em;
+    padding: 2em 3em;
+    background: $c-bg-zebra;
+  }
+
+  @keyframes reveal {
+    0%,
+    95% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  #help-engine-deny form {
+    opacity: 0;
+  }
+  #help-engine-deny:target form {
+    animation: 20s reveal;
+    animation-fill-mode: forwards;
+  }
+}

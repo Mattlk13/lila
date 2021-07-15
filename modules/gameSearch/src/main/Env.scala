@@ -21,7 +21,10 @@ final class Env(
     appConfig: Configuration,
     gameRepo: lila.game.GameRepo,
     makeClient: Index => ESClient
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem
+) {
 
   private val config = appConfig.get[GameSearchConfig]("gameSearch")(AutoConfig.loader)
 
@@ -31,12 +34,12 @@ final class Env(
 
   lazy val paginator = wire[PaginatorBuilder[lila.game.Game, Query]]
 
-  lazy val forms = wire[DataForm]
+  lazy val forms = wire[GameSearchForm]
 
   lazy val userGameSearch = wire[UserGameSearch]
 
   lila.common.Bus.subscribeFun("finishGame", "gameSearchInsert") {
-    case FinishGame(game, _, _) if !game.aborted => api store game
-    case InsertGame(game)                        => api store game
+    case FinishGame(game, _, _) if !game.aborted => api.store(game).unit
+    case InsertGame(game)                        => api.store(game).unit
   }
 }

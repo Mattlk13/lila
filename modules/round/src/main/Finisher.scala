@@ -1,13 +1,13 @@
 package lila.round
 
 import chess.{ Color, DecayingStats, Status }
-import com.github.ghik.silencer.silent
 
 import lila.common.{ Bus, Uptime }
 import lila.game.actorApi.{ AbortedBy, FinishGame }
 import lila.game.{ Game, GameRepo, Pov, RatingDiffs }
 import lila.playban.PlaybanApi
 import lila.user.{ User, UserRepo }
+import lila.i18n.{ I18nKeys => trans, defaultLang }
 
 final private class Finisher(
     gameRepo: GameRepo,
@@ -21,31 +21,41 @@ final private class Finisher(
     recentTvGames: RecentTvGames
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
-  def abort(pov: Pov)(implicit proxy: GameProxy): Fu[Events] = apply(pov.game, _.Aborted, None) >>- {
-    getSocketStatus(pov.game) foreach { ss =>
-      playban.abort(pov, ss.colorsOnGame)
+  implicit private val chatLang = defaultLang
+
+  def abort(pov: Pov)(implicit proxy: GameProxy): Fu[Events] =
+    apply(pov.game, _.Aborted, None) >>- {
+      getSocketStatus(pov.game) foreach { ss =>
+        playban.abort(pov, ss.colorsOnGame)
+      }
+      Bus.publish(AbortedBy(pov.copy(game = pov.game.abort)), "abortGame")
     }
-    Bus.publish(AbortedBy(pov), "abortGame")
-  }
+
+  def abortForce(game: Game)(implicit proxy: GameProxy): Fu[Events] =
+    apply(game, _.Aborted, None)
 
   def rageQuit(game: Game, winner: Option[Color])(implicit proxy: GameProxy): Fu[Events] =
     apply(game, _.Timeout, winner) >>-
-      winner.?? { color =>
+      winner.foreach { color =>
         playban.rageQuit(game, !color)
       }
 
-  def outOfTime(game: Game)(implicit proxy: GameProxy): Fu[Events] = {
-    if (!game.isCorrespondence && !Uptime.startedSinceSeconds(120) && game.movedAt.isBefore(Uptime.startedAt)) {
+  def outOfTime(game: Game)(implicit proxy: GameProxy): Fu[Events] =
+    if (
+      !game.isCorrespondence && !Uptime.startedSinceSeconds(120) && game.movedAt.isBefore(Uptime.startedAt)
+    ) {
       logger.info(s"Aborting game last played before JVM boot: ${game.id}")
       other(game, _.Aborted, none)
+
+    } else if (game.player(!game.player.color).isOfferingDraw) {
+      apply(game, _.Draw, None, Some(trans.drawOfferAccepted.txt()))
     } else {
       val winner = Some(!game.player.color) ifFalse game.situation.opponentHasInsufficientMaterial
       apply(game, _.Outoftime, winner) >>-
-        winner.?? { w =>
+        winner.foreach { w =>
           playban.flag(game, !w)
         }
     }
-  }
 
   def noStart(game: Game)(implicit proxy: GameProxy): Fu[Events] =
     game.playerWhoDidNotMove ?? { culprit =>
@@ -61,7 +71,7 @@ final private class Finisher(
       winner: Option[Color],
       message: Option[String] = None
   )(implicit proxy: GameProxy): Fu[Events] =
-    apply(game, status, winner, message) >>- playban.other(game, status, winner)
+    apply(game, status, winner, message) >>- playban.other(game, status, winner).unit
 
   private def recordLagStats(game: Game): Unit =
     for {
@@ -97,7 +107,7 @@ final private class Finisher(
   private def apply(
       game: Game,
       makeStatus: Status.type => Status,
-      @silent winnerC: Option[Color] = None,
+      winnerC: Option[Color],
       message: Option[String] = None
   )(implicit proxy: GameProxy): Fu[Events] = {
     val status = makeStatus(Status)
@@ -111,7 +121,7 @@ final private class Finisher(
         mode = game.mode.name,
         status = status.name
       )
-      .increment
+      .increment()
     val g = prog.game
     recordLagStats(g)
     proxy.save(prog) >>
@@ -126,44 +136,43 @@ final private class Finisher(
           g.whitePlayer.userId,
           g.blackPlayer.userId
         )
-        .flatMap {
-          case (whiteO, blackO) => {
-            val finish = FinishGame(g, whiteO, blackO)
-            updateCountAndPerfs(finish) map { ratingDiffs =>
-              message foreach { messenger.system(g, _) }
-              gameRepo game g.id foreach { newGame =>
-                newGame foreach proxy.setFinishedGame
-                Bus.publish(finish.copy(game = newGame | g), "finishGame")
+        .flatMap { case (whiteO, blackO) =>
+          val finish = FinishGame(g, whiteO, blackO)
+          updateCountAndPerfs(finish) map { ratingDiffs =>
+            message foreach { messenger.system(g, _) }
+            gameRepo game g.id foreach { newGame =>
+              newGame foreach proxy.setFinishedGame
+              val newFinish = finish.copy(game = newGame | g)
+              Bus.publish(newFinish, "finishGame")
+              game.userIds foreach { userId =>
+                Bus.publish(newFinish, s"userFinishGame:$userId")
               }
-              prog.events :+ lila.game.Event.EndData(g, ratingDiffs)
             }
+            prog.events :+ lila.game.Event.EndData(g, ratingDiffs)
           }
         }
   }
 
   private def updateCountAndPerfs(finish: FinishGame): Fu[Option[RatingDiffs]] =
     (!finish.isVsSelf && !finish.game.aborted) ?? {
-      (finish.white |@| finish.black).tupled ?? {
-        case (white, black) =>
-          crosstableApi.add(finish.game) zip perfsUpdater.save(finish.game, white, black) map {
-            case _ ~ ratingDiffs => ratingDiffs
-          }
+      import cats.implicits._
+      (finish.white, finish.black).mapN((_, _)) ?? { case (white, black) =>
+        crosstableApi.add(finish.game) zip perfsUpdater.save(finish.game, white, black) dmap (_._2)
       } zip
         (finish.white ?? incNbGames(finish.game)) zip
-        (finish.black ?? incNbGames(finish.game)) map {
-        case ratingDiffs ~ _ ~ _ => ratingDiffs
-      }
+        (finish.black ?? incNbGames(finish.game)) dmap (_._1._1)
     }
 
-  private def incNbGames(game: Game)(user: User): Funit = game.finished ?? {
-    val totalTime = (game.hasClock && user.playTime.isDefined) ?? game.durationSeconds
-    val tvTime    = totalTime ifTrue recentTvGames.get(game.id)
-    val result =
-      if (game.winnerUserId has user.id) 1
-      else if (game.loserUserId has user.id) -1
-      else 0
-    userRepo
-      .incNbGames(user.id, game.rated, game.hasAi, result = result, totalTime = totalTime, tvTime = tvTime)
-      .void
-  }
+  private def incNbGames(game: Game)(user: User): Funit =
+    game.finished ?? {
+      val totalTime = (game.hasClock && user.playTime.isDefined) ?? game.durationSeconds
+      val tvTime    = totalTime ifTrue recentTvGames.get(game.id)
+      val result =
+        if (game.winnerUserId has user.id) 1
+        else if (game.loserUserId has user.id) -1
+        else 0
+      userRepo
+        .incNbGames(user.id, game.rated, game.hasAi, result = result, totalTime = totalTime, tvTime = tvTime)
+        .void
+    }
 }

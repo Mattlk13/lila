@@ -2,26 +2,28 @@ package lila.game
 
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import play.api.libs.json._
-import play.api.libs.ws.WSClient
-
-import lila.common.Maths
-import lila.common.config.BaseUrl
-
-import chess.{ Centis, Color, Replay, Situation, Game => ChessGame }
 import chess.format.{ FEN, Forsyth, Uci }
+import chess.{ Centis, Color, Replay, Situation, Game => ChessGame }
+import play.api.libs.json._
+import play.api.libs.ws.JsonBodyWritables._
+import play.api.libs.ws.StandaloneWSClient
+
+import lila.common.config.BaseUrl
+import lila.common.Json._
+import lila.common.Maths
 
 final class GifExport(
-    ws: WSClient,
+    ws: StandaloneWSClient,
     lightUserApi: lila.user.LightUserApi,
     baseUrl: BaseUrl,
     url: String
 )(implicit ec: scala.concurrent.ExecutionContext) {
-  private val targetMedianTime = 80.0
+  private val targetMedianTime = Centis(80)
+  private val targetMaxTime    = Centis(200)
 
   def fromPov(pov: Pov, initialFen: Option[FEN]): Fu[Source[ByteString, _]] =
     lightUserApi preloadMany pov.game.userIds flatMap { _ =>
-      ws.url(s"${url}/game.gif")
+      ws.url(s"$url/game.gif")
         .withMethod("POST")
         .addHttpHeaders("Content-Type" -> "application/json")
         .withBody(
@@ -30,7 +32,7 @@ final class GifExport(
             "black"       -> Namer.playerTextBlocking(pov.game.blackPlayer, withRating = true)(lightUserApi.sync),
             "comment"     -> s"${baseUrl.value}/${pov.game.id} rendered with https://github.com/niklasf/lila-gif",
             "orientation" -> pov.color.name,
-            "delay"       -> targetMedianTime.toInt, // default delay for frames, centis
+            "delay"       -> targetMedianTime.centis, // default delay for frames
             "frames"      -> frames(pov.game, initialFen)
           )
         )
@@ -44,17 +46,17 @@ final class GifExport(
 
   def gameThumbnail(game: Game): Fu[Source[ByteString, _]] = {
     val query = List(
-      "fen"         -> (Forsyth >> game.chess),
+      "fen"         -> (Forsyth >> game.chess).value,
       "white"       -> Namer.playerTextBlocking(game.whitePlayer, withRating = true)(lightUserApi.sync),
       "black"       -> Namer.playerTextBlocking(game.blackPlayer, withRating = true)(lightUserApi.sync),
-      "orientation" -> game.firstColor.name
+      "orientation" -> game.naturalOrientation.name
     ) ::: List(
-      game.lastMoveKeys.map { "lastMove"       -> _ },
+      game.lastMoveKeys.map { "lastMove" -> _ },
       game.situation.checkSquare.map { "check" -> _.key }
     ).flatten
 
     lightUserApi preloadMany game.userIds flatMap { _ =>
-      ws.url(s"${url}/image.gif")
+      ws.url(s"$url/image.gif")
         .withMethod("GET")
         .withQueryStringParameters(query: _*)
         .stream() flatMap {
@@ -74,41 +76,44 @@ final class GifExport(
       lastMove.map { "lastMove" -> _ }
     ).flatten
 
-    ws.url(s"${url}/image.gif")
+    ws.url(s"$url/image.gif")
       .withMethod("GET")
       .withQueryStringParameters(query: _*)
       .stream() flatMap {
       case res if res.status != 200 =>
-        logger.warn(s"GifExport thumbnail ${fen} ${res.status}")
+        logger.warn(s"GifExport thumbnail $fen ${res.status}")
         fufail(res.statusText)
       case res => fuccess(res.bodyAsSource)
     }
   }
 
   private def scaleMoveTimes(moveTimes: Vector[Centis]): Vector[Centis] = {
-    val targetMax = Centis(200)
-    Maths.median(moveTimes.map(_.centis)).filter(_ >= targetMedianTime) match {
-      case Some(median) => moveTimes.map(_ *~ (targetMedianTime / median.atLeast(1)) atMost targetMax)
-      case None         => moveTimes.map(_ atMost targetMax)
+    // goal for bullet: close to real-time
+    // goal for classical: speed up to reach target median, avoid extremely
+    // fast moves, unless they were actually played instantly
+    Maths.median(moveTimes.map(_.centis)).map(Centis.apply).filter(_ >= targetMedianTime) match {
+      case Some(median) =>
+        val scale = targetMedianTime.centis.toDouble / median.centis.atLeast(1).toDouble
+        moveTimes.map { t =>
+          if (t * 2 < median) t atMost (targetMedianTime *~ 0.5)
+          else t *~ scale atLeast (targetMedianTime *~ 0.5) atMost targetMaxTime
+        }
+      case None => moveTimes.map(_ atMost targetMaxTime)
     }
   }
 
   private def frames(game: Game, initialFen: Option[FEN]) = {
     Replay.gameMoveWhileValid(
       game.pgnMoves,
-      initialFen.map(_.value) | game.variant.initialFen,
+      initialFen | game.variant.initialFen,
       game.variant
     ) match {
       case (init, games, _) =>
-        val steps = (init, None) :: (games map {
-          case (g, Uci.WithSan(uci, _)) => (g, uci.some)
+        val steps = (init, None) :: (games map { case (g, Uci.WithSan(uci, _)) =>
+          (g, uci.some)
         })
         framesRec(
-          steps.zip(game.moveTimes match {
-            case Some(moveTimes) =>
-              scaleMoveTimes(moveTimes).map(_.some) :+ None :+ None // one for last move, one for #5543
-            case None => LazyList.continually(None)
-          }),
+          steps.zip(scaleMoveTimes(~game.moveTimes).map(_.some).padTo(steps.length, None)),
           Json.arr()
         )
     }

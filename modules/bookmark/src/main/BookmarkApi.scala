@@ -29,7 +29,8 @@ final class BookmarkApi(
     user ?? { u =>
       val candidateIds = games collect { case g if g.bookmarks > 0 => g.id }
       candidateIds.nonEmpty ??
-        coll.distinctEasy[Game.ID, Set]("g", userIdQuery(u.id) ++ $doc("g" $in candidateIds))
+        coll.secondaryPreferred
+          .distinctEasy[Game.ID, Set]("g", userIdQuery(u.id) ++ $doc("g" $in candidateIds))
     }
 
   def removeByGameId(gameId: Game.ID): Funit =
@@ -39,7 +40,6 @@ final class BookmarkApi(
     coll.delete.one($doc("g" $in gameIds)).void
 
   def remove(gameId: Game.ID, userId: User.ID): Funit = coll.delete.one(selectId(gameId, userId)).void
-  // def remove(selector: Bdoc): Funit = coll.remove(selector).void
 
   def toggle(gameId: Game.ID, userId: User.ID): Funit =
     exists(gameId, userId) flatMap { e =>
@@ -50,8 +50,7 @@ final class BookmarkApi(
 
   def countByUser(user: User): Fu[Int] = coll.countSel(userIdQuery(user.id))
 
-  def gamePaginatorByUser(user: User, page: Int) =
-    paginator.byUser(user, page) dmap { _.map(_.game) }
+  def gamePaginatorByUser(user: User, page: Int) = paginator.byUser(user, page)
 
   private def add(gameId: Game.ID, userId: User.ID, date: DateTime): Funit =
     coll.insert

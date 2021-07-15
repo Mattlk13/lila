@@ -1,41 +1,29 @@
 import RoundController from './ctrl';
-import { Step } from './interfaces';
 import viewStatus from 'game/view/status';
+import { Step } from './interfaces';
 
-export function setup(ctrl: RoundController) {
-  window.lichess.pubsub.on('speech.enabled', onSpeechChange(ctrl));
-  onSpeechChange(ctrl)(window.lichess.sound.speech());
-}
+export const setup = (ctrl: RoundController) => {
+  lichess.pubsub.on('speech.enabled', onSpeechChange(ctrl));
+  onSpeechChange(ctrl)(lichess.sound.speech());
+};
 
-function onSpeechChange(ctrl: RoundController) {
-  return function(enabled: boolean) {
-    if (!window.LichessSpeech && enabled)
-      window.lichess.loadScript(
-        window.lichess.compiledScript('speech')
-      ).then(() => status(ctrl));
-    else if (window.LichessSpeech && !enabled) window.LichessSpeech = undefined;
-  };
-}
+const onSpeechChange = (ctrl: RoundController) => (enabled: boolean) => {
+  if (!window.LichessSpeech && enabled) lichess.loadModule('speech').then(() => status(ctrl));
+  else if (window.LichessSpeech && !enabled) window.LichessSpeech = undefined;
+};
 
-export function status(ctrl: RoundController) {
-  const s = viewStatus(ctrl);
-  if (s == 'playingRightNow') window.LichessSpeech!.step(ctrl.stepAt(ctrl.ply), false);
+export const status = (ctrl: RoundController) => {
+  if (ctrl.data.game.status.name === 'started') window.LichessSpeech!.step(ctrl.stepAt(ctrl.ply), false);
   else {
-    withSpeech(speech => speech.say(s, false));
+    const s = viewStatus(ctrl);
+    lichess.sound.say(s, false, false, true);
     const w = ctrl.data.game.winner;
-    if (w) withSpeech(speech => speech.say(ctrl.noarg(w + 'IsVictorious'), false));
+    if (w) lichess.sound.say(ctrl.noarg(w + 'IsVictorious'), false, false, true);
   }
-}
+};
 
+export const userJump = (ctrl: RoundController, ply: Ply) => withSpeech(s => s.step(ctrl.stepAt(ply), true));
 
-export function userJump(ctrl: RoundController, ply: Ply) {
-  withSpeech(s => s.step(ctrl.stepAt(ply), true));
-}
+export const step = (step: Step) => withSpeech(s => s.step(step, false));
 
-export function step(step: Step) {
-  withSpeech(s => s.step(step, false));
-}
-
-function withSpeech(f: (speech: LichessSpeech) => void) {
-  if (window.LichessSpeech) f(window.LichessSpeech);
-}
+const withSpeech = (f: (speech: LichessSpeech) => void) => window.LichessSpeech && f(window.LichessSpeech);

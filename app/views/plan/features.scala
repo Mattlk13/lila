@@ -29,7 +29,7 @@ object features {
           tbody(
             tr(unlimited)(
               "Play and create ",
-              a(href := routes.Tournament.home(1))("tournaments")
+              a(href := routes.Tournament.home)("tournaments")
             ),
             tr(unlimited)(
               "Play and create ",
@@ -42,11 +42,11 @@ object features {
               "Standard chess and ",
               a(href := routes.Page.variantHome)("8 chess variants (Crazyhouse, Chess960, Horde, ...)")
             ),
-            tr(custom("30 per day"))(
-              s"Deep $engineName server analysis"
+            tr(custom("35 per day"))(
+              "Deep Stockfish 14+ server analysis"
             ),
             tr(unlimited)(
-              s"Instant local $engineName analysis"
+              "Instant local Stockfish 13+ analysis"
             ),
             tr(unlimited)(
               a(href := "https://lichess.org/blog/WN-gLzAAAKlI89Xn/thousands-of-stockfish-analysers")(
@@ -75,8 +75,17 @@ object features {
               a(href := routes.Puzzle.home)("Tactical puzzles from user games")
             ),
             tr(unlimited)(
-              a(href := s"${routes.UserAnalysis.index()}#explorer")("Opening explorer"),
-              " (62 million games!)"
+              a(href := routes.Puzzle.streak)("Puzzle Streak")
+            ),
+            tr(unlimited)(
+              a(href := routes.Storm.home)("Puzzle Storm")
+            ),
+            tr(unlimited)(
+              a(href := routes.Racer.home)("Puzzle Racer")
+            ),
+            tr(unlimited)(
+              a(href := s"${routes.UserAnalysis.index}#explorer")("Opening explorer"),
+              " (280 million games!)"
             ),
             tr(unlimited)(
               a(href := s"${routes.UserAnalysis.parseArg("QN4n1/6r1/3k4/8/b2K4/8/8/8_b_-_-")}#explorer")(
@@ -88,7 +97,7 @@ object features {
             ),
             tr(unlimited)(
               a(href := routes.Search.index(1))("Advanced search"),
-              " through Lichess 1.5 billion games"
+              " through Lichess 3 billion games"
             ),
             tr(unlimited)(
               a(href := routes.Video.index)("Chess video library")
@@ -122,10 +131,10 @@ object features {
               "Bullet, Blitz, Rapid, Classical and Correspondence chess"
             ),
             tr(unlimited)(
-              a(href := routes.Tournament.home(1))("Arena tournaments")
+              a(href := routes.Tournament.home)("Arena tournaments")
             ),
             tr(check)(
-              s"Board editor and analysis board with $engineName"
+              "Board editor and analysis board with Stockfish 13+"
             ),
             tr(unlimited)(
               a(href := routes.Puzzle.home)("Tactics puzzles")
@@ -180,21 +189,20 @@ object features {
       )
     }
 
-  private def header(name: Frag)(implicit lang: Lang) = thead(
-    st.tr(th(name), th(trans.patron.freeAccount()), th(trans.patron.lichessPatron()))
-  )
+  private def header(name: Frag)(implicit lang: Lang) =
+    thead(
+      st.tr(th(name), th(trans.patron.freeAccount()), th(trans.patron.lichessPatron()))
+    )
 
-  private val unlimited = span(dataIcon := "E", cls := "is is-green text unlimited")("Unlimited")
+  private val unlimited = span(dataIcon := "", cls := "is is-green text unlimited")("Unlimited")
 
-  private val check = span(dataIcon := "E", cls := "is is-green text check")("Yes")
+  private val check = span(dataIcon := "", cls := "is is-green text check")("Yes")
 
-  private def custom(str: String) = span(dataIcon := "E", cls := "is is-green text check")(str)
+  private def custom(str: String) = span(dataIcon := "", cls := "is is-green text check")(str)
 
   private def all(content: Frag) = frag(td(content), td(content))
 
   private def tr(value: Frag)(text: Frag*) = st.tr(th(text), all(value))
 
   private val title = "Lichess features"
-
-  private val engineName = "Stockfish 11+"
 }

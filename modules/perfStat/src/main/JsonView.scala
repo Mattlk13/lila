@@ -23,6 +23,7 @@ final class JsonView(getLightUser: LightUser.GetterSync) {
   }
 
   implicit val ratingAtWrites                      = Json.writes[RatingAt]
+  implicit val gameAtWrites                        = Json.writes[GameAt]
   implicit val resultWrites                        = Json.writes[Result]
   implicit val resultsWrites                       = Json.writes[Results]
   implicit val streakWrites                        = Json.writes[Streak]
@@ -32,18 +33,14 @@ final class JsonView(getLightUser: LightUser.GetterSync) {
   implicit val countWrites                         = Json.writes[Count]
   implicit def perfStatWrites(implicit lang: Lang) = Json.writes[PerfStat]
 
-  def apply(
-      user: User,
-      stat: PerfStat,
-      rank: Option[Int],
-      percentile: Option[Double]
-  )(implicit lang: Lang) = Json.obj(
-    "user"       -> user,
-    "perf"       -> user.perfs(stat.perfType),
-    "rank"       -> rank,
-    "percentile" -> percentile,
-    "stat"       -> stat
-  )
+  def apply(data: PerfStatData)(implicit lang: Lang) =
+    Json.obj(
+      "user"       -> data.user,
+      "perf"       -> data.user.perfs(data.stat.perfType),
+      "rank"       -> data.rank,
+      "percentile" -> data.percentile,
+      "stat"       -> data.stat
+    )
 }
 
 object JsonView {
@@ -70,10 +67,11 @@ object JsonView {
   implicit private val avgWriter: Writes[Avg] = Writes { a =>
     JsNumber(round(a.avg))
   }
-  implicit def perfTypeWriter(implicit lang: Lang): OWrites[PerfType] = OWrites { pt =>
-    Json.obj(
-      "key"  -> pt.key,
-      "name" -> pt.trans
-    )
-  }
+  implicit def perfTypeWriter(implicit lang: Lang): OWrites[PerfType] =
+    OWrites { pt =>
+      Json.obj(
+        "key"  -> pt.key,
+        "name" -> pt.trans
+      )
+    }
 }

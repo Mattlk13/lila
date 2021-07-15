@@ -1,10 +1,12 @@
 package lila.insight
 
+import scala.util.chaining._
+import cats.data.NonEmptyList
+
 import chess.format.FEN
-import chess.{ Board, Role }
+import chess.{ Board, Centis, Role, Stats }
 import lila.analyse.{ Accuracy, Advice }
 import lila.game.{ Game, Pov }
-import scalaz.NonEmptyList
 
 final private class PovToEntry(
     gameRepo: lila.game.GameRepo,
@@ -21,11 +23,11 @@ final private class PovToEntry(
       division: chess.Division,
       moveAccuracy: Option[List[Int]],
       boards: NonEmptyList[Board],
-      movetimes: NonEmptyList[Int],
+      movetimes: NonEmptyList[Centis],
       advices: Map[Ply, Advice]
   )
 
-  def apply(game: Game, userId: String, provisional: Boolean): Fu[Either[Game, Entry]] =
+  def apply(game: Game, userId: String, provisional: Boolean): Fu[Either[Game, InsightEntry]] =
     enrich(game, userId, provisional) map
       (_ flatMap convert toRight game)
 
@@ -34,8 +36,7 @@ final private class PovToEntry(
       gameRepo setUnanalysed game.id
       analysisRepo remove game.id
       true
-    }
-    false
+    } else false
   }
 
   private def enrich(game: Game, userId: String, provisional: Boolean): Fu[Option[RichPov]] =
@@ -43,18 +44,18 @@ final private class PovToEntry(
     else
       lila.game.Pov.ofUserId(game, userId) ?? { pov =>
         gameRepo.initialFen(game) zip
-          (game.metadata.analysed ?? analysisRepo.byId(game.id)) map {
-          case (fen, an) =>
+          (game.metadata.analysed ?? analysisRepo.byId(game.id)) map { case (fen, an) =>
             for {
-              boards <- chess.Replay
-                .boards(
-                  moveStrs = game.pgnMoves,
-                  initialFen = fen,
-                  variant = game.variant
-                )
-                .toOption
-                .flatMap(_.toNel)
-              movetimes <- game.moveTimes(pov.color).flatMap(_.map(_.roundTenths).toNel)
+              boards <-
+                chess.Replay
+                  .boards(
+                    moveStrs = game.pgnMoves,
+                    initialFen = fen,
+                    variant = game.variant
+                  )
+                  .toOption
+                  .flatMap(_.toNel)
+              movetimes <- game.moveTimes(pov.color).flatMap(_.toNel)
             } yield RichPov(
               pov = pov,
               provisional = provisional,
@@ -70,22 +71,23 @@ final private class PovToEntry(
                 }.toMap
               }
             )
-        }
+          }
       }
 
-  private def pgnMoveToRole(pgn: String): Role = pgn.head match {
-    case 'N'       => chess.Knight
-    case 'B'       => chess.Bishop
-    case 'R'       => chess.Rook
-    case 'Q'       => chess.Queen
-    case 'K' | 'O' => chess.King
-    case _         => chess.Pawn
-  }
+  private def pgnMoveToRole(pgn: String): Role =
+    pgn.head match {
+      case 'N'       => chess.Knight
+      case 'B'       => chess.Bishop
+      case 'R'       => chess.Rook
+      case 'Q'       => chess.Queen
+      case 'K' | 'O' => chess.King
+      case _         => chess.Pawn
+    }
 
-  private def makeMoves(from: RichPov): List[Move] = {
+  private def makeMoves(from: RichPov): List[InsightMove] = {
     val cpDiffs = ~from.moveAccuracy toVector
     val prevInfos = from.analysis.?? { an =>
-      Accuracy.prevColorInfos(from.pov, an) |> { is =>
+      Accuracy.prevColorInfos(from.pov, an) pipe { is =>
         from.pov.color.fold(is, is.map(_.invert))
       }
     }
@@ -97,8 +99,13 @@ final private class PovToEntry(
         case (e, i) if (i % 2) == pivot => e
       }
     }
-    movetimes.zip(roles).zip(boards).zipWithIndex.map {
-      case tenths ~ role ~ board ~ i =>
+    val blurs = {
+      val bools = from.pov.player.blurs.booleans
+      bools ++ Array.fill(movetimes.size - bools.length)(false)
+    }
+    val timeCvs = slidingMoveTimesCvs(movetimes)
+    movetimes.zip(roles).zip(boards).zip(blurs).zip(timeCvs).zipWithIndex.map {
+      case (((((movetime, role), board), blur), timeCv), i) =>
         val ply      = i * 2 + from.pov.color.fold(1, 2)
         val prevInfo = prevInfos lift i
         val opportunism = from.advices.get(ply - 1) flatMap {
@@ -117,33 +124,57 @@ final private class PovToEntry(
             }
           case _ => none
         }
-        Move(
+        InsightMove(
           phase = Phase.of(from.division, ply),
-          tenths = tenths,
+          tenths = movetime.roundTenths,
           role = role,
           eval = prevInfo.flatMap(_.cp).map(_.ceiled.centipawns),
           mate = prevInfo.flatMap(_.mate).map(_.moves),
           cpl = cpDiffs lift i,
           material = board.materialImbalance * from.pov.color.fold(1, -1),
           opportunism = opportunism,
-          luck = luck
+          luck = luck,
+          blur = blur,
+          timeCv = timeCv
         )
     }
   }
 
-  private def queenTrade(from: RichPov) = QueenTrade {
-    from.division.end.fold(from.boards.last.some)(from.boards.toList.lift) match {
-      case Some(board) =>
-        chess.Color.all.forall { color =>
-          !board.hasPiece(chess.Piece(color, chess.Queen))
+  private def slidingMoveTimesCvs(movetimes: Seq[Centis]): Seq[Option[Float]] = {
+    val sliding = 13 // should be odd
+    val nb      = movetimes.size
+    if (nb < sliding) Vector.fill(nb)(none[Float])
+    else {
+      val sides = Vector.fill(sliding / 2)(none[Float])
+      val cvs = movetimes
+        .sliding(sliding)
+        .map { a =>
+          // drop outliers
+          coefVariation(a.map(_.centis + 10).sorted.drop(1).dropRight(1))
         }
-      case _ =>
-        logger.warn(s"https://lichess.org/${from.pov.gameId} missing endgame board")
-        false
+      sides ++ cvs ++ sides
     }
   }
 
-  private def convert(from: RichPov): Option[Entry] = {
+  private def coefVariation(a: Seq[Int]): Option[Float] = {
+    val s = Stats(a)
+    s.stdDev.map { _ / s.mean }
+  }
+
+  private def queenTrade(from: RichPov) =
+    QueenTrade {
+      from.division.end.fold(from.boards.last.some)(from.boards.toList.lift) match {
+        case Some(board) =>
+          chess.Color.all.forall { color =>
+            !board.hasPiece(chess.Piece(color, chess.Queen))
+          }
+        case _ =>
+          logger.warn(s"https://lichess.org/${from.pov.gameId} missing endgame board")
+          false
+      }
+    }
+
+  private def convert(from: RichPov): Option[InsightEntry] = {
     import from._
     import pov.game
     for {
@@ -151,8 +182,8 @@ final private class PovToEntry(
       myRating <- pov.player.rating
       opRating <- pov.opponent.rating
       perfType <- game.perfType
-    } yield Entry(
-      id = Entry povToId pov,
+    } yield InsightEntry(
+      id = InsightEntry povToId pov,
       number = 0, // temporary :-/ the Indexer will set it
       userId = myId,
       color = pov.color,

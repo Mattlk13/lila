@@ -62,7 +62,11 @@ object Query {
 
   val durations: List[(Int, String)] =
     ((30, "30 seconds") ::
-      options(List(60, 60 * 2, 60 * 3, 60 * 5, 60 * 10, 60 * 15, 60 * 20, 60 * 30), _ / 60, "%d minute{s}").toList) :+
+      options(
+        List(60, 60 * 2, 60 * 3, 60 * 5, 60 * 10, 60 * 15, 60 * 20, 60 * 30),
+        _ / 60,
+        "%d minute{s}"
+      ).toList) :+
       (60 * 60 * 1 -> "One hour") :+
       (60 * 60 * 2 -> "Two hours") :+
       (60 * 60 * 3 -> "Three hours")
@@ -127,12 +131,12 @@ object Query {
     options(1 to 6, "m", "%d month{s} ago") ++
     options(1 to 5, "y", "%d year{s} ago")
 
-  val statuses = Status.finishedNotCheated.map {
+  val statuses = Status.finishedNotCheated.flatMap {
     case s if s.is(_.Timeout)       => none
     case s if s.is(_.NoStart)       => none
     case s if s.is(_.UnknownFinish) => none
     case s if s.is(_.Outoftime)     => Some(s.id -> "Clock Flag")
     case s if s.is(_.VariantEnd)    => Some(s.id -> "Variant End")
     case s                          => Some(s.id -> s.toString)
-  }.flatten
+  }
 }

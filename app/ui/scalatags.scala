@@ -1,37 +1,39 @@
 package lila.app
+
 package ui
 
 import ornicar.scalalib.Zero
-
 import scalatags.Text.all._
 import scalatags.text.Builder
 import scalatags.Text.{ Aggregate, Cap }
 
 import lila.api.Context
+import lila.user.Title
 
 // collection of lila attrs
 trait ScalatagsAttrs {
-  val dataAssetUrl     = attr("data-asset-url")
-  val dataAssetVersion = attr("data-asset-version")
-  val dataDev          = attr("data-dev")
-  val dataTheme        = attr("data-theme")
-  val dataTag          = attr("data-tag")
-  val dataIcon         = attr("data-icon")
-  val dataHref         = attr("data-href")
-  val dataCount        = attr("data-count")
-  val dataEnableTime   = attr("data-enable-time")
-  val datatime24h      = attr("data-time_24h")
-  val dataColor        = attr("data-color")
-  val dataFen          = attr("data-fen")
-  val dataRel          = attr("data-rel")
-  val novalidate       = attr("novalidate").empty
-  val datetimeAttr     = attr("datetime")
-  val dataBotAttr      = attr("data-bot").empty
-  val deferAttr        = attr("defer").empty
+  val dataTag      = attr("data-tag")
+  val dataIcon     = attr("data-icon")
+  val dataHref     = attr("data-href")
+  val dataCount    = attr("data-count")
+  val dataColor    = attr("data-color")
+  val dataFen      = attr("data-fen")
+  val dataRel      = attr("data-rel")
+  val novalidate   = attr("novalidate").empty
+  val datetimeAttr = attr("datetime")
+  val dataBotAttr  = attr("data-bot").empty
+  val deferAttr    = attr("defer").empty
+  val downloadAttr = attr("download").empty
+  val viewBoxAttr  = attr("viewBox")
+
   object frame {
     val scrolling       = attr("scrolling")
     val allowfullscreen = attr("allowfullscreen").empty
   }
+
+  val dataSortNumberTh = th(attr("data-sort-method") := "number")
+  val dataSort         = attr("data-sort")
+  val dataSortDefault  = attr("data-sort-default").empty
 }
 
 // collection of lila snippets
@@ -46,31 +48,28 @@ trait ScalatagsSnippets extends Cap {
   def iconTag(icon: String): Tag             = i(dataIcon := icon)
   def iconTag(icon: Char, text: Frag): Tag   = iconTag(icon.toString, text)
   def iconTag(icon: String, text: Frag): Tag = i(dataIcon := icon, cls := "text")(text)
-  val styleTag                               = tag("style")(tpe := "text/css")
+  val styleTag                               = tag("style")
   val ratingTag                              = tag("rating")
   val countTag                               = tag("count")
   val goodTag                                = tag("good")
   val badTag                                 = tag("bad")
   val timeTag                                = tag("time")
+  val dialog                                 = tag("dialog")
+  val svgTag                                 = tag("svg")
+  val svgGroupTag                            = tag("g")
+  val svgTextTag                             = tag("text")
 
-  def dataBot(title: lila.user.Title): Modifier =
-    if (title == lila.user.Title.BOT) dataBotAttr
-    else emptyModifier
-
-  def pagerNext(pager: lila.common.paginator.Paginator[_], url: Int => String): Option[Frag] =
-    pager.nextPage.map { np =>
-      div(cls := "pager none")(a(rel := "next", href := url(np))("Next"))
-    }
-  def pagerNextTable(pager: lila.common.paginator.Paginator[_], url: Int => String): Option[Frag] =
-    pager.nextPage.map { np =>
-      tr(th(cls := "pager none")(a(rel := "next", href := url(np))("Next")))
-    }
+  def userTitleTag(t: Title) =
+    span(
+      cls := "utitle",
+      t == lila.user.Title.BOT option dataBotAttr,
+      title := Title titleName t
+    )(t.value)
 
   val utcLink =
     a(
       href := "https://time.is/UTC",
-      target := "_blank",
-      rel := "noopener",
+      targetBlank,
       title := "Coordinated Universal Time"
     )("UTC")
 }
@@ -126,7 +125,8 @@ trait ScalatagsExtensions {
       t.setAttr(a.name, scalatags.text.Builder.GenericAttrValueSource(v.value))
   }
 
-  implicit val charAttr = genericAttr[Char]
+  implicit val charAttr       = genericAttr[Char]
+  implicit val bigDecimalAttr = genericAttr[BigDecimal]
 
   implicit val optionStringAttr = new AttrValue[Option[String]] {
     def apply(t: scalatags.text.Builder, a: Attr, v: Option[String]): Unit = {
@@ -147,24 +147,28 @@ trait ScalatagsExtensions {
   val emptyFrag: Frag                   = new RawFrag("")
   implicit val LilaFragZero: Zero[Frag] = Zero.instance(emptyFrag)
 
-  val emptyModifier: Modifier = new Modifier {
-    def applyTo(t: Builder) = {}
+  val targetBlank: Modifier = (t: Builder) => {
+    // Prevent tab nabbing when opening untrusted links. Apply also to trusted
+    // links, because there can be a small performance advantage and lila does
+    // not use window.opener anywhere. Will not be overwritten by additional
+    // rels.
+    t.setAttr("rel", Builder.GenericAttrValueSource("noopener"))
+    t.setAttr("target", Builder.GenericAttrValueSource("_blank"))
   }
 
-  def ariaTitle(v: String) = new Modifier {
-    def applyTo(t: Builder) = {
-      val value = Builder.GenericAttrValueSource(v)
-      t.setAttr("title", value)
-      t.setAttr("aria-label", value)
-    }
+  val noFollow = rel := "nofollow"
+
+  def ariaTitle(v: String): Modifier = (t: Builder) => {
+    val value = Builder.GenericAttrValueSource(v)
+    t.setAttr("title", value)
+    t.setAttr("aria-label", value)
   }
 
-  def titleOrText(blind: Boolean, v: String): Modifier = new Modifier {
-    def applyTo(t: Builder) = {
-      if (blind) t.addChild(v)
-      else t.setAttr("title", Builder.GenericAttrValueSource(v))
-    }
-  }
+  def titleOrText(blind: Boolean, v: String): Modifier = (t: Builder) =>
+    if (blind) t.addChild(v)
+    else t.setAttr("title", Builder.GenericAttrValueSource(v))
 
   def titleOrText(v: String)(implicit ctx: Context): Modifier = titleOrText(ctx.blind, v)
 }
+
+object ScalatagsExtensions extends ScalatagsExtensions

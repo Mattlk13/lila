@@ -18,9 +18,9 @@ final class TournamentStatsApi(
   implicit private val statsBSONHandler = Macros.handler[TournamentStats]
 
   private val cache = mongoCache[Tournament.ID, TournamentStats](
-    32,
+    64,
     "tournament:stats",
-    30 days,
+    60 days,
     identity
   ) { loader =>
     _.expireAfterAccess(10 minutes)
@@ -53,7 +53,7 @@ private object TournamentStats {
 
   def readAggregation(rating: Int)(docs: List[Bdoc]): TournamentStats = {
     val colorStats: Map[Option[Color], ColorStats] = docs.view.map { doc =>
-      doc.getAsOpt[Boolean]("_id").map(Color.apply) ->
+      doc.getAsOpt[Boolean]("_id").map(Color.fromWhite) ->
         ColorStats(
           ~doc.int("games"),
           ~doc.int("moves"),

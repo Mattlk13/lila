@@ -23,20 +23,24 @@ final class Tv(
       case GameIdAndHistory(gameId, historyIds) =>
         for {
           game <- gameId ?? roundProxyGame
-          games <- historyIds
-            .map { id =>
-              roundProxyGame(id) orElse gameRepo.game(id)
-            }
-            .sequenceFu
-            .dmap(_.flatten)
-          history = games map Pov.first
+          games <-
+            historyIds
+              .map { id =>
+                roundProxyGame(id) orElse gameRepo.game(id)
+              }
+              .sequenceFu
+              .dmap(_.flatten)
+          history = games map Pov.naturalOrientation
         } yield game map (_ -> history)
     }
 
   def getGames(channel: Tv.Channel, max: Int): Fu[List[Game]] =
-    trouper.ask[List[Game.ID]](TvTrouper.GetGameIds(channel, max, _)) flatMap {
+    getGameIds(channel, max) flatMap {
       _.map(roundProxyGame).sequenceFu.map(_.flatten)
     }
+
+  def getGameIds(channel: Tv.Channel, max: Int): Fu[List[Game.ID]] =
+    trouper.ask[List[Game.ID]](TvTrouper.GetGameIds(channel, max, _))
 
   def getBestGame = getGame(Tv.Channel.Best) orElse gameRepo.random
 
@@ -56,12 +60,13 @@ object Tv {
   }
 
   private[tv] case class Candidate(game: Game, hasBot: Boolean)
-  private[tv] def toCandidate(lightUser: LightUser.GetterSync)(game: Game) = Tv.Candidate(
-    game = game,
-    hasBot = game.userIds.exists { userId =>
-      lightUser(userId).exists(_.isBot)
-    }
-  )
+  private[tv] def toCandidate(lightUser: LightUser.GetterSync)(game: Game) =
+    Tv.Candidate(
+      game = game,
+      hasBot = game.userIds.exists { userId =>
+        lightUser(userId).exists(_.isBot)
+      }
+    )
 
   sealed abstract class Channel(
       val name: String,
@@ -77,7 +82,7 @@ object Tv {
     case object Best
         extends Channel(
           name = "Top Rated",
-          icon = "C",
+          icon = "",
           secondsSinceLastMove = freshBlitz,
           filters = Seq(rated(2150), standard, noBot)
         )
@@ -175,14 +180,14 @@ object Tv {
     case object Bot
         extends Channel(
           name = "Bot",
-          icon = "n",
+          icon = "",
           secondsSinceLastMove = freshBlitz,
           filters = Seq(standard, hasBot)
         )
     case object Computer
         extends Channel(
           name = "Computer",
-          icon = "n",
+          icon = "",
           secondsSinceLastMove = freshBlitz,
           filters = Seq(computerFromInitialPosition)
         )
@@ -224,4 +229,17 @@ object Tv {
     game.finished && !game.olderThan(7)
   } // rematch time
   private def hasMinRating(g: Game, min: Int) = g.players.exists(_.rating.exists(_ >= min))
+
+  private[tv] val titleScores = Map(
+    "GM"  -> 500,
+    "WGM" -> 500,
+    "IM"  -> 300,
+    "WIM" -> 300,
+    "FM"  -> 200,
+    "WFM" -> 200,
+    "NM"  -> 100,
+    "CM"  -> 100,
+    "WCM" -> 100,
+    "WNM" -> 100
+  )
 }

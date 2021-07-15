@@ -1,5 +1,6 @@
 // import RoundController from './ctrl';
 import { RoundSocket } from './socket';
+import * as xhr from 'common/xhr';
 
 /* Tracks moves that were played on the board,
  * sent to the server, possibly acked,
@@ -11,21 +12,20 @@ import { RoundSocket } from './socket';
  * It will also help with lila-ws restarts.
  */
 export default class TransientMove {
-
-  constructor(readonly socket: RoundSocket) { }
+  constructor(readonly socket: RoundSocket) {}
 
   current: number | undefined = undefined;
 
   register = () => {
     this.current = setTimeout(this.expire, 10000);
-  }
+  };
 
   clear = () => {
     if (this.current) clearTimeout(this.current);
-  }
+  };
 
   expire = () => {
-    $.ajax({ method: 'POST', url: '/statlog?e=roundTransientExpire' });
+    xhr.text('/statlog?e=roundTransientExpire', { method: 'post' });
     this.socket.reload({});
-  }
+  };
 }

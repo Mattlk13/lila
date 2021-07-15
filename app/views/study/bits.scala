@@ -15,7 +15,7 @@ object bits {
 
   def orderSelect(order: Order, active: String, url: String => Call)(implicit ctx: Context) = {
     val orders =
-      if (active == "all") Order.allButOldest
+      if (active == "all") Order.withoutSelector
       else if (active startsWith "topic") Order.allWithMine
       else Order.all
     views.html.base.bits.mselect(
@@ -29,7 +29,7 @@ object bits {
 
   def newForm()(implicit ctx: Context) =
     postForm(cls := "new-study", action := routes.Study.create)(
-      submitButton(cls := "button button-green", dataIcon := "O", title := trans.study.createStudy.txt())
+      submitButton(cls := "button button-green", dataIcon := "", title := trans.study.createStudy.txt())
     )
 
   def authLinks(active: String, order: lila.study.Order)(implicit ctx: Context) = {
@@ -47,46 +47,46 @@ object bits {
     )
   }
 
-  def widget(s: lila.study.Study.WithChaptersAndLiked, tag: Tag = h2)(implicit ctx: Context) = frag(
-    a(cls := "overlay", href := routes.Study.show(s.study.id.value), title := s.study.name.value),
-    div(cls := "top", dataIcon := "4")(
-      div(
-        tag(cls := "study-name")(s.study.name.value),
-        span(
-          !s.study.isPublic option frag(
-            iconTag("a")(cls := "private", ariaTitle(trans.study.`private`.txt())),
-            " "
-          ),
-          iconTag(if (s.liked) "" else ""),
-          " ",
-          s.study.likes.value,
-          " • ",
-          usernameOrId(s.study.ownerId),
-          " • ",
-          momentFromNow(s.study.createdAt)
+  def widget(s: lila.study.Study.WithChaptersAndLiked, tag: Tag = h2)(implicit ctx: Context) =
+    frag(
+      a(cls := "overlay", href := routes.Study.show(s.study.id.value), title := s.study.name.value),
+      div(cls := "top", dataIcon := "")(
+        div(
+          tag(cls := "study-name")(s.study.name.value),
+          span(
+            !s.study.isPublic option frag(
+              iconTag("")(cls := "private", ariaTitle(trans.study.`private`.txt())),
+              " "
+            ),
+            iconTag(if (s.liked) "" else ""),
+            " ",
+            s.study.likes.value,
+            " • ",
+            usernameOrId(s.study.ownerId),
+            " • ",
+            momentFromNow(s.study.createdAt)
+          )
+        )
+      ),
+      div(cls := "body")(
+        ol(cls := "chapters")(
+          s.chapters.map { name =>
+            li(cls := "text", dataIcon := "")(name.value)
+          }
+        ),
+        ol(cls := "members")(
+          s.study.members.members.values
+            .take(4)
+            .map { m =>
+              li(cls := "text", dataIcon := (if (m.canContribute) "" else ""))(usernameOrId(m.id))
+            }
+            .toList
         )
       )
-    ),
-    div(cls := "body")(
-      ol(cls := "chapters")(
-        s.chapters.map { name =>
-          li(cls := "text", dataIcon := "K")(name.value)
-        }
-      ),
-      ol(cls := "members")(
-        s.study.members.members.values
-          .take(4)
-          .map { m =>
-            li(cls := "text", dataIcon := (if (m.canContribute) "" else "v"))(usernameOrId(m.id))
-        } toList
-      )
     )
-  )
 
-  def streamers(streams: List[lila.streamer.Stream])(implicit lang: Lang) =
-    streams.nonEmpty option div(cls := "streamers none")(
-      streams.map { s =>
-        views.html.streamer.bits.contextual(s.streamer.userId)
-      }
+  def streamers(streamers: List[lila.user.User.ID])(implicit lang: Lang) =
+    streamers.nonEmpty option div(cls := "context-streamers none")(
+      streamers map views.html.streamer.bits.contextual
     )
 }

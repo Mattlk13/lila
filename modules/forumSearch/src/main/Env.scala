@@ -21,7 +21,11 @@ final class Env(
     makeClient: Index => ESClient,
     postApi: lila.forum.PostApi,
     postRepo: lila.forum.PostRepo
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, mat: akka.stream.Materializer) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    mat: akka.stream.Materializer
+) {
 
   private val config = appConfig.get[ForumSearchConfig]("forumSearch")(AutoConfig.loader)
 
@@ -32,11 +36,12 @@ final class Env(
   def apply(text: String, page: Int, troll: Boolean) =
     paginatorBuilder(Query(text, troll), page)
 
-  def cli = new lila.common.Cli {
-    def process = {
-      case "forum" :: "search" :: "reset" :: Nil => api.reset inject "done"
+  def cli =
+    new lila.common.Cli {
+      def process = { case "forum" :: "search" :: "reset" :: Nil =>
+        api.reset inject "done"
+      }
     }
-  }
 
   private lazy val paginatorBuilder = wire[lila.search.PaginatorBuilder[lila.forum.PostView, Query]]
 
@@ -44,9 +49,9 @@ final class Env(
     Props(new Actor {
       import lila.forum.actorApi._
       def receive = {
-        case InsertPost(post) => api store post
-        case RemovePost(id)   => client deleteById Id(id)
-        case RemovePosts(ids) => client deleteByIds ids.map(Id.apply)
+        case InsertPost(post) => api.store(post).unit
+        case RemovePost(id)   => client.deleteById(Id(id)).unit
+        case RemovePosts(ids) => client.deleteByIds(ids map Id).unit
       }
     }),
     name = config.actorName

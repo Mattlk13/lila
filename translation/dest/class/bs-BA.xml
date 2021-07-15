@@ -24,7 +24,6 @@
   <string name="visibleByBothStudentsAndTeachers">Vidljivo instruktorima i učenicima ovog časa</string>
   <string name="teachersOfTheClass">Instruktori ovog časa</string>
   <string name="addLichessUsernames">Dodajte Lichess korisnička imena da ih pozovete kao instruktore. Dodajte svako ime u zaseban red.</string>
-  <string name="theyMustFirstApply">Prvo se moraju prijaviti da postanu Lichess instruktori.</string>
   <string name="resetPassword">Resetujte lozinku</string>
   <string name="makeSureToCopy">Iskopirajte ili zapišite lozinku sada. Nećete je moći opet vidjeti!</string>
   <string name="passwordX">Lozinka: %s</string>
@@ -49,6 +48,16 @@ Lozinka: %3$s</string>
   <string name="createDesc4">Ukoliko učenici već imaju korisnički račun, nemojte kreirati novi račun nego ih pozovite.</string>
   <string name="lichessUsername">Lichess korisničko ime</string>
   <string name="generateANewUsername">Generišite novo korisničko ime</string>
+  <string name="welcomeToClass">Dobro došli na Vaš čas: %s.
+Evo linka za pristup času.</string>
+  <string name="invitationToClass">Pozvani ste da se pridružite času %s kao student.</string>
+  <string name="clickToViewInvitation">Kliknite na link da vidite pozivnicu:</string>
+  <plurals name="nbPendingInvitations">
+    <item quantity="one">Jedna pozivnica na čekanju</item>
+    <item quantity="few">%s pozivnice / pozivnica na čekanju</item>
+    <item quantity="other">%s pozivnice / pozivnica na čekanju</item>
+  </plurals>
+  <string name="noPendingInvitations">Nema pozivnica</string>
   <string name="onlyVisibleToTeachers">Vidljivo samo instruktorima časa</string>
   <string name="lastActiveDate">Zadnja aktivnost</string>
   <string name="managed">Pod nadzorom</string>
@@ -70,6 +79,7 @@ Lozinka: %3$s</string>
     <item quantity="few">%s Učenika</item>
     <item quantity="other">%s Učenika</item>
   </plurals>
+  <string name="students">Studenti</string>
   <string name="progress">Napredak</string>
   <string name="noStudents">Nema još učenika u času.</string>
   <string name="noRemovedStudents">Nema ukloljenih učenika.</string>
@@ -85,5 +95,4 @@ Lozinka: %3$s</string>
   <string name="newsEdit1">Sve vijesti časa u jednom polju.</string>
   <string name="newsEdit2">Dodajte najnoviju vijest na vrh. Ne brišite prethodne vijesti.</string>
   <string name="newsEdit3">Odvojite vijesti sa --- kako biste prikazali horizontalnu liniju.</string>
-  <string name="markdownAvailable">%s je na raspolaganju za napredniju sintaksu.</string>
 </resources>

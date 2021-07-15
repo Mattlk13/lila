@@ -5,7 +5,6 @@ import org.joda.time.DateTime
 import play.api.libs.json._
 import reactivemongo.api.bson._
 import reactivemongo.api.ReadPreference
-import scala.concurrent.duration._
 
 import lila.analyse.{ JsonView => analysisJson, Analysis }
 import lila.common.config._
@@ -124,7 +123,7 @@ final private[api] class GameApi(
         ),
         nbResults =
           if (~playing) gameCache.nbPlaying(users._1.id)
-          else crosstableApi(users._1.id, users._2.id, 5 seconds).map(_.nbGames)
+          else crosstableApi(users._1.id, users._2.id).dmap(_.nbGames)
       ),
       currentPage = page,
       maxPerPage = nb
@@ -176,7 +175,7 @@ final private[api] class GameApi(
       }
     }
 
-  private def makeUrl(game: Game) = s"${net.baseUrl}/${game.id}/${game.firstPlayer.color.name}"
+  private def makeUrl(game: Game) = s"${net.baseUrl}/${game.id}/${game.naturalOrientation.name}"
 
   private def gamesJson(withFlags: WithFlags)(games: Seq[Game]): Fu[Seq[JsObject]] = {
     val allAnalysis =
@@ -184,9 +183,8 @@ final private[api] class GameApi(
       else fuccess(List.fill(games.size)(none[Analysis]))
     allAnalysis flatMap { analysisOptions =>
       (games map gameRepo.initialFen).sequenceFu map { initialFens =>
-        games zip analysisOptions zip initialFens map {
-          case ((g, analysisOption), initialFen) =>
-            gameToJson(g, analysisOption, initialFen, checkToken(withFlags))
+        games zip analysisOptions zip initialFens map { case ((g, analysisOption), initialFen) =>
+          gameToJson(g, analysisOption, initialFen, checkToken(withFlags))
         }
       }
     }
@@ -266,8 +264,9 @@ object GameApi {
       token: Option[String] = none
   ) {
 
-    def applyToken(validToken: String) = copy(
-      blurs = token has validToken
-    )
+    def applyToken(validToken: String) =
+      copy(
+        blurs = token has validToken
+      )
   }
 }

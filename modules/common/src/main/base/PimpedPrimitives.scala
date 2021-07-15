@@ -4,10 +4,16 @@ import java.lang.Math.{ max, min }
 
 import ornicar.scalalib.Zero
 
+final class AugmentedAny(private val self: Any) extends AnyVal {
+
+  // sugar for -Wvalue-discard
+  @scala.annotation.nowarn
+  def unit: Unit = ()
+}
+
 final class PimpedBoolean(private val self: Boolean) extends AnyVal {
 
-  /**
-    * Replaces scalaz boolean ops
+  /** Replaces scalaz boolean ops
     * so ?? works on Zero and not Monoid
     */
   def ??[A](a: => A)(implicit z: Zero[A]): A = if (self) a else z.zero
@@ -23,7 +29,7 @@ final class PimpedLong(private val self: Long) extends AnyVal {
 
   def squeeze(bottom: Long, top: Long): Long = max(min(self, top), bottom)
 
-  def truncInt: Int =
+  def toSaturatedInt: Int =
     if (self.toInt == self) self.toInt
     else if (self > 0) Integer.MAX_VALUE
     else Integer.MIN_VALUE

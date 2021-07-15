@@ -4,7 +4,7 @@ import akka.actor._
 import com.softwaremill.macwire._
 import io.methvin.play.autoconfig._
 import play.api.Configuration
-import play.api.libs.ws.WSClient
+import play.api.libs.ws.StandaloneWSClient
 import scala.concurrent.duration._
 
 import lila.common.config._
@@ -13,7 +13,6 @@ final private class GameConfig(
     @ConfigName("collection.game") val gameColl: CollName,
     @ConfigName("collection.crosstable") val crosstableColl: CollName,
     @ConfigName("collection.matchup") val matchupColl: CollName,
-    @ConfigName("paginator.max_per_page") val paginatorMaxPerPage: MaxPerPage,
     @ConfigName("captcher.name") val captcherName: String,
     @ConfigName("captcher.duration") val captcherDuration: FiniteDuration,
     val gifUrl: String
@@ -22,18 +21,20 @@ final private class GameConfig(
 @Module
 final class Env(
     appConfig: Configuration,
-    ws: WSClient,
+    ws: StandaloneWSClient,
     db: lila.db.Db,
     baseUrl: BaseUrl,
     userRepo: lila.user.UserRepo,
     mongoCache: lila.memo.MongoCache.Api,
     lightUserApi: lila.user.LightUserApi,
-    settingStore: lila.memo.SettingStore.Builder,
     cacheApi: lila.memo.CacheApi
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, scheduler: Scheduler) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    scheduler: Scheduler
+) {
 
   private val config = appConfig.get[GameConfig]("game")(AutoConfig.loader)
-  import config.paginatorMaxPerPage
 
   lazy val gameRepo = new GameRepo(db(config.gameColl))
 
@@ -51,38 +52,19 @@ final class Env(
 
   lazy val pgnDump = wire[PgnDump]
 
-  lazy val crosstableInit = settingStore[Boolean](
-    "crosstableInit",
-    default = true,
-    text = "Compute empty crosstables (DB expensive)".some
-  )
-
-  lazy val playTimeInit = settingStore[Boolean](
-    "playTimeInit",
-    default = true,
-    text = "Compute empty play times (DB expensive)".some
-  )
-
-  lazy val playTimeCompute = new PlayTimeApi.Compute(playTimeInit.get _)
-
   lazy val crosstableApi = new CrosstableApi(
     coll = db(config.crosstableColl),
-    matchupColl = db(config.matchupColl),
-    userRepo = userRepo,
-    gameRepo = gameRepo,
-    compute = crosstableInit.get _
+    matchupColl = db(config.matchupColl)
   )
-
-  lazy val playTime = wire[PlayTimeApi]
 
   lazy val gamesByUsersStream = wire[GamesByUsersStream]
 
-  lazy val bestOpponents = wire[BestOpponents]
+  lazy val favoriteOpponents = wire[FavoriteOpponents]
 
   lazy val rematches = Rematches(
     lila.memo.CacheApi.scaffeineNoScheduler
       .expireAfterWrite(1 hour)
-      .build[Game.ID, Game.ID]
+      .build[Game.ID, Game.ID]()
   )
 
   lazy val jsonView = wire[JsonView]

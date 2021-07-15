@@ -61,14 +61,17 @@
   <string name="shareAndExport">Împărtășește &amp; exportă</string>
   <string name="cloneStudy">Clonează</string>
   <string name="studyPgn">PGN-ul studiului</string>
+  <string name="downloadAllGames">Descarcă toate partidele</string>
   <string name="chapterPgn">PGN-ul capitolului</string>
+  <string name="downloadGame">Descarcă partida</string>
   <string name="studyUrl">URL-ul studiului</string>
   <string name="currentChapterUrl">URL-ul capitolului curent</string>
-  <string name="youCanPasteThisInTheForumToEmbedTheChapter">Puteți lipi acest cod într-un forum pentru a încorpora capitolul</string>
+  <string name="youCanPasteThisInTheForumToEmbed">Poți lipi acest cod în forum pentru a îngloba</string>
   <string name="startAtInitialPosition">Începeți de la poziția inițială</string>
   <string name="startAtX">Începeți la %s</string>
-  <string name="embedThisChapter">Încorporați acest capitol în website-ul sau blogul dumneavoastră</string>
-  <string name="readMoreAboutEmbeddingAStudyChapter">Citiți mai multe despre încorporarea unui capitol al studiului</string>
+  <string name="embedInYourWebsite">Înglobează pe site-ul sau blog-ul tău</string>
+  <string name="readMoreAboutEmbedding">Citește mai multe despre înglobare</string>
+  <string name="onlyPublicStudiesCanBeEmbedded">Numai studii publice pot fi înglobate!</string>
   <string name="open">Deschideți</string>
   <string name="xBroughtToYouByY">%1$s, oferit pentru dvs. de %2$s</string>
   <string name="studyNotFound">Studiul nu a fost găsit</string>
@@ -123,9 +126,29 @@
   <string name="pinnedStudyComment">Comentariu fixat</string>
   <string name="start">Începe</string>
   <string name="save">Salvează</string>
-  <string name="clearChat">Golește chatul</string>
+  <string name="clearChat">Șterge conversația</string>
   <string name="deleteTheStudyChatHistory">Ștergeți istoricul chatului? Nu există cale de întoarcere!</string>
   <string name="deleteStudy">Ștergeți studiul</string>
   <string name="deleteTheEntireStudy">Ștergeți întregul studiu? Nu există cale de întoarcere!</string>
   <string name="whereDoYouWantToStudyThat">Unde vreți s-o studiați?</string>
+  <string name="goodMove">Mutare bună</string>
+  <string name="mistake">Greșeală</string>
+  <string name="brilliantMove">Mișcare genială</string>
+  <string name="blunder">Gafă</string>
+  <string name="interestingMove">Mișcare interesantă</string>
+  <string name="dubiousMove" comment="dubiousMove&#10;A questionable move.">Mutare dubioasă</string>
+  <string name="onlyMove" comment="onlyMove&#10;The only possible move. This is a label that can be placed in a study of a past game. It may not technically be the only move, but the only feasible one.">Singura mișcare posibilă</string>
+  <string name="equalPosition">Poziție egală</string>
+  <string name="unclearPosition" comment="unclearPosition&#10;It is unclear who is winning or losing.">Poziție neclară</string>
+  <string name="whiteIsSlightlyBetter">Albul este puțin mai bun</string>
+  <string name="blackIsSlightlyBetter">Negrul este puțin mai bun</string>
+  <string name="whiteIsBetter">Albul este mai bun</string>
+  <string name="blackIsBetter">Negrul este mai bun</string>
+  <string name="whiteIsWinning">Albul câștigă</string>
+  <string name="blackIsWinning">Negrul câștigă</string>
+  <string name="novelty" comment="novelty&#10;&#10;A move in the opening that has not been played before.&#10;https://en.wikipedia.org/wiki/Glossary_of_chess#theoretical_novelty">Noutate</string>
+  <string name="attack" comment="attack&#10;A label that can be applied to a position in a Lichess study. Noun.">Atac</string>
+  <string name="nextChapter">Capitolul următor</string>
+  <string name="prevChapter">Capitolul precedent</string>
+  <string name="studyActions">Acţiuni de studiu</string>
 </resources>

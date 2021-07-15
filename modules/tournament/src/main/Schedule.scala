@@ -1,6 +1,6 @@
 package lila.tournament
 
-import chess.StartingPosition
+import chess.format.FEN
 import chess.variant.Variant
 import org.joda.time.DateTime
 import play.api.i18n.Lang
@@ -11,7 +11,7 @@ case class Schedule(
     freq: Schedule.Freq,
     speed: Schedule.Speed,
     variant: Variant,
-    position: StartingPosition,
+    position: Option[FEN],
     at: DateTime,
     conditions: Condition.All = Condition.All.empty
 ) {
@@ -20,7 +20,7 @@ case class Schedule(
     import Schedule.Freq._
     import Schedule.Speed._
     import lila.i18n.I18nKeys.tourname._
-    if (variant.standard && position.initial)
+    if (variant.standard && position.isEmpty)
       (conditions.minRating, conditions.maxRating) match {
         case (None, None) =>
           (freq, speed) match {
@@ -73,7 +73,9 @@ case class Schedule(
         case (_, Some(max))         => s"<${max.rating} ${speed.name}"
       }
     else if (variant.standard) {
-      val n = s"${position.shortName} ${speed.name}"
+      val n = position.flatMap(Thematic.byFen).fold(speed.name) { pos =>
+        s"${pos.shortName} ${speed.name}"
+      }
       if (full) xArena.txt(n) else n
     } else
       freq match {
@@ -132,6 +134,15 @@ case class Schedule(
 
 object Schedule {
 
+  def uniqueFor(tour: Tournament) =
+    Schedule(
+      freq = Freq.Unique,
+      speed = Speed fromClock tour.clock,
+      variant = tour.variant,
+      position = tour.position,
+      at = tour.startsAt
+    )
+
   case class Plan(schedule: Schedule, buildFunc: Option[Tournament => Tournament]) {
 
     def build: Tournament = {
@@ -139,9 +150,10 @@ object Schedule {
       buildFunc.foldRight(t) { _(_) }
     }
 
-    def map(f: Tournament => Tournament) = copy(
-      buildFunc = buildFunc.fold(f)(f.compose).some
-    )
+    def map(f: Tournament => Tournament) =
+      copy(
+        buildFunc = buildFunc.fold(f)(f.compose).some
+      )
   }
 
   sealed abstract class Freq(val id: Int, val importance: Int) extends Ordered[Freq] {
@@ -203,12 +215,13 @@ object Schedule {
     val mostPopular: List[Speed] = List(Bullet, Blitz, Rapid, Classical)
     def apply(key: String)       = all.find(_.key == key) orElse all.find(_.key.toLowerCase == key.toLowerCase)
     def byId(id: Int)            = all find (_.id == id)
-    def similar(s1: Speed, s2: Speed) = (s1, s2) match {
-      case (a, b) if a == b                              => true
-      case (HyperBullet, Bullet) | (Bullet, HyperBullet) => true
-      case (Bullet, HippoBullet) | (HippoBullet, Bullet) => true
-      case _                                             => false
-    }
+    def similar(s1: Speed, s2: Speed) =
+      (s1, s2) match {
+        case (a, b) if a == b                                        => true
+        case (Bullet, HippoBullet) | (HippoBullet, Bullet)           => true
+        case (HyperBullet, UltraBullet) | (UltraBullet, HyperBullet) => true
+        case _                                                       => false
+      }
     def fromClock(clock: chess.Clock.Config) = {
       val time = clock.estimateTotalSeconds
       if (time < 30) UltraBullet
@@ -219,13 +232,14 @@ object Schedule {
       else if (time < 1500) Rapid
       else Classical
     }
-    def toPerfType(speed: Speed) = speed match {
-      case UltraBullet                        => PerfType.UltraBullet
-      case HyperBullet | Bullet | HippoBullet => PerfType.Bullet
-      case SuperBlitz | Blitz                 => PerfType.Blitz
-      case Rapid                              => PerfType.Rapid
-      case Classical                          => PerfType.Classical
-    }
+    def toPerfType(speed: Speed) =
+      speed match {
+        case UltraBullet                        => PerfType.UltraBullet
+        case HyperBullet | Bullet | HippoBullet => PerfType.Bullet
+        case SuperBlitz | Blitz                 => PerfType.Blitz
+        case Rapid                              => PerfType.Rapid
+        case Classical                          => PerfType.Classical
+      }
   }
 
   sealed trait Season

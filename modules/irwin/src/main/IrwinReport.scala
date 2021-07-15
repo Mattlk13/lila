@@ -14,6 +14,10 @@ case class IrwinReport(
 ) {
 
   def suspectId = SuspectId(_id)
+
+  def note: String = games.sortBy(-_.activation).map { g =>
+    s"#${g.gameId} = ${g.activation}"
+  } mkString ", "
 }
 
 object IrwinReport {
@@ -42,8 +46,9 @@ object IrwinReport {
 
   case class WithPovs(report: IrwinReport, povs: Map[Game.ID, Pov]) {
 
-    def withPovs: List[GameReport.WithPov] = report.games.flatMap { gameReport =>
-      povs get gameReport.gameId map { GameReport.WithPov(gameReport, _) }
-    }
+    def withPovs: List[GameReport.WithPov] =
+      report.games.flatMap { gameReport =>
+        povs get gameReport.gameId map { GameReport.WithPov(gameReport, _) }
+      }
   }
 }

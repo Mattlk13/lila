@@ -17,7 +17,7 @@ final class DuctConcMap[D <: Duct](
 
   def tell(id: String, msg: Any): Unit = getOrMake(id) ! msg
 
-  def tellIfPresent(id: String, msg: Any): Unit = getIfPresent(id) foreach (_ ! msg)
+  def tellIfPresent(id: String, msg: => Any): Unit = getIfPresent(id) foreach (_ ! msg)
 
   def tellAll(msg: Any) =
     ducts.forEachValue(16, _ ! msg)
@@ -26,9 +26,10 @@ final class DuctConcMap[D <: Duct](
 
   def ask[A](id: String)(makeMsg: Promise[A] => Any): Fu[A] = getOrMake(id).ask(makeMsg)
 
-  def askIfPresent[A](id: String)(makeMsg: Promise[A] => Any): Fu[Option[A]] = getIfPresent(id) ?? {
-    _ ask makeMsg dmap some
-  }
+  def askIfPresent[A](id: String)(makeMsg: Promise[A] => Any): Fu[Option[A]] =
+    getIfPresent(id) ?? {
+      _ ask makeMsg dmap some
+    }
 
   def askIfPresentOrZero[A: Zero](id: String)(makeMsg: Promise[A] => Any): Fu[A] =
     askIfPresent(id)(makeMsg) dmap (~_)
@@ -47,10 +48,15 @@ final class DuctConcMap[D <: Duct](
   def size: Int = ducts.size()
 
   def terminate(id: String, lastWill: Duct => Unit): Unit =
-    ducts.computeIfPresent(id, (_, d) => {
-      lastWill(d)
-      nullD
-    })
+    ducts
+      .computeIfPresent(
+        id,
+        (_, d) => {
+          lastWill(d)
+          nullD
+        }
+      )
+      .unit
 
   private[this] val ducts = new ConcurrentHashMap[String, D](initialCapacity)
 

@@ -5,9 +5,12 @@ import scala.concurrent.duration._
 
 import lila.common.Bus
 import lila.db.dsl._
+import lila.hub.actorApi.clas.{ AreKidsInSameClass, IsTeacherOf }
 import lila.hub.actorApi.report.AutoFlag
-import lila.hub.actorApi.clas.IsTeacherOf
+import lila.hub.actorApi.team.IsLeaderOf
+import lila.hub.actorApi.user.{ KidId, NonKidId }
 import lila.memo.RateLimit
+import lila.security.Granter
 import lila.shutup.Analyser
 import lila.user.User
 
@@ -18,60 +21,94 @@ final private class MsgSecurity(
     relationApi: lila.relation.RelationApi,
     spam: lila.security.Spam,
     chatPanic: lila.chat.ChatPanic
-)(implicit ec: scala.concurrent.ExecutionContext, system: akka.actor.ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: akka.actor.ActorSystem
+) {
 
   import BsonHandlers._
   import MsgSecurity._
 
+  private object limitCost {
+    val normal   = 25
+    val verified = 5
+    val hog      = 1
+    def apply(u: User.Contact) =
+      if (u.isApiHog) hog
+      else if (u.isVerified) verified
+      else if (u isDaysOld 3) normal
+      else if (u isHoursOld 3) normal * 2
+      else normal * 4
+  }
+
   private val CreateLimitPerUser = new RateLimit[User.ID](
-    credits = 20 * 5,
+    credits = 20 * limitCost.normal,
     duration = 24 hour,
-    name = "PM creates per user",
     key = "msg_create.user"
   )
 
   private val ReplyLimitPerUser = new RateLimit[User.ID](
-    credits = 20 * 5,
+    credits = 20 * limitCost.normal,
     duration = 1 minute,
-    name = "PM replies per user",
     key = "msg_reply.user"
   )
 
+  private val dirtSpamDedup = new lila.memo.HashCodeExpireSetMemo[String](1 minute)
+
   object can {
 
-    def post(contacts: User.Contacts, text: String, isNew: Boolean, unlimited: Boolean = false): Fu[Verdict] =
-      may.post(contacts, isNew) flatMap {
-        case false => fuccess(Block)
-        case _ =>
-          isLimited(contacts.orig, isNew, unlimited) orElse
-            isSpam(text) orElse
-            isTroll(contacts) orElse
-            isDirt(contacts.orig, text, isNew) getOrElse
-            fuccess(Ok)
-      } flatMap {
-        case mute: Mute =>
-          relationApi.fetchFollows(contacts.dest.id, contacts.orig.id) dmap { isFriend =>
-            if (isFriend) Ok else mute
-          }
-        case verdict => fuccess(verdict)
-      } addEffect {
-        case Dirt =>
-          Bus.publish(
-            AutoFlag(contacts.orig.id, s"msg/${contacts.orig.id}/${contacts.dest.id}", text),
-            "autoFlag"
-          )
-        case Spam =>
-          logger.warn(s"PM spam from ${contacts.orig.id}: ${text}")
-        case _ =>
-      }
+    def post(
+        contacts: User.Contacts,
+        rawText: String,
+        isNew: Boolean,
+        unlimited: Boolean = false
+    ): Fu[Verdict] = {
+      val text = rawText.trim
+      if (text.isEmpty) fuccess(Invalid)
+      else
+        may.post(contacts, isNew) flatMap {
+          case false => fuccess(Block)
+          case _ =>
+            isLimited(contacts, isNew, unlimited) orElse
+              isSpam(text) orElse
+              isTroll(contacts) orElse
+              isDirt(contacts.orig, text, isNew) getOrElse
+              fuccess(Ok)
+        } flatMap {
+          case mute: Mute =>
+            relationApi.fetchFollows(contacts.dest.id, contacts.orig.id) dmap { isFriend =>
+              if (isFriend) Ok else mute
+            }
+          case verdict => fuccess(verdict)
+        } addEffect {
+          case Dirt =>
+            dirtSpamDedup.once(text) {
+              Bus.publish(
+                AutoFlag(contacts.orig.id, s"msg/${contacts.orig.id}/${contacts.dest.id}", text),
+                "autoFlag"
+              )
+            }
+          case Spam =>
+            dirtSpamDedup.once(text) {
+              logger.warn(s"PM spam from ${contacts.orig.id} to ${contacts.dest.id}: $text")
+            }
+          case _ =>
+        }
+    }
 
-    private def isLimited(user: User.Contact, isNew: Boolean, unlimited: Boolean): Fu[Option[Verdict]] =
+    private def isLimited(contacts: User.Contacts, isNew: Boolean, unlimited: Boolean): Fu[Option[Verdict]] =
       if (unlimited) fuccess(none)
-      else {
-        val limiter = if (isNew) CreateLimitPerUser else ReplyLimitPerUser
-        val cost    = if (user.isVerified) 1 else 5
-        !limiter(user.id, cost = cost)(true) ?? fuccess(Limit.some)
+      else if (isNew) {
+        isLeaderOf(contacts) >>| isTeacherOf(contacts)
+      } map {
+        case true => none
+        case _ =>
+          CreateLimitPerUser[Option[Verdict]](contacts.orig.id, limitCost(contacts.orig))(none)(Limit.some)
       }
+      else
+        fuccess {
+          ReplyLimitPerUser[Option[Verdict]](contacts.orig.id, limitCost(contacts.orig))(none)(Limit.some)
+        }
 
     private def isSpam(text: String): Fu[Option[Verdict]] =
       spam.detect(text) ?? fuccess(Spam.some)
@@ -87,16 +124,19 @@ final private class MsgSecurity(
   object may {
 
     def post(orig: User.ID, dest: User.ID, isNew: Boolean): Fu[Boolean] =
-      userRepo.contacts(orig, dest) orFail s"Missing convo contact user $orig->$dest" flatMap {
-        post(_, isNew)
+      userRepo.contacts(orig, dest) flatMap {
+        _ ?? { post(_, isNew) }
       }
 
     def post(contacts: User.Contacts, isNew: Boolean): Fu[Boolean] =
-      fuccess(contacts.dest.id != User.lichessId) >>&
-        !relationApi.fetchBlocks(contacts.dest.id, contacts.orig.id) >>&
-        (create(contacts) >>| reply(contacts)) >>&
-        chatPanic.allowed(contacts.orig.id, userRepo.byId) >>&
-        kidCheck(contacts, isNew)
+      fuccess(contacts.dest.id != User.lichessId) >>& {
+        fuccess(Granter.byRoles(_.ModMessage)(~contacts.orig.roles)) >>| {
+          !relationApi.fetchBlocks(contacts.dest.id, contacts.orig.id) >>&
+            (create(contacts) >>| reply(contacts)) >>&
+            chatPanic.allowed(contacts.orig.id, userRepo.byId) >>&
+            kidCheck(contacts, isNew)
+        }
+      }
 
     private def create(contacts: User.Contacts): Fu[Boolean] =
       prefApi.getPref(contacts.dest.id, _.message) flatMap {
@@ -110,20 +150,29 @@ final private class MsgSecurity(
     // unless they deleted the thread.
     private def reply(contacts: User.Contacts): Fu[Boolean] =
       colls.thread.exists(
-        $id(MsgThread.id(contacts.orig.id, contacts.dest.id)) ++ $or(
-          "del" $ne contacts.dest.id,
-          $doc(
-            "lastMsg.user" -> contacts.dest.id,
-            "lastMsg.date" $gt DateTime.now.minusDays(3)
-          )
-        )
+        $id(MsgThread.id(contacts.orig.id, contacts.dest.id)) ++
+          $doc("del" $ne contacts.dest.id)
       )
 
     private def kidCheck(contacts: User.Contacts, isNew: Boolean): Fu[Boolean] =
-      if (contacts.orig.isKid && isNew) fuFalse
-      else if (!contacts.dest.isKid) fuTrue
-      else Bus.ask[Boolean]("clas") { IsTeacherOf(contacts.orig.id, contacts.dest.id, _) }
+      if (!isNew || !contacts.hasKid) fuTrue
+      else
+        (contacts.orig.kidId, contacts.dest.kidId) match {
+          case (a: KidId, b: KidId)    => Bus.ask[Boolean]("clas") { AreKidsInSameClass(a, b, _) }
+          case (t: NonKidId, s: KidId) => isTeacherOf(t.id, s.id)
+          case (s: KidId, t: NonKidId) => isTeacherOf(t.id, s.id)
+          case _                       => fuFalse
+        }
   }
+
+  private def isTeacherOf(contacts: User.Contacts) =
+    Bus.ask[Boolean]("clas") { IsTeacherOf(contacts.orig.id, contacts.dest.id, _) }
+
+  private def isTeacherOf(teacher: User.ID, student: User.ID) =
+    Bus.ask[Boolean]("clas") { IsTeacherOf(teacher, student, _) }
+
+  private def isLeaderOf(contacts: User.Contacts) =
+    Bus.ask[Boolean]("teamIsLeaderOf") { IsLeaderOf(contacts.orig.id, contacts.dest.id, _) }
 }
 
 private object MsgSecurity {
@@ -133,10 +182,11 @@ private object MsgSecurity {
   sealed abstract class Send(val mute: Boolean) extends Verdict
   sealed abstract class Mute                    extends Send(true)
 
-  case object Ok    extends Send(false)
-  case object Troll extends Mute
-  case object Spam  extends Mute
-  case object Dirt  extends Mute
-  case object Block extends Reject
-  case object Limit extends Reject
+  case object Ok      extends Send(false)
+  case object Troll   extends Mute
+  case object Spam    extends Mute
+  case object Dirt    extends Mute
+  case object Block   extends Reject
+  case object Limit   extends Reject
+  case object Invalid extends Reject
 }

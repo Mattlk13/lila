@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="arenaTournaments">Tornei arena</string>
   <string name="isItRated">Questo torneo è classificato?</string>
   <string name="willBeNotified">Riceverai una notifica quando il torneo inizierà. Durante l\'attesa puoi tranquillamente giocare in un\'altra scheda.</string>
   <string name="isRated">Questo torneo è classificato e influenzerà il tuo punteggio.</string>
@@ -26,10 +27,9 @@ La modalità Berserk non è disponibile per le partite senza un tempo iniziale (
 
 Una partita Berserk vinta varrà un punto in più solo se giocherai almeno 7 mosse.</string>
   <string name="howIsTheWinnerDecided">Come viene deciso il vincitore?</string>
-  <string name="howIsTheWinnerDecidedAnswer">Saranno proclamati vincitori i tre giocatori che abbiano il maggior numero di punti allo scadere del tempo previsto per la durata del torneo.
+  <string name="howIsTheWinnerDecidedAnswer">Saranno proclamati vincitori i tre giocatori che abbiano il maggior numero di punti allo scadere del tempo previsto per il torneo.
 
-Se due giocatori hanno lo stesso numero di punti, lo spareggio avverrà in base alla valutazione della performance nel torneo.
-(valutazione della performance nel torneo= [ somma dei punteggi degli avversari + 400 × (Vittorie - Sconfitte) ] / Partite giocate).</string>
+Se due o più giocatori hanno lo stesso numero di punti, lo spareggio avverrà in base alla performance del torneo, valutata dal Tournament Performance Rating, calcolato come [Somma dei punteggi degli avversari + 400×(Vittorie - Sconfitte)] / Partite giocate.</string>
   <string name="howDoesPairingWork">Come funziona l\'accoppiamento?</string>
   <string name="howDoesPairingWorkAnswer">All\'inizio del torneo i giocatori sono accoppiati sulla base del loro punteggio individuale.
 Non appena finisci una partita, ritorna nella lobby del torneo e attendi: verrai nuovamente accoppiato con un altro giocatore con un punteggio simile al tuo. Il tempo di attesa è minimo; tuttavia, potresti non affrontare tutti i giocatori partecipanti al torneo.
@@ -44,4 +44,18 @@ Gioca in fretta e ritorna nella lobby per avere la possibilità di giocare più 
   </plurals>
   <string name="thisIsPrivate">Questo torneo è privato</string>
   <string name="shareUrl">Condividi questo URL per permettere alle persone di unirsi: %s</string>
+  <string name="drawStreak">Serie di patte: quando in un\'arena un giocatore pareggia in partite consecutive viene assegnato un punto solo per il primo pareggio o per ogni patta in cui sono state effettuate più di %s mosse. La serie di patte può essere interrotta solo da una vittoria, non da una sconfitta o da un\'ulteriore patta.</string>
+  <string name="history">Cronologia dell\'Arena</string>
+  <plurals name="viewAllXTeams" comment="viewAllXTeams [one] [other]&#10;&#10;%s is the number of teams that can be viewed">
+    <item quantity="one">Visualizza la squadra</item>
+    <item quantity="other">Visualizza tutte le %s squadre</item>
+  </plurals>
+  <string name="newTeamBattle">Nuova Battaglia di Squadra</string>
+  <string name="customStartDate">Data iniziale personalizzata</string>
+  <string name="customStartDateHelp">Nel tuo fuso orario locale. Questo sovrascrive l\'impostazione \"Tempo prima dell\'inizio del torneo\"</string>
+  <string name="allowBerserk">Consenti Berserk</string>
+  <string name="allowBerserkHelp">Consenti ai giocatori di dimezzare il loro tempo d\'orologio per ottenere un punto extra</string>
+  <string name="allowChatHelp">Consenti ai giocatori di discutere nella chat room</string>
+  <string name="arenaStreaks">Serie dell\'arena</string>
+  <string name="arenaStreaksHelp">Dopo 2 vittorie, le vittorie consecutive concedono 4 punti invece di 2.</string>
 </resources>

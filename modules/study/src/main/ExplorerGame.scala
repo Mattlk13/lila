@@ -1,5 +1,7 @@
 package lila.study
 
+import scala.util.chaining._
+
 import chess.format.FEN
 import chess.format.pgn.Parser
 import lila.game.{ Game, Namer }
@@ -26,14 +28,14 @@ final private class ExplorerGame(
       importer(gameId) map {
         _ ?? { game =>
           position.node ?? { fromNode =>
-            GameToRoot(game, none, false).|> { root =>
+            GameToRoot(game, none, withClocks = false).pipe { root =>
               root.setCommentAt(
                 comment = gameComment(game),
                 path = Path(root.mainline.map(_.id))
               )
             } ?? { gameRoot =>
-              merge(fromNode, position.path, gameRoot) flatMap {
-                case (newNode, path) => position.chapter.addNode(newNode, path) map (_ -> path)
+              merge(fromNode, position.path, gameRoot) flatMap { case (newNode, path) =>
+                position.chapter.addNode(newNode, path) map (_ -> path)
               }
             }
           }
@@ -55,11 +57,12 @@ final private class ExplorerGame(
     foundGameNode.map { _ -> fromPath.+(path) }
   }
 
-  private def gameComment(game: Game) = Comment(
-    id = Comment.Id.make,
-    text = Comment.Text(s"${gameTitle(game)}, ${gameUrl(game)}"),
-    by = Comment.Author.Lichess
-  )
+  private def gameComment(game: Game) =
+    Comment(
+      id = Comment.Id.make,
+      text = Comment.Text(s"${gameTitle(game)}, ${gameUrl(game)}"),
+      by = Comment.Author.Lichess
+    )
 
   private def gameUrl(game: Game) = s"${net.baseUrl}/${game.id}"
 

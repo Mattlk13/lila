@@ -18,6 +18,7 @@ case class UserRecord(
   def rageSit                   = c | RageSit.empty
 
   def banInEffect = bans.lastOption.exists(_.inEffect)
+  def banMinutes  = bans.lastOption.map(_.remainingMinutes)
 
   def nbOutcomes = outcomes.size
 
@@ -27,27 +28,29 @@ case class UserRecord(
       case o if o != Outcome.Good         => 1
     } sum
 
-  def badOutcomeRatio: Float = if (bans.size < 3) 0.4f else 0.3f
+  def badOutcomeRatio: Float = if (bans.sizeIs < 3) 0.4f else 0.3f
 
-  def minBadOutcomes: Int = bans.size match {
-    case 0 | 1 => 4
-    case 2 | 3 => 3
-    case _     => 2
-  }
+  def minBadOutcomes: Int =
+    bans.size match {
+      case 0 | 1 => 4
+      case 2 | 3 => 3
+      case _     => 2
+    }
 
-  def badOutcomesStreakSize: Int = bans.size match {
-    case 0     => 6
-    case 1 | 2 => 5
-    case _     => 4
-  }
+  def badOutcomesStreakSize: Int =
+    bans.size match {
+      case 0     => 6
+      case 1 | 2 => 5
+      case _     => 4
+    }
 
   def bannable(accountCreationDate: DateTime): Option[TempBan] = {
     rageSitRecidive || {
       outcomes.lastOption.exists(_ != Outcome.Good) && {
         // too many bad overall
-        badOutcomeScore >= (badOutcomeRatio * nbOutcomes atLeast minBadOutcomes) || {
+        badOutcomeScore >= (badOutcomeRatio * nbOutcomes atLeast minBadOutcomes.toFloat) || {
           // bad result streak
-          outcomes.size >= badOutcomesStreakSize &&
+          outcomes.sizeIs >= badOutcomesStreakSize &&
           outcomes.takeRight(badOutcomesStreakSize).forall(Outcome.Good !=)
         }
       }
@@ -75,7 +78,7 @@ case class TempBan(
 
   def remainingMinutes: Int = (remainingSeconds / 60) atLeast 1
 
-  def inEffect = endsAt isAfter DateTime.now
+  def inEffect = endsAt.isAfterNow
 
 }
 
@@ -83,29 +86,30 @@ object TempBan {
 
   implicit val tempbanWrites = Json.writes[TempBan]
 
-  private def make(minutes: Int) = TempBan(
-    DateTime.now,
-    minutes atMost 3 * 24 * 60
-  )
+  private def make(minutes: Int) =
+    TempBan(
+      DateTime.now,
+      minutes atMost 3 * 24 * 60
+    )
 
   private val baseMinutes = 10
 
-  /**
-    * Create a playban. First offense: 10 min.
+  /** Create a playban. First offense: 10 min.
     * Multiplier of repeat offense after X days:
     * - 0 days: 3x
     * - 0 - 3 days: linear scale from 3x to 1x
     * - >3 days quick drop off
     * Account less than 3 days old --> 2x the usual time
     */
-  def make(bans: Vector[TempBan], accountCreationDate: DateTime): TempBan = make {
-    (bans.lastOption ?? { prev =>
-      prev.endsAt.toNow.getStandardHours.truncInt match {
-        case h if h < 72 => prev.mins * (132 - h) / 60
-        case h           => prev.mins - Math.pow(h / 12, 1.5).toInt
-      }
-    } atLeast baseMinutes) * (if (accountCreationDate.plusDays(3).isAfter(DateTime.now)) 2 else 1)
-  }
+  def make(bans: Vector[TempBan], accountCreationDate: DateTime): TempBan =
+    make {
+      (bans.lastOption ?? { prev =>
+        prev.endsAt.toNow.getStandardHours.toSaturatedInt match {
+          case h if h < 72 => prev.mins * (132 - h) / 60
+          case h           => (55.6 * prev.mins / (Math.pow(5.56 * prev.mins - 54.6, h / 720) + 54.6)).toInt
+        }
+      } atLeast baseMinutes) * (if (accountCreationDate.plusDays(3).isAfterNow) 2 else 1)
+    }
 }
 
 sealed abstract class Outcome(

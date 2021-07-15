@@ -1,13 +1,13 @@
 package lila.app
 package templating
 
-import play.api.i18n.Lang
 import controllers.routes
 import mashup._
+import play.api.i18n.Lang
 
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.LightUser
-import lila.i18n.{ I18nKeys => trans }
+import lila.i18n.{ I18nKey, I18nKeys => trans }
 import lila.rating.{ Perf, PerfType }
 import lila.user.{ Title, User }
 
@@ -33,7 +33,7 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
     PerfType.Crazyhouse
   )
 
-  def showPerfRating(rating: Int, name: String, nb: Int, provisional: Boolean, icon: Char)(
+  def showPerfRating(rating: Int, name: String, nb: Int, provisional: Boolean, clueless: Boolean, icon: Char)(
       implicit lang: Lang
   ): Frag =
     span(
@@ -41,12 +41,19 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
       dataIcon := icon,
       cls := "text"
     )(
-      if (nb > 0) frag(rating, provisional option "?")
-      else frag(nbsp, nbsp, nbsp, "-")
+      if (clueless) frag(nbsp, nbsp, nbsp, if (nb < 1) "-" else "?")
+      else frag(rating, provisional option "?")
     )
 
   def showPerfRating(perfType: PerfType, perf: Perf)(implicit lang: Lang): Frag =
-    showPerfRating(perf.intRating, perfType.trans, perf.nb, perf.provisional, perfType.iconChar)
+    showPerfRating(
+      perf.intRating,
+      perfType.trans,
+      perf.nb,
+      perf.provisional,
+      perf.clueless,
+      perfType.iconChar
+    )
 
   def showPerfRating(u: User, perfType: PerfType)(implicit lang: Lang): Frag =
     showPerfRating(perfType, u perfs perfType)
@@ -54,19 +61,21 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
   def showPerfRating(u: User, perfKey: String)(implicit lang: Lang): Option[Frag] =
     PerfType(perfKey) map { showPerfRating(u, _) }
 
-  def showBestPerf(u: User)(implicit lang: Lang): Option[Frag] = u.perfs.bestPerf map {
-    case (pt, perf) => showPerfRating(pt, perf)
-  }
+  def showBestPerf(u: User)(implicit lang: Lang): Option[Frag] =
+    u.perfs.bestPerf map { case (pt, perf) =>
+      showPerfRating(pt, perf)
+    }
   def showBestPerfs(u: User, nb: Int)(implicit lang: Lang): List[Frag] =
-    u.perfs.bestPerfs(nb) map {
-      case (pt, perf) => showPerfRating(pt, perf)
+    u.perfs.bestPerfs(nb) map { case (pt, perf) =>
+      showPerfRating(pt, perf)
     }
 
-  def showRatingDiff(diff: Int): Frag = diff match {
-    case 0          => span("±0")
-    case d if d > 0 => goodTag(s"+$d")
-    case d          => badTag(s"−${-d}")
-  }
+  def showRatingDiff(diff: Int): Frag =
+    diff match {
+      case 0          => span("±0")
+      case d if d > 0 => goodTag(s"+$d")
+      case d          => badTag(s"−${-d}")
+    }
 
   def lightUser = env.user.lightUserSync
 
@@ -78,15 +87,15 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
   def isStreaming(userId: String) = env.streamer.liveStreamApi isStreaming userId
 
   def userIdLink(
-      userIdOption: Option[String],
+      userIdOption: Option[User.ID],
       cssClass: Option[String] = None,
       withOnline: Boolean = true,
       withTitle: Boolean = true,
       truncate: Option[Int] = None,
       params: String = "",
       modIcon: Boolean = false
-  )(implicit lang: Lang): Frag =
-    userIdOption.flatMap(lightUser).fold[Frag](User.anonymous) { user =>
+  )(implicit ctx: Lang): Tag =
+    userIdOption.flatMap(lightUser).fold[Tag](span(User.anonymous)) { user =>
       userIdNameLink(
         userId = user.id,
         username = user.name,
@@ -107,32 +116,23 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
       withTitle: Boolean = true,
       truncate: Option[Int] = None,
       params: String = ""
-  )(implicit lang: Lang): Frag = userIdNameLink(
-    userId = user.id,
-    username = user.name,
-    isPatron = user.isPatron,
-    title = withTitle ?? user.title map Title.apply,
-    cssClass = cssClass,
-    withOnline = withOnline,
-    truncate = truncate,
-    params = params,
-    modIcon = false
-  )
-
-  def userIdLink(
-      userId: String,
-      cssClass: Option[String]
-  )(implicit lang: Lang): Frag = userIdLink(userId.some, cssClass)
-
-  def titleTag(title: Option[Title]): Option[Frag] = title map { t =>
-    frag(
-      span(
-        cls := s"title${(t == Title.BOT) ?? " data-bot"}",
-        st.title := Title.titleName(t)
-      )(t),
-      nbsp
+  )(implicit lang: Lang): Tag =
+    userIdNameLink(
+      userId = user.id,
+      username = user.name,
+      isPatron = user.isPatron,
+      title = withTitle ?? user.title map Title.apply,
+      cssClass = cssClass,
+      withOnline = withOnline,
+      truncate = truncate,
+      params = params,
+      modIcon = false
     )
-  }
+
+  def titleTag(title: Option[Title]): Option[Frag] =
+    title map { t =>
+      frag(userTitleTag(t), nbsp)
+    }
   def titleTag(lu: LightUser): Frag = titleTag(lu.title map Title.apply)
 
   private def userIdNameLink(
@@ -145,7 +145,7 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
       title: Option[Title],
       params: String,
       modIcon: Boolean
-  )(implicit lang: Lang): Frag =
+  )(implicit lang: Lang): Tag =
     a(
       cls := userClass(userId, cssClass, withOnline),
       href := userUrl(username, params = params)
@@ -165,7 +165,7 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
       withPerfRating: Option[PerfType] = None,
       name: Option[Frag] = None,
       params: String = ""
-  )(implicit lang: Lang): Frag =
+  )(implicit lang: Lang): Tag =
     a(
       cls := userClass(user.id, cssClass, withOnline, withPowerTip),
       href := userUrl(user.username, params)
@@ -209,25 +209,26 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
     )
   }
 
-  private def renderRating(perf: Perf): Frag = frag(
-    " (",
-    perf.intRating,
-    perf.provisional option "?",
-    ")"
-  )
+  private def renderRating(perf: Perf): Frag =
+    frag(
+      " (",
+      perf.intRating,
+      perf.provisional option "?",
+      ")"
+    )
 
   private def userRating(user: User, withPerfRating: Option[PerfType], withBestRating: Boolean): Frag =
     withPerfRating match {
       case Some(perfType) => renderRating(user.perfs(perfType))
       case _ if withBestRating =>
-        user.perfs.bestPerf ?? {
-          case (_, perf) => renderRating(perf)
+        user.perfs.bestPerf ?? { case (_, perf) =>
+          renderRating(perf)
         }
       case _ => ""
     }
 
-  private def userUrl(username: String, params: String = "") =
-    s"""${routes.User.show(username)}$params"""
+  private def userUrl(username: String, params: String = ""): Option[String] =
+    (username != "Ghost" && username != "ghost") option s"""${routes.User.show(username)}$params"""
 
   protected def userClass(
       userId: String,
@@ -235,45 +236,50 @@ trait UserHelper { self: I18nHelper with StringHelper with NumberHelper =>
       withOnline: Boolean,
       withPowerTip: Boolean = true
   ): List[(String, Boolean)] =
-    (withOnline ?? List((if (isOnline(userId)) "online" else "offline") -> true)) ::: List(
-      "user-link"                                                       -> true,
-      ~cssClass                                                         -> cssClass.isDefined,
-      "ulpt"                                                            -> withPowerTip
-    )
+    if (userId == "ghost") List("user-link" -> true, ~cssClass -> cssClass.isDefined)
+    else
+      (withOnline ?? List((if (isOnline(userId)) "online" else "offline") -> true)) ::: List(
+        "user-link" -> true,
+        ~cssClass   -> cssClass.isDefined,
+        "ulpt"      -> withPowerTip
+      )
 
-  def userGameFilterTitle(u: User, nbs: UserInfo.NbGames, filter: GameFilter)(
-      implicit lang: Lang
+  def userGameFilterTitle(u: User, nbs: UserInfo.NbGames, filter: GameFilter)(implicit
+      lang: Lang
   ): Frag =
     if (filter == GameFilter.Search) frag(br, trans.search.advancedSearch())
     else splitNumber(userGameFilterTitleNoTag(u, nbs, filter))
 
-  def userGameFilterTitleNoTag(u: User, nbs: UserInfo.NbGames, filter: GameFilter)(
-      implicit lang: Lang
+  private def transLocalize(key: I18nKey, number: Int)(implicit lang: Lang) =
+    key.pluralSameTxt(number)
+
+  def userGameFilterTitleNoTag(u: User, nbs: UserInfo.NbGames, filter: GameFilter)(implicit
+      lang: Lang
   ): String =
-    (filter match {
-      case GameFilter.All      => trans.nbGames.pluralSameTxt(u.count.game)
-      case GameFilter.Me       => nbs.withMe ?? trans.nbGamesWithYou.pluralSameTxt
-      case GameFilter.Rated    => trans.nbRated.pluralSameTxt(u.count.rated)
-      case GameFilter.Win      => trans.nbWins.pluralSameTxt(u.count.win)
-      case GameFilter.Loss     => trans.nbLosses.pluralSameTxt(u.count.loss)
-      case GameFilter.Draw     => trans.nbDraws.pluralSameTxt(u.count.draw)
-      case GameFilter.Playing  => trans.nbPlaying.pluralSameTxt(nbs.playing)
-      case GameFilter.Bookmark => trans.nbBookmarks.pluralSameTxt(nbs.bookmark)
-      case GameFilter.Imported => trans.nbImportedGames.pluralSameTxt(nbs.imported)
+    filter match {
+      case GameFilter.All      => transLocalize(trans.nbGames, u.count.game)
+      case GameFilter.Me       => nbs.withMe ?? { transLocalize(trans.nbGamesWithYou, _) }
+      case GameFilter.Rated    => transLocalize(trans.nbRated, u.count.rated)
+      case GameFilter.Win      => transLocalize(trans.nbWins, u.count.win)
+      case GameFilter.Loss     => transLocalize(trans.nbLosses, u.count.loss)
+      case GameFilter.Draw     => transLocalize(trans.nbDraws, u.count.draw)
+      case GameFilter.Playing  => transLocalize(trans.nbPlaying, nbs.playing)
+      case GameFilter.Bookmark => transLocalize(trans.nbBookmarks, nbs.bookmark)
+      case GameFilter.Imported => transLocalize(trans.nbImportedGames, nbs.imported)
       case GameFilter.Search   => trans.search.advancedSearch.txt()
-    })
+    }
 
   def describeUser(user: User)(implicit lang: Lang) = {
     val name      = user.titleUsername
     val nbGames   = user.count.game
     val createdAt = org.joda.time.format.DateTimeFormat forStyle "M-" print user.createdAt
-    val currentRating = user.perfs.bestPerf ?? {
-      case (pt, perf) => s" Current ${pt.trans} rating: ${perf.intRating}."
+    val currentRating = user.perfs.bestPerf ?? { case (pt, perf) =>
+      s" Current ${pt.trans} rating: ${perf.intRating}."
     }
     s"$name played $nbGames games since $createdAt.$currentRating"
   }
 
-  val patronIconChar = ""
+  val patronIconChar = ""
   val lineIconChar   = ""
 
   val lineIcon: Frag = i(cls := "line")

@@ -5,7 +5,7 @@ import play.api.libs.json._
 import lila.api.Context
 import lila.app._
 import lila.common.LightUser.lightUserWrites
-import lila.i18n.{ enLang, I18nKeys => trans, I18nLangPicker }
+import lila.i18n.{ enLang, I18nKeys => trans, I18nLangPicker, LangList }
 
 final class Dasher(env: Env) extends LilaController(env) {
 
@@ -34,6 +34,8 @@ final class Dasher(env: Env) extends LilaController(env) {
     trans.profile,
     trans.inbox,
     trans.preferences.preferences,
+    trans.coachManager,
+    trans.streamerManager,
     trans.logOut
   ).map(_.key) ::: translationsBase
 
@@ -48,57 +50,58 @@ final class Dasher(env: Env) extends LilaController(env) {
       else I18nLangPicker.bestFromRequestHeaders(ctx.req) | enLang
     )
 
-  def get = Open { implicit ctx =>
-    negotiate(
-      html = notFound,
-      api = _ =>
-        ctx.me.??(env.streamer.api.isStreamer) map { isStreamer =>
-          Ok {
-            Json.obj(
-              "user" -> ctx.me.map(_.light),
-              "lang" -> Json.obj(
-                "current"  -> ctx.lang.code,
-                "accepted" -> I18nLangPicker.allFromRequestHeaders(ctx.req).map(_.code)
-              ),
-              "sound" -> Json.obj(
-                "list" -> lila.pref.SoundSet.list.map { set =>
-                  s"${set.key} ${set.name}"
-                }
-              ),
-              "background" -> Json.obj(
-                "current" -> ctx.currentBg,
-                "image"   -> ctx.pref.bgImgOrDefault
-              ),
-              "board" -> Json.obj(
-                "is3d" -> ctx.pref.is3d
-              ),
-              "theme" -> Json.obj(
-                "d2" -> Json.obj(
-                  "current" -> ctx.currentTheme.name,
-                  "list"    -> lila.pref.Theme.all.map(_.name)
+  def get =
+    Open { implicit ctx =>
+      negotiate(
+        html = notFound,
+        api = _ =>
+          ctx.me.??(env.streamer.api.isPotentialStreamer) map { isStreamer =>
+            Ok {
+              Json.obj(
+                "user" -> ctx.me.map(_.light),
+                "lang" -> Json.obj(
+                  "current"  -> ctx.lang.code,
+                  "accepted" -> I18nLangPicker.allFromRequestHeaders(ctx.req).map(_.code),
+                  "list"     -> LangList.allChoices
                 ),
-                "d3" -> Json.obj(
-                  "current" -> ctx.currentTheme3d.name,
-                  "list"    -> lila.pref.Theme3d.all.map(_.name)
-                )
-              ),
-              "piece" -> Json.obj(
-                "d2" -> Json.obj(
-                  "current" -> ctx.currentPieceSet.name,
-                  "list"    -> lila.pref.PieceSet.all.map(_.name)
+                "sound" -> Json.obj(
+                  "list" -> lila.pref.SoundSet.list.map { set =>
+                    s"${set.key} ${set.name}"
+                  }
                 ),
-                "d3" -> Json.obj(
-                  "current" -> ctx.currentPieceSet3d.name,
-                  "list"    -> lila.pref.PieceSet3d.all.map(_.name)
-                )
-              ),
-              "inbox"    -> ctx.hasInbox,
-              "coach"    -> isGranted(_.Coach),
-              "streamer" -> isStreamer,
-              "i18n"     -> translations
-            )
+                "background" -> Json.obj(
+                  "current" -> lila.pref.Pref.Bg.asString.get(ctx.pref.bg),
+                  "image"   -> ctx.pref.bgImgOrDefault
+                ),
+                "board" -> Json.obj(
+                  "is3d" -> ctx.pref.is3d
+                ),
+                "theme" -> Json.obj(
+                  "d2" -> Json.obj(
+                    "current" -> ctx.currentTheme.name,
+                    "list"    -> lila.pref.Theme.all.map(_.name)
+                  ),
+                  "d3" -> Json.obj(
+                    "current" -> ctx.currentTheme3d.name,
+                    "list"    -> lila.pref.Theme3d.all.map(_.name)
+                  )
+                ),
+                "piece" -> Json.obj(
+                  "d2" -> Json.obj(
+                    "current" -> ctx.currentPieceSet.name,
+                    "list"    -> lila.pref.PieceSet.all.map(_.name)
+                  ),
+                  "d3" -> Json.obj(
+                    "current" -> ctx.currentPieceSet3d.name,
+                    "list"    -> lila.pref.PieceSet3d.all.map(_.name)
+                  )
+                ),
+                "coach"    -> isGranted(_.Coach),
+                "streamer" -> isStreamer,
+                "i18n"     -> translations
+              )
+            }
           }
-        }
-    )
-  }
+      )
+    }
 }

@@ -20,6 +20,9 @@
   <plurals name="playedNbMoves">
     <item quantity="other">%1$s 수를 둠</item>
   </plurals>
+  <plurals name="inNbCorrespondenceGames">
+    <item quantity="other">%1$s개의 통신전에서</item>
+  </plurals>
   <plurals name="completedNbGames">
     <item quantity="other">%s 번의 통신전을 완료하셨습니다.</item>
   </plurals>
@@ -44,6 +47,10 @@
   <plurals name="rankedInTournament">
     <item quantity="other">%1$s 위 (상위 %2$s%%)  (%4$s 에서 %3$s 국)</item>
   </plurals>
+  <plurals name="competedInNbSwissTournaments">
+    <item quantity="other">%s 번 토너먼트에 참가함</item>
+  </plurals>
+  <string name="rankedInSwissTournament">%2$s에서 %1$s등</string>
   <string name="signedUp">Lichess에 회원가입함</string>
   <plurals name="joinedNbTeams">
     <item quantity="other">%s 팀에 참가함</item>

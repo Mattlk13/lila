@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="activity">Verlauf</string>
-  <string name="hostedALiveStream">Hat einen Livestream gehosted</string>
+  <string name="hostedALiveStream">Hat live gestreamt</string>
   <plurals name="supportedNbMonths">
     <item quantity="one">Unterstützt lichess.org seit %1$s Monat als %2$s</item>
     <item quantity="other">Unterstützt lichess.org seit %1$s Monaten als %2$s</item>
@@ -62,6 +62,11 @@
     <item quantity="one">Hat Platz #%1$s (obere %2$s%%) mit %3$s Spiel in %4$s erreicht</item>
     <item quantity="other">Hat Platz #%1$s (obere %2$s%%) mit %3$s Spielen in %4$s erreicht</item>
   </plurals>
+  <plurals name="competedInNbSwissTournaments">
+    <item quantity="one">Hat an %s Turnier nach Schweizer System teilgenommen</item>
+    <item quantity="other">Hat an %s Turnieren nach Schweizer System teilgenommen</item>
+  </plurals>
+  <string name="rankedInSwissTournament">Hat Platz #%1$s im Turnier %2$s belegt</string>
   <string name="signedUp">Hat sich bei Lichess angemeldet</string>
   <plurals name="joinedNbTeams">
     <item quantity="one">Ist %s Team beigetreten</item>

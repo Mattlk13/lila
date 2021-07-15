@@ -27,7 +27,7 @@ object watcher {
         c.chat,
         name = trans.spectatorRoom.txt(),
         timeout = c.timeout,
-        withNote = ctx.isAuth,
+        withNoteAge = ctx.isAuth option pov.game.secondsSinceCreation,
         public = true,
         resourceId = lila.chat.Chat.ResourceId(s"game/${c.chat.id}"),
         palantir = ctx.me.exists(_.canPalantir)
@@ -36,18 +36,17 @@ object watcher {
 
     bits.layout(
       variant = pov.game.variant,
-      title = gameVsText(pov.game, withRatings = true),
+      title = s"${gameVsText(pov.game, withRatings = true)} • spectator",
       moreJs = frag(
         roundNvuiTag,
         roundTag,
-        embedJsUnsafe(s"""lichess=window.lichess||{};customWS=true;onload=function(){
-LichessRound.boot(${safeJsonValue(
+        embedJsUnsafeLoadThen(s"""LichessRound.boot(${safeJsonValue(
           Json.obj(
             "data" -> data,
             "i18n" -> jsI18n(pov.game),
             "chat" -> chatJson
           )
-        )})}""")
+        )})""")
       ),
       openGraph = povOpenGraph(pov).some,
       chessground = false
@@ -57,15 +56,15 @@ LichessRound.boot(${safeJsonValue(
           bits.side(pov, data, tour, simul, userTv, bookmarked),
           chatOption.map(_ => chat.frag)
         ),
-        bits.roundAppPreload(pov, false),
+        bits.roundAppPreload(pov, controls = false),
         div(cls := "round__underboard")(bits.crosstable(cross, pov.game)),
         div(cls := "round__underchat")(bits underchat pov.game)
       )
     )
   }
 
-  def crawler(pov: Pov, initialFen: Option[chess.format.FEN], pgn: chess.format.pgn.Pgn)(
-      implicit ctx: Context
+  def crawler(pov: Pov, initialFen: Option[chess.format.FEN], pgn: chess.format.pgn.Pgn)(implicit
+      ctx: Context
   ) =
     bits.layout(
       variant = pov.game.variant,

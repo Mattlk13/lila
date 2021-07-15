@@ -12,21 +12,43 @@
   <string name="noTeamFound">Joukkuetta ei löytynyt</string>
   <string name="joinTeam">Liity joukkueeseen</string>
   <string name="quitTeam">Lähde joukkueesta</string>
-  <string name="anyoneCanJoin">Kuka tahansa voi liittyä</string>
-  <string name="aConfirmationIsRequiredToJoin">Liittymiseen vaaditaan vahvistus</string>
-  <string name="joiningPolicy">Liittymissäännöt</string>
-  <string name="teamLeader">Joukkueen johtaja</string>
-  <string name="teamBestPlayers">Joukkueen paras pelaaja</string>
+  <string name="manuallyReviewAdmissionRequests">Käy liittymispyynnöt yksitellen läpi</string>
+  <string name="manuallyReviewAdmissionRequestsHelp">Jos valitset tämän, pelaajien tulee joukkueeseen liittyäkseen kirjoittaa liittymispyynnöt, jotka voit hylätä tai hyväksyä.</string>
+  <plurals name="teamLeaders">
+    <item quantity="one">Joukkueen johtaja</item>
+    <item quantity="other">Joukkueen johtajat</item>
+  </plurals>
+  <string name="teamBestPlayers">Parhaat pelaajat</string>
   <string name="teamRecentMembers">Joukkueen viimeaikaiset jäsenet</string>
   <string name="kickSomeone">Poista joku joukkueesta</string>
   <string name="whoToKick">Kenet haluat poistaa joukkueesta?</string>
-  <string name="appointOwner">Nimeä toinen joukkueen omistaja</string>
-  <string name="changeOwner">Kenestä haluat tehdä joukkueen omistajan?</string>
   <plurals name="xJoinRequests">
     <item quantity="one">%s liittymispyyntö</item>
     <item quantity="other">%s liittymispyyntöä</item>
   </plurals>
   <string name="willBeReviewed">Joukkueen johtaja tarkastaa liittymispyyntösi.</string>
   <string name="beingReviewed">Liittymispyyntösi on joukkueen johtajan tarkastettavana.</string>
-  <string name="teamBattle">Joukkuekamppailu</string>
+  <string name="subToTeamMessages">Tilaa joukkueen viestit</string>
+  <string name="teamBattle">Joukkuetaisto</string>
+  <string name="teamBattleOverview">Useiden joukkueiden keskinäinen kamppailu: kukin pelaaja kerää pisteitä joukkueelleen</string>
+  <string name="teamTournament">Joukkueen sisäinen turnaus</string>
+  <string name="teamTournamentOverview">Areena-turnaus, johon vain joukkueen jäsenet voivat liittyä</string>
+  <string name="swissTournamentOverview">Sveitsiläinen turnaus, johon vain joukkueesi jäsenet voivat liittyä</string>
+  <string name="messageAllMembers">Lähetä viesti kaikille jäsenille</string>
+  <string name="messageAllMembersOverview">Lähetä yksityisviesti jokaiselle joukkueen jäsenelle</string>
+  <string name="messageAllMembersLongDescription">Lähetä henkilökohtainen viesti joukkueen KAIKILLE jäsenille.
+Voit kutsua tällä pelaajia liittymään turnauksiin tai joukkuetaisteluihin.
+Pelaajat, jotka eivät mielellään ota vastaan viestejäsi, saattavat lähteä joukkueesta.</string>
+  <string name="teamsIlead">Johtamani joukkueet</string>
+  <string name="youWayWantToLinkOneOfTheseTournaments">Saatat haluta linkata yhden näistä tulevista turnauksista?</string>
+  <string name="usersWhoCanManageThisTeam">Käyttäjät, jotka voivat hallita tätä joukkuetta</string>
+  <string name="leadersChat">Johtajien keskustelu</string>
+  <string name="closeTeam">Sulje joukkue</string>
+  <string name="closeTeamDescription">Sulkee joukkueen pysyvästi.</string>
+  <string name="teamPassword">Joukkueen salasana</string>
+  <string name="teamPasswordDescriptionForLeader">(Valinnainen) Salasana, joka uusien jäsenten on tunnettava voidakseen liittyä joukkueeseen.</string>
+  <string name="incorrectTeamPassword">Virheellinen joukkuesalasana.</string>
+  <string name="teamAlreadyExists">Tämä joukkue on jo olemassa.</string>
+  <string name="upcomingTourns">Tulevat turnaukset</string>
+  <string name="completedTourns">Päättyneet turnaukset</string>
 </resources>

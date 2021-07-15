@@ -1,11 +1,13 @@
 package lila.forum
 
+import org.joda.time.DateTime
 import Filter._
 import lila.db.dsl._
 import lila.user.User
+import scala.concurrent.duration._
 
-final class TopicRepo(val coll: Coll, filter: Filter = Safe)(
-    implicit ec: scala.concurrent.ExecutionContext
+final class TopicRepo(val coll: Coll, filter: Filter = Safe)(implicit
+    ec: scala.concurrent.ExecutionContext
 ) {
 
   def forUser(user: Option[User]) =
@@ -59,9 +61,6 @@ final class TopicRepo(val coll: Coll, filter: Filter = Safe)(
       else fuccess(slug)
     }
   }
-
-  def incViews(topic: Topic) =
-    coll.incFieldUnchecked($id(topic.id), "views")
 
   def byCategQuery(categ: Categ)          = $doc("categId" -> categ.slug) ++ trollFilter
   def byCategNotStickyQuery(categ: Categ) = byCategQuery(categ) ++ notStickyQuery

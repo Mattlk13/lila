@@ -5,6 +5,10 @@
   <string name="freeAccount">Ücretsiz Hesap</string>
   <string name="becomePatron">Lichess Destekçisi olun</string>
   <string name="xBecamePatron">%s Lichess Destekçisi oldu</string>
+  <plurals name="xIsPatronForNbMonths">
+    <item quantity="one">%1$s %2$s aylığına Lichess\'i destekledi</item>
+    <item quantity="other">%1$s %2$s aylığına Lichess\'i destekledi</item>
+  </plurals>
   <string name="newPatrons">Yeni Destekçiler</string>
   <string name="freeChess">Herkes için ücretsiz satranç,
 sonsuza kadar!</string>
@@ -16,15 +20,14 @@ sonsuza kadar!</string>
   <string name="weAreNonProfit">Herkesin ücretsiz ve kaliteli bir satranç platformuna kolayca ulaşabilmesi gerektiğine gönülden inandığımız için hiçbir kâr amacı gütmüyoruz.</string>
   <string name="weRelyOnSupport">Lichess sizler gibi insanların desteği sayesinde ayakta duruyor. Bu çorbada sizin de tuzunuz olsun istiyorsanız lütfen bizden desteğinizi esirgemeyin.</string>
   <string name="lifetime">Ömür Boyu</string>
-  <string name="payLifetimeOnce">Tek seferde %s ödeyin ve sonsuza dek Lichess destekçisi olun!</string>
+  <string name="payLifetimeOnce">Tek seferde %s ödeyin ve sonsuza değin Lichess destekçisi olun!</string>
   <string name="lifetimePatron">Bir Ömür Lichess Destekçisi</string>
-  <string name="makeExtraDonation">Fazladan ödeme yap?</string>
   <string name="monthly">Aylık</string>
   <string name="recurringBilling">Tekrarlayan ödeme, Destekçi kanatlarınız her ay yenilenecek.</string>
   <string name="onetime">Tek sefer</string>
   <string name="singleDonation">Tek seferlik bir ödeme yaptığınız takdirde kullanıcı adınızın yanında beliren destekçi kanatlarına bir aylığına sahip olursunuz.</string>
   <string name="otherAmount">Diğer</string>
-  <string name="pleaseEnterAmount">Lütfen Amerikan Doları cinsinden bir tutar girin</string>
+  <string name="pleaseEnterAmountInX">Lütfen %s cinsinden bir tutar girin</string>
   <string name="withCreditCard">Kredi Kartı</string>
   <string name="withPaypal">PayPal</string>
   <string name="weAreSmallTeam">Biz küçük bir ekibiz, dolayısıyla desteğiniz büyük bir fark yaratacak!</string>
@@ -57,6 +60,7 @@ Ancak Destekçilerimiz, müthiş profil simgeleriyle sonuna kadar övünme hakk�
   <string name="nextPayment">Sonraki ödeme</string>
   <string name="youWillBeChargedXOnY">%2$s tarihinde %1$s ödemeniz olacak.</string>
   <string name="makeAdditionalDonation">Bir bağış daha yap</string>
+  <string name="giftPatronWings">Başka bir oyuncu adına Lichess\'i destekle</string>
   <string name="update">Güncelle</string>
   <string name="changeMonthlyAmount">Aylık ücreti değiştir (%s)</string>
   <string name="cancelSupport">desteğini iptal et</string>
@@ -64,8 +68,6 @@ Ancak Destekçilerimiz, müthiş profil simgeleriyle sonuna kadar övünme hakk�
   <string name="decideHowMuch">Lichess\'in sizin için ne kadar değerli olduğuna karar verin:</string>
   <string name="stopPayments">Kredi kartınızı geri çekin ve ödemeleri durdurun:</string>
   <string name="noLongerSupport">Artık Lichess\'i desteklemiyor</string>
-  <string name="paymentHistory">Ödeme geçmişi</string>
-  <string name="paid">Ödenen</string>
   <string name="viewOthers">Diğer Lichess Destekçilerini gör</string>
   <string name="date">Tarih</string>
   <string name="amount">Tutar</string>
@@ -75,4 +77,5 @@ Ancak Destekçilerimiz, müthiş profil simgeleriyle sonuna kadar övünme hakk�
   <string name="nowLifetime">Bu desteğiniz bize bir ömür yeter!</string>
   <string name="nowOneMonth">Bir aylığına Lichess Destekçisi oldunuz!</string>
   <string name="downgradeNextMonth">Bir ay içinde sizden tekrar ücret talep edilmeyecek ve Lichess hesabınız ücretsiz hâline dönecek.</string>
+  <string name="changeCurrency">Para birimini değiştir</string>
 </resources>

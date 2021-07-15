@@ -1,38 +1,19 @@
 package lila.app
 package templating
 
-import lila.common.paginator.Paginator
+import lila.app.ui.ScalatagsTemplate._
 
 trait PaginatorHelper {
 
-  implicit def toRichPager[A](pager: Paginator[A]): RichPager = new RichPager(pager)
-}
-
-final class RichPager(pager: Paginator[_]) {
-
-  def sliding(length: Int, showPost: Boolean = true): List[Option[Int]] = {
-    val fromPage = 1 max (pager.currentPage - length)
-    val toPage   = pager.nbPages min (pager.currentPage + length)
-    val pre = fromPage match {
-      case 1 => Nil
-      case 2 => List(1.some)
-      case _ => List(1.some, none)
+  def pagerNext(pager: lila.common.paginator.Paginator[_], url: Int => String): Option[Tag] =
+    pager.nextPage.map { np =>
+      div(cls := "pager")(pagerA(url(np)))
     }
-    val post = toPage match {
-      case x if x == pager.nbPages     => Nil
-      case x if x == pager.nbPages - 1 => List(pager.nbPages.some)
-      case _ if showPost               => List(none, pager.nbPages.some)
-      case _                           => List(none)
+
+  def pagerNextTable(pager: lila.common.paginator.Paginator[_], url: Int => String): Option[Tag] =
+    pager.nextPage.map { np =>
+      tr(cls := "pager")(th(pagerA(url(np))))
     }
-    pre ::: (fromPage to toPage).view.map(some).toList ::: post
-  }
 
-  def firstIndex: Int =
-    (pager.maxPerPage.value * (pager.currentPage - 1) + 1) min pager.nbResults
-
-  def lastIndex: Int =
-    (firstIndex + pageNbResults - 1) max 0
-
-  def pageNbResults =
-    pager.currentPageResults.size
+  private def pagerA(url: String) = a(rel := "next", href := url)("Next")
 }

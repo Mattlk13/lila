@@ -14,18 +14,17 @@ case class AnaDests(
     chapterId: Option[String]
 ) {
 
-  def isInitial =
-    variant.standard && fen.value == chess.format.Forsyth.initial && path == ""
+  def isInitial = variant.standard && fen.initial && path == ""
 
   val dests: String =
     if (isInitial) AnaDests.initialDests
     else {
-      val sit = chess.Game(variant.some, fen.value.some).situation
+      val sit = chess.Game(variant.some, fen.some).situation
       sit.playable(false) ?? destString(sit.destinations)
     }
 
   lazy val opening = Variant.openingSensibleVariants(variant) ?? {
-    FullOpeningDB findByFen fen.value
+    FullOpeningDB findByFen fen
   }
 
   def json =

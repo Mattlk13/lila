@@ -2,14 +2,14 @@ package lila.blog
 
 import io.prismic._
 import play.api.mvc.RequestHeader
-import play.api.libs.ws.WSClient
+import play.api.libs.ws.StandaloneWSClient
 
 import lila.common.config.MaxPerPage
 import lila.common.paginator._
 
 final class BlogApi(
     config: BlogConfig
-)(implicit ec: scala.concurrent.ExecutionContext, ws: WSClient) {
+)(implicit ec: scala.concurrent.ExecutionContext, ws: StandaloneWSClient) {
 
   private def collection = config.collection
 
@@ -26,7 +26,7 @@ final class BlogApi(
       .pageSize(maxPerPage.value)
       .page(page)
       .submit()
-      .fold(_ => none, some _)
+      .fold(_ => none, some)
       .dmap2 { PrismicPaginator(_, page, maxPerPage) }
 
   def recent(
@@ -41,7 +41,8 @@ final class BlogApi(
       .forms(collection)
       .query(s"""[[:d = at(document.id, "$id")]]""")
       .ref(ref | api.master.ref)
-      .submit() map (_.results.headOption)
+      .submit()
+      .map(_.results.headOption)
 
   def one(prismic: BlogApi.Context, id: String): Fu[Option[Document]] = one(prismic.api, prismic.ref.some, id)
 
@@ -70,13 +71,19 @@ final class BlogApi(
     }
   }
 
-  def masterContext(
-      implicit linkResolver: (Api, Option[String]) => DocumentLinkResolver
+  def masterContext(implicit
+      linkResolver: (Api, Option[String]) => DocumentLinkResolver
   ): Fu[BlogApi.Context] = {
     prismicApi map { api =>
       BlogApi.Context(api, api.master.ref, linkResolver(api, none))
     }
   }
+
+  def all(page: Int = 1)(implicit prismic: BlogApi.Context): Fu[List[Document]] =
+    recent(prismic.api, page, MaxPerPage(50), none) flatMap { res =>
+      val docs = res.??(_.currentPageResults).toList
+      (docs.nonEmpty ?? all(page + 1)) map (docs ::: _)
+    }
 
   private def resolveRef(api: Api)(ref: Option[String]) =
     ref.map(_.trim).filterNot(_.isEmpty) map { reqRef =>

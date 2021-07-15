@@ -1,16 +1,38 @@
-import { h } from 'snabbdom'
-import { VNode } from 'snabbdom/vnode'
+import { h, VNode } from 'snabbdom';
 import { titleNameToId, bind, dataIcon, iconTag, onInsert, scrollTo } from '../util';
 import { prop, Prop } from 'common';
-import { ctrl as inviteFormCtrl } from './inviteForm';
+import { makeCtrl as inviteFormCtrl, StudyInviteFormCtrl } from './inviteForm';
 import { StudyCtrl, StudyMember, StudyMemberMap, Tab } from './interfaces';
 import { NotifCtrl } from './notif';
+import { AnalyseSocketSend } from '../socket';
+
+export interface StudyMemberCtrl {
+  dict: Prop<StudyMemberMap>;
+  confing: Prop<string | null>;
+  myId?: string;
+  inviteForm: StudyInviteFormCtrl;
+  update(members: StudyMemberMap): void;
+  setActive(id: string): void;
+  isActive(id: string): boolean;
+  owner(): StudyMember;
+  myMember(): StudyMember | undefined;
+  isOwner(): boolean;
+  canContribute(): boolean;
+  max: number;
+  setRole(id: string, role: string): void;
+  kick(id: string): void;
+  leave(): void;
+  ordered(): StudyMember[];
+  size(): number;
+  isOnline(userId: string): boolean;
+  hasOnlineContributor(): boolean;
+}
 
 interface Opts {
   initDict: StudyMemberMap;
-  myId: string | null;
+  myId: string | undefined;
   ownerId: string;
-  send: SocketSend;
+  send: AnalyseSocketSend;
   tab: Prop<Tab>;
   startTour(): void;
   notif: NotifCtrl;
@@ -20,9 +42,9 @@ interface Opts {
   trans: Trans;
 }
 
-function memberActivity(onIdle) {
-  let timeout;
-  let schedule = function() {
+function memberActivity(onIdle: () => void) {
+  let timeout: Timeout;
+  const schedule = () => {
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(onIdle, 100);
   };
@@ -30,52 +52,59 @@ function memberActivity(onIdle) {
   return schedule;
 }
 
-export function ctrl(opts: Opts) {
-
+export function ctrl(opts: Opts): StudyMemberCtrl {
   const dict = prop<StudyMemberMap>(opts.initDict);
-  const confing = prop<string | undefined>(undefined);
-  let active: { [id: string]: () => void } = {};
+  const confing = prop<string | null>(null);
+  const active: { [id: string]: () => void } = {};
   let online: { [id: string]: boolean } = {};
   let spectatorIds: string[] = [];
   const max = 30;
 
   function owner() {
     return dict()[opts.ownerId];
-  };
+  }
 
   function isOwner() {
     return opts.myId === opts.ownerId || (opts.admin && canContribute());
-  };
+  }
 
   function myMember() {
-    return opts.myId ? dict()[opts.myId] : null;
-  };
+    return opts.myId ? dict()[opts.myId] : undefined;
+  }
 
   function canContribute(): boolean {
     const m = myMember();
     return !!m && m.role === 'w';
-  };
+  }
 
   const inviteForm = inviteFormCtrl(opts.send, dict, () => opts.tab('members'), opts.redraw, opts.trans);
 
-  function setActive(id) {
+  function setActive(id: string) {
     if (opts.tab() !== 'members') return;
     if (active[id]) active[id]();
-    else active[id] = memberActivity(function() {
-      delete(active[id]);
-      opts.redraw();
-    });
+    else
+      active[id] = memberActivity(() => {
+        delete active[id];
+        opts.redraw();
+      });
     opts.redraw();
-  };
+  }
 
   function updateOnline() {
     online = {};
     const members: StudyMemberMap = dict();
-    spectatorIds.forEach(function(id) {
+    spectatorIds.forEach(function (id) {
       if (members[id]) online[id] = true;
     });
     if (opts.tab() === 'members') opts.redraw();
   }
+
+  lichess.pubsub.on('socket.in.crowd', d => {
+    const names: string[] = d.users || [];
+    inviteForm.spectators(names);
+    spectatorIds = names.map(titleNameToId);
+    updateOnline();
+  });
 
   return {
     dict,
@@ -83,27 +112,26 @@ export function ctrl(opts: Opts) {
     myId: opts.myId,
     inviteForm,
     update(members: StudyMemberMap) {
-      if (isOwner()) confing(Object.keys(members).find(function(sri) {
-        return !dict()[sri];
-      }));
+      if (isOwner()) confing(Object.keys(members).find(sri => !dict()[sri]) || null);
       const wasViewer = myMember() && !canContribute();
       const wasContrib = myMember() && canContribute();
       dict(members);
       if (wasViewer && canContribute()) {
-        if (window.lichess.once('study-tour')) opts.startTour();
+        if (lichess.once('study-tour')) opts.startTour();
         opts.onBecomingContributor();
         opts.notif.set({
           text: opts.trans.noarg('youAreNowAContributor'),
-          duration: 3000
+          duration: 3000,
         });
-      } else if (wasContrib && !canContribute()) opts.notif.set({
-        text: opts.trans.noarg('youAreNowASpectator'),
-        duration: 3000
-      });
+      } else if (wasContrib && !canContribute())
+        opts.notif.set({
+          text: opts.trans.noarg('youAreNowASpectator'),
+          duration: 3000,
+        });
       updateOnline();
     },
     setActive,
-    isActive(id) {
+    isActive(id: string) {
       return !!active[id];
     },
     owner,
@@ -111,166 +139,195 @@ export function ctrl(opts: Opts) {
     isOwner,
     canContribute,
     max,
-    setRole(id, role) {
+    setRole(id: string, role: string) {
       setActive(id);
-      opts.send("setRole", {
+      opts.send('setRole', {
         userId: id,
-        role
+        role,
       });
-      confing(undefined);
+      confing(null);
     },
-    kick(id) {
-      opts.send("kick", id);
-      confing(undefined);
+    kick(id: string) {
+      opts.send('kick', id);
+      confing(null);
     },
     leave() {
-      opts.send("leave");
+      opts.send('leave');
     },
     ordered() {
       const d = dict();
-      return Object.keys(d).map(id => d[id]).sort((a, b) =>
-        a.role === 'r' && b.role === 'w' ? 1 : (
-          a.role === 'w' && b.role === 'r' ? -1 : 0
-        ));
+      return Object.keys(d)
+        .map(id => d[id])
+        .sort((a, b) => (a.role === 'r' && b.role === 'w' ? 1 : a.role === 'w' && b.role === 'r' ? -1 : 0));
     },
     size() {
       return Object.keys(dict()).length;
-    },
-    setSpectators(usernames?: string[]) {
-      const names = usernames || [];
-      this.inviteForm.setSpectators(names);
-      spectatorIds = names.map(titleNameToId);
-      updateOnline();
     },
     isOnline(userId: string) {
       return online[userId];
     },
     hasOnlineContributor() {
       const members = dict();
-      for (let i in members) if (online[i] && members[i].role === 'w') return true;
+      for (const i in members) if (online[i] && members[i].role === 'w') return true;
       return false;
-    }
+    },
   };
 }
 
 export function view(ctrl: StudyCtrl): VNode {
-
-  const members = ctrl.members, isOwner = members.isOwner();
+  const members = ctrl.members,
+    isOwner = members.isOwner();
 
   function username(member: StudyMember) {
-    var u = member.user;
-    return h('span.user-link.ulpt', {
-      attrs: { 'data-href': '/@/' + u.name }
-    }, (u.title ? u.title + ' ' : '') + u.name);
-  };
+    const u = member.user;
+    return h(
+      'span.user-link.ulpt',
+      {
+        attrs: { 'data-href': '/@/' + u.name },
+      },
+      (u.title ? u.title + ' ' : '') + u.name
+    );
+  }
 
   function statusIcon(member: StudyMember) {
     const contrib = member.role === 'w';
-    return h('span.status', {
-      class: {
-        contrib,
-        active: members.isActive(member.user.id),
-        online: members.isOnline(member.user.id)
+    return h(
+      'span.status',
+      {
+        class: {
+          contrib,
+          active: members.isActive(member.user.id),
+          online: members.isOnline(member.user.id),
+        },
+        attrs: { title: ctrl.trans.noarg(contrib ? 'contributor' : 'spectator') },
       },
-      attrs: { title: ctrl.trans.noarg(contrib ? 'contributor' : 'spectator') },
-    }, [
-      iconTag(contrib ? 'r' : 'v')
-    ]);
-  };
+      [iconTag(contrib ? '' : '')]
+    );
+  }
 
   function configButton(ctrl: StudyCtrl, member: StudyMember) {
     if (isOwner && (member.user.id !== members.myId || ctrl.data.admin))
-      return h('act', {
-        key: 'cfg-' + member.user.id,
-        attrs: dataIcon('%'),
-        hook: bind('click', _ => {
-          members.confing(members.confing() === member.user.id ? null : member.user.id);
-        }, ctrl.redraw)
+      return h('i.act', {
+        attrs: dataIcon(''),
+        hook: bind(
+          'click',
+          _ => {
+            members.confing(members.confing() == member.user.id ? null : member.user.id);
+            console.log(members.confing(), member.user.id);
+          },
+          ctrl.redraw
+        ),
       });
     if (!isOwner && member.user.id === members.myId)
-      return h('act.leave', {
-        key: 'leave',
+      return h('i.act.leave', {
         attrs: {
-          'data-icon': 'F',
-          title: ctrl.trans.noarg('leaveTheStudy')
+          'data-icon': '',
+          title: ctrl.trans.noarg('leaveTheStudy'),
         },
-        hook: bind('click', members.leave, ctrl.redraw)
+        hook: bind('click', members.leave, ctrl.redraw),
       });
-  };
+    return undefined;
+  }
 
   function memberConfig(member: StudyMember): VNode {
     const roleId = 'member-role';
-    return h('m-config', {
-      key: member.user.id + '-config',
-      hook: onInsert(el => scrollTo($(el).parent('.members')[0] as HTMLElement, el))
-    }, [
-      h('div.role', [
-        h('div.switch', [
-          h('input.cmn-toggle', {
-            attrs: {
-              id: roleId,
-              type: 'checkbox',
-              checked: member.role === 'w'
-            },
-            hook: bind('change', e => {
-              members.setRole(member.user.id, (e.target as HTMLInputElement).checked ? 'w' : 'r');
-            }, ctrl.redraw)
-          }),
-          h('label', { attrs: { 'for': roleId } })
-        ]),
-        h('label', { attrs: { 'for': roleId } }, ctrl.trans.noarg('contributor'))
-      ]),
-      h('div.kick', h('a.button.button-red.button-empty.text', {
-        attrs: dataIcon('L'),
-        hook: bind('click', _ => members.kick(member.user.id), ctrl.redraw)
-      }, ctrl.trans.noarg('kick')))
-    ]);
-  };
-
-  var ordered = members.ordered();
-
-  return h('div.study__members', {
-    hook: {
-      insert: _ => {
-        window.lichess.pubsub.emit('content_loaded');
-        window.lichess.pubsub.emit('chat.resize');
-      }
-    }
-  }, [
-    ...ordered.map(function(member) {
-      const confing = members.confing() === member.user.id;
-      return [
-        h('div', {
-          key: member.user.id,
-          class: { editing: !!confing }
-        }, [
-          h('div.left', [
-            statusIcon(member),
-            username(member)
+    return h(
+      'm-config',
+      {
+        key: member.user.id + '-config',
+        hook: onInsert(el => scrollTo($(el).parent('.members')[0] as HTMLElement, el)),
+      },
+      [
+        h('div.role', [
+          h('div.switch', [
+            h('input.cmn-toggle', {
+              attrs: {
+                id: roleId,
+                type: 'checkbox',
+                checked: member.role === 'w',
+              },
+              hook: bind(
+                'change',
+                e => {
+                  members.setRole(member.user.id, (e.target as HTMLInputElement).checked ? 'w' : 'r');
+                },
+                ctrl.redraw
+              ),
+            }),
+            h('label', { attrs: { for: roleId } }),
           ]),
-          configButton(ctrl, member)
+          h('label', { attrs: { for: roleId } }, ctrl.trans.noarg('contributor')),
         ]),
-        confing ? memberConfig(member) : null
-      ];
-    }).reduce((a, b) => a.concat(b), []),
-    (isOwner && ordered.length < members.max) ? h('div.add', {
-      key: 'add',
-      hook: bind('click', members.inviteForm.toggle, ctrl.redraw)
-    }, [
-      h('div.left', [
-        h('span.status', iconTag('O')),
-        h('div.user-link', ctrl.trans.noarg('addMembers'))
-      ])
-    ]) : null,
-    (!members.canContribute() && ctrl.data.admin) ? h('form.admin', {
-      attrs: {
-        method: 'post',
-        action: `/study/${ctrl.data.id}/admin`
-      }
-    }, [
-      h('button.button.button-red.button-thin', {
-        attrs: { type: 'submit' }
-      }, 'Enter as admin')
-    ]) : null
-  ]);
+        h(
+          'div.kick',
+          h(
+            'a.button.button-red.button-empty.text',
+            {
+              attrs: dataIcon(''),
+              hook: bind('click', _ => members.kick(member.user.id), ctrl.redraw),
+            },
+            ctrl.trans.noarg('kick')
+          )
+        ),
+      ]
+    );
+  }
+
+  const ordered: StudyMember[] = members.ordered();
+
+  return h(
+    'div.study__members',
+    {
+      hook: onInsert(() => lichess.pubsub.emit('chat.resize')),
+    },
+    [
+      ...ordered
+        .map(member => {
+          const confing = members.confing() === member.user.id;
+          return [
+            h(
+              'div',
+              {
+                key: member.user.id,
+                class: { editing: !!confing },
+              },
+              [h('div.left', [statusIcon(member), username(member)]), configButton(ctrl, member)]
+            ),
+            confing ? memberConfig(member) : null,
+          ];
+        })
+        .reduce((a, b) => a.concat(b), []),
+      isOwner && ordered.length < members.max
+        ? h(
+            'div.add',
+            {
+              key: 'add',
+              hook: bind('click', members.inviteForm.toggle, ctrl.redraw),
+            },
+            [h('div.left', [h('span.status', iconTag('')), h('div.user-link', ctrl.trans.noarg('addMembers'))])]
+          )
+        : null,
+      !members.canContribute() && ctrl.data.admin
+        ? h(
+            'form.admin',
+            {
+              key: ':admin',
+              attrs: {
+                method: 'post',
+                action: `/study/${ctrl.data.id}/admin`,
+              },
+            },
+            [
+              h(
+                'button.button.button-red.button-thin',
+                {
+                  attrs: { type: 'submit' },
+                },
+                'Enter as admin'
+              ),
+            ]
+          )
+        : null,
+    ]
+  );
 }

@@ -1,34 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="lichessClasses">Schaakgroepen</string>
-  <string name="teachClassesOfChessStudents">Geef groepen van schaakstudenten les met Lichess schaakgroep hulpmiddelen.</string>
+  <string name="lichessClasses">Klassen</string>
+  <string name="teachClassesOfChessStudents">Geef groepen leerlingen les met Lichess schaakgroep hulpmiddelen.</string>
   <string name="features">Functies</string>
-  <string name="quicklyGenerateSafeUsernames">Genereer snel veilige gebruikersnamen en wachtwoorden voor studenten</string>
+  <string name="quicklyGenerateSafeUsernames">Genereer snel veilige gebruikersnamen en wachtwoorden voor leerlingen</string>
   <string name="trackStudentProgress">Volg de voortgang van leerlingen in partijen en puzzels</string>
   <string name="messageAllStudents">Informeer alle leerlingen over nieuw lesmateriaal</string>
   <string name="freeForAllForever">100% gratis voor iedereen, voor altijd, zonder advertenties of trackers</string>
   <string name="applyToBeLichessTeacher">Meld u aan als Lichess Leraar</string>
   <string name="noClassesYet">Nog geen lessen.</string>
   <string name="teachersX">Leraren: %s</string>
-  <string name="newClass">Nieuwe schaakgroep</string>
+  <string name="newClass">Nieuwe klas</string>
   <string name="closeClass">Groep sluiten</string>
   <string name="closedByX">Gesloten door %s</string>
   <string name="reopen">Heropen</string>
-  <string name="removeStudent">Verwijder student</string>
+  <string name="removeStudent">Verwijder leerling</string>
   <string name="removedStudents">Verwijderd</string>
   <string name="inviteTheStudentBack">Nodig de student opnieuw uit</string>
-  <string name="sendAMessage">Stuur een bericht naar alle studenten.</string>
+  <string name="sendAMessage">Stuur een bericht naar alle leerlingen.</string>
   <string name="aLinkToTheClassWillBeAdded">Een link naar de groep wordt automatisch toegevoegd aan het einde van het bericht, dus u hoeft deze niet zelf toe te voegen.</string>
   <string name="className">Naam van de groep</string>
   <string name="classDescription">Omschrijving van de groep</string>
   <string name="visibleByBothStudentsAndTeachers">Zichtbaar voor zowel leraren als leerlingen van de groep</string>
   <string name="teachersOfTheClass">Leraren binnen de groep</string>
   <string name="addLichessUsernames">Voeg Lichess gebruikersnamen toe om ze als leraar uit te nodigen. Eén per regel.</string>
-  <string name="theyMustFirstApply">Ze moeten zich eerst aanmelden om Lichess leraren te zijn.</string>
   <string name="resetPassword">Reset wachtwoord</string>
   <string name="makeSureToCopy">Zorg ervoor dat je het wachtwoord nu kopieert of opschrijft. Je kunt het later niet meer zien!</string>
   <string name="passwordX">Wachtwoord: %s</string>
-  <string name="generateANewPassword">Genereer een nieuw wachtwoord voor de student</string>
+  <string name="generateANewPassword">Genereer een nieuw wachtwoord voor de leerling</string>
   <string name="invitedToXByY">Uitgenodigd tot %1$s door %2$s</string>
   <string name="realName">Echte naam</string>
   <string name="privateWillNeverBeShown">Privé. Wordt nooit getoond buiten de groep. Helpt onthouden wie de leerling is.</string>
@@ -40,7 +39,7 @@ Wachtwoord: %3$s</string>
   <string name="inviteALichessAccount">Nodig een Lichess account uit</string>
   <string name="inviteDesc1">Als de leerling al een Lichess account heeft, kunt u ze uitnodigen voor de groep.</string>
   <string name="inviteDesc2">Ze ontvangen een bericht op Lichess met een link om zich bij de groep aan te sluiten.</string>
-  <string name="inviteDesc3">Belangrijk: nodig alleen studenten uit die je kent en die actief deel willen nemen aan de groep.</string>
+  <string name="inviteDesc3">Belangrijk: nodig alleen leerlingen uit die je kent en die actief deel willen nemen aan de groep.</string>
   <string name="inviteDesc4">Stuur nooit ongevraagde uitnodigingen naar willekeurige spelers.</string>
   <string name="createANewLichessAccount">Maak een nieuw Lichess account aan</string>
   <string name="createDesc1">Als de leerling nog geen Lichess account heeft, kunt u deze hier aanmaken.</string>
@@ -51,6 +50,13 @@ Wachtwoord: %3$s</string>
   <string name="generateANewUsername">Nieuwe gebruikersnaam genereren</string>
   <string name="welcomeToClass">Welkom bij de groep: %s.
 Hier is de link om toegang te krijgen tot de groep.</string>
+  <string name="invitationToClass">Je bent uitgenodigd om als leerling deel te nemen aan klas \"%s\".</string>
+  <string name="clickToViewInvitation">Klik op de link om de uitnodiging te bekijken:</string>
+  <plurals name="nbPendingInvitations">
+    <item quantity="one">Eén openstaande uitnodiging</item>
+    <item quantity="other">%s openstaande uitnodigingen</item>
+  </plurals>
+  <string name="noPendingInvitations">Geen openstaande uitnodigingen</string>
   <string name="onlyVisibleToTeachers">Alleen zichtbaar voor leraren in de groep</string>
   <string name="lastActiveDate">Actief</string>
   <string name="managed">Beheerd</string>
@@ -61,6 +67,10 @@ Hier is de link om toegang te krijgen tot de groep.</string>
   <string name="releaseDesc1">Een vrijgegeven account kan niet opnieuw worden beheerd. De student kan dan zelf de kind-modus veranderen of het wachtwoord resetten.</string>
   <string name="releaseDesc2">De leerling blijft in de groep nadat zijn account is vrijgegeven.</string>
   <string name="realUniqueEmail">Echt, unieke e-mailadres van de student. We sturen een bevestigingsmail met een link om het account vrij te geven.</string>
+  <string name="closeStudent">Account sluiten</string>
+  <string name="closeTheAccount">Sluit het leerlingaccount zonder dat ongedaan maken mogelijk is.</string>
+  <string name="closeDesc1">De leerling zal dit dit account nooit meer kunnen gebruiken. Sluiten is definitief. Zorg ervoor dat de leerling dit begrijpt en ermee instemt.</string>
+  <string name="closeDesc2">Je kunt de leerling in plaats daarvan controle over het account geven, zodat de leerling het account kan blijven gebruiken.</string>
   <string name="teachers">Leraren</string>
   <plurals name="nbTeachers">
     <item quantity="one">Leraar</item>
@@ -70,6 +80,7 @@ Hier is de link om toegang te krijgen tot de groep.</string>
     <item quantity="one">Student</item>
     <item quantity="other">%s studenten</item>
   </plurals>
+  <string name="students">Leerlingen</string>
   <string name="progress">Voortgang</string>
   <string name="noStudents">Nog geen studenten in de groep.</string>
   <string name="noRemovedStudents">Geen verwijderde studenten.</string>
@@ -85,5 +96,4 @@ Hier is de link om toegang te krijgen tot de groep.</string>
   <string name="newsEdit1">Alle groepsnieuws in een enkel veld.</string>
   <string name="newsEdit2">Voeg het laatste nieuws toe aan de top. Verwijder vorig nieuws niet.</string>
   <string name="newsEdit3">Scheid het nieuws met --- het zal als een horizontale lijn worden weergeven.</string>
-  <string name="markdownAvailable">%s is beschikbaar voor meer geavanceerde syntaxis.</string>
 </resources>

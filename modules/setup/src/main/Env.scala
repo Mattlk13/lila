@@ -4,26 +4,24 @@ import com.softwaremill.macwire._
 import play.api.Configuration
 
 import lila.common.config._
-import lila.user.UserContext
+import lila.oauth.OAuthServer
 
 @Module
 final class Env(
     appConfig: Configuration,
-    db: lila.db.Db,
     gameRepo: lila.game.GameRepo,
-    fishnetPlayer: lila.fishnet.Player,
+    idGenerator: lila.game.IdGenerator,
+    fishnetPlayer: lila.fishnet.FishnetPlayer,
     onStart: lila.round.OnStart,
-    gameCache: lila.game.Cached
-)(implicit ec: scala.concurrent.ExecutionContext) {
+    gameCache: lila.game.Cached,
+    oauthServer: OAuthServer
+)(implicit ec: scala.concurrent.ExecutionContext, mat: akka.stream.Materializer) {
 
-  private lazy val maxPlaying     = appConfig.get[Max]("setup.max_playing")
-  private lazy val anonConfigRepo = new AnonConfigRepo(db(CollName("config")))
-  private lazy val userConfigRepo = new UserConfigRepo(db(CollName("config_anon")))
+  private lazy val maxPlaying = appConfig.get[Max]("setup.max_playing")
 
-  lazy val forms = wire[FormFactory]
-
-  val filter: UserContext => Fu[FilterConfig] = ctx =>
-    ctx.me.fold(anonConfigRepo filter ctx.req)(userConfigRepo.filter)
+  lazy val forms = SetupForm
 
   lazy val processor = wire[Processor]
+
+  lazy val bulk = wire[SetupBulkApi]
 }

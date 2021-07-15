@@ -4,11 +4,13 @@ $player-height: 1.6rem;
   cg-board {
     border-radius: 0;
   }
+
   @include breakpoint($mq-col2) {
     .analyse__underboard {
       margin-top: calc(#{$player-height / 2} + #{$block-gap / 2});
     }
   }
+
   @include breakpoint($mq-col1) {
     .analyse__controls {
       margin-top: $player-height;
@@ -18,50 +20,78 @@ $player-height: 1.6rem;
 
 .study__player {
   @extend %flex-between-nowrap, %metal, %box-shadow;
+
   position: absolute;
-  left: 0;
   right: 0;
   font-weight: bold;
+  width: var(--cg-width, 100%);
   height: $player-height;
   white-space: nowrap;
+
   &-top {
     @extend %box-radius-top;
+
     top: #{-$player-height};
   }
+
   &-bot {
     @extend %box-radius-bottom;
-    bottom: #{-$player-height};
+
+    top: var(--cg-height, 100%);
   }
+
   .left {
     flex: 1 1 100%;
     display: flex;
+    overflow: hidden;
   }
+
   .result {
     flex: 0 0 auto;
-    margin-left: .8em;
-    padding-right: .8em;
+    margin-left: 0.8em;
+    padding-right: 0.8em;
     border-right: $border;
   }
+
   .analyse__clock {
     @extend %roboto, %flex-center-nowrap;
+
     align-self: stretch;
     font-size: 1.2em;
-    padding: 0 .8em;
+    padding: 0 0.8em;
     border-radius: 0 4px 0 0;
   }
+
   &-bot .analyse__clock {
     border-radius: 0 0 4px 0;
   }
+
   &.ticking .analyse__clock {
     background: $c-secondary;
     color: $c-secondary-over;
     text-shadow: none;
   }
+
   .info {
     margin-left: 10px;
+    display: flex;
+    overflow: hidden;
+
+    > * {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: fit-content;
+      flex: 1;
+    }
   }
+
+  .name {
+    margin-left: 0.5ch;
+    flex: 3;
+  }
+
   .elo {
-    margin-left: .5em;
+    margin-left: 0.5em;
     font-weight: normal;
   }
 }

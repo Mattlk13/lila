@@ -1,64 +1,46 @@
+import { altCastles } from 'chess';
+import { parseUci } from 'chessops/util';
 import { path as pathOps } from 'tree';
-import { decomposeUci, sanToRole } from 'chess';
-import { Vm, Puzzle } from './interfaces';
+import { Vm, Puzzle, MoveTest } from './interfaces';
 
-const altCastles = {
-  e1a1: 'e1c1',
-  e1h1: 'e1g1',
-  e8a8: 'e8c8',
-  e8h8: 'e8g8'
-};
+type MoveTestReturn = undefined | 'fail' | 'win' | MoveTest;
 
-export default function(vm: Vm, puzzle: Puzzle) {
+type AltCastle = keyof typeof altCastles;
 
-  return function() {
+function isAltCastle(str: string): str is AltCastle {
+  return str in altCastles;
+}
 
-    if (vm.mode === 'view') return;
-    if (!pathOps.contains(vm.path, vm.initialPath)) return;
+export default function moveTest(vm: Vm, puzzle: Puzzle): MoveTestReturn {
+  if (vm.mode === 'view') return;
+  if (!pathOps.contains(vm.path, vm.initialPath)) return;
 
-    var playedByColor = vm.node.ply % 2 === 1 ? 'white' : 'black';
-    if (playedByColor !== puzzle.color) return;
+  const playedByColor = vm.node.ply % 2 === 1 ? 'white' : 'black';
+  if (playedByColor !== vm.pov) return;
 
-    var nodes = vm.nodeList.slice(pathOps.size(vm.initialPath) + 1).map(function(node) {
-      return {
-        uci: node.uci,
-        castle: node.san!.startsWith('O-O')
-      };
-    });
+  const nodes = vm.nodeList.slice(pathOps.size(vm.initialPath) + 1).map(node => ({
+    uci: node.uci,
+    castle: node.san!.startsWith('O-O'),
+    checkmate: node.san!.endsWith('#'),
+  }));
 
-    var progress = puzzle.lines;
-    for (var i in nodes) {
-      if (progress[nodes[i].uci!]) progress = progress[nodes[i].uci!];
-      else if (nodes[i].castle) progress = progress[altCastles[nodes[i].uci!]] || 'fail';
-      else progress = 'fail';
-      if (typeof progress === 'string') break;
-    }
-    if (typeof progress === 'string') {
-      vm.node.puzzle = progress;
-      return progress;
-    }
+  for (const i in nodes) {
+    if (nodes[i].checkmate) return (vm.node.puzzle = 'win');
+    const uci = nodes[i].uci!,
+      solUci = puzzle.solution[i];
+    if (uci != solUci && (!nodes[i].castle || !isAltCastle(uci) || altCastles[uci] != solUci))
+      return (vm.node.puzzle = 'fail');
+  }
 
-    var nextKey = Object.keys(progress)[0]
-      if (progress[nextKey] === 'win') {
-        vm.node.puzzle = 'win';
-        return 'win';
-      }
+  const nextUci = puzzle.solution[nodes.length];
+  if (!nextUci) return (vm.node.puzzle = 'win');
 
-      // from here we have a next move
+  // from here we have a next move
+  vm.node.puzzle = 'good';
 
-      vm.node.puzzle = 'good';
-
-    var opponentUci = decomposeUci(nextKey);
-    var promotion = opponentUci[2] ? sanToRole[opponentUci[2].toUpperCase()] : null;
-
-    var move: any = {
-      orig: opponentUci[0],
-      dest: opponentUci[1],
-      fen: vm.node.fen,
-      path: vm.path
-    };
-    if (promotion) move.promotion = promotion;
-
-    return move;
+  return {
+    move: parseUci(nextUci)!,
+    fen: vm.node.fen,
+    path: vm.path,
   };
 }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="arenaTournaments">Turnee de tip arenă</string>
   <string name="isItRated">Este evaluat?</string>
   <string name="willBeNotified">Vei fi notificat când competiția începe, deci este în regulă să joci în altă filă în timp ce aștepți.</string>
   <string name="isRated">Această competiție este evaluată și-ți va afecta scorul.</string>
@@ -37,4 +38,14 @@ Joacă rapid și întoarce-te la lobby pentru a juca mai multe meciuri și pentr
   </plurals>
   <string name="thisIsPrivate">Acesta este o competiție privată</string>
   <string name="shareUrl">Pentru a distribui, folosiți acest URL: %s</string>
+  <string name="drawStreak">Serie de remize consecutive: Când un jucător are remize consecutive într-un turneu de tip arenă, numai prima remiză este punctată, sau remize în partide care au mai mult de %s mutări. Seria de remize poate fi întreruptă doar de o victorie, nu de o înfrângere sau remiză.</string>
+  <string name="history">Istoricul turneelor de tip arenă</string>
+  <plurals name="viewAllXTeams" comment="viewAllXTeams [one] [other]&#10;&#10;%s is the number of teams that can be viewed">
+    <item quantity="one">Vezi echipa</item>
+    <item quantity="few">Vezi toate cele %s echipe</item>
+    <item quantity="other">Vezi toate cele %s de echipe</item>
+  </plurals>
+  <string name="customStartDate">Data de început personalizată</string>
+  <string name="allowBerserkHelp">Lăsați jucătorii să își înjumătățească timpul pentru a obține un punct în plus</string>
+  <string name="allowChatHelp">Permiteți jucătorilor să discute într-o cameră de chat</string>
 </resources>

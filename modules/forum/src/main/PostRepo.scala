@@ -8,8 +8,8 @@ import Filter._
 import lila.db.dsl._
 import lila.user.User
 
-final class PostRepo(val coll: Coll, filter: Filter = Safe)(
-    implicit ec: scala.concurrent.ExecutionContext
+final class PostRepo(val coll: Coll, filter: Filter = Safe)(implicit
+    ec: scala.concurrent.ExecutionContext
 ) {
 
   def forUser(user: Option[User]) =
@@ -43,18 +43,24 @@ final class PostRepo(val coll: Coll, filter: Filter = Safe)(
     coll.countSel(selectTopic(topic.id))
 
   def lastByCateg(categ: Categ): Fu[Option[Post]] =
-    coll.ext.find(selectCateg(categ.id)).sort($sort.createdDesc).one[Post]
+    coll.find(selectCateg(categ.id)).sort($sort.createdDesc).one[Post]
 
   def lastByTopic(topic: Topic): Fu[Option[Post]] =
-    coll.ext.find(selectTopic(topic.id)).sort($sort.createdDesc).one[Post]
+    coll.find(selectTopic(topic.id)).sort($sort.createdDesc).one[Post]
 
   def recentInCategs(nb: Int)(categIds: List[String], langs: List[String]): Fu[List[Post]] =
-    coll.ext
-      .find(
-        selectCategs(categIds) ++ selectLangs(langs) ++ selectNotHidden
-      )
+    coll
+      .find(selectCategs(categIds) ++ selectLangs(langs) ++ selectNotHidden ++ selectNotErased)
       .sort($sort.createdDesc)
-      .list[Post](nb)
+      .cursor[Post]()
+      .list(nb)
+
+  def recentInCateg(categId: String, nb: Int): Fu[List[Post]] =
+    coll
+      .find(selectCateg(categId) ++ selectNotHidden ++ selectNotErased)
+      .sort($sort.createdDesc)
+      .cursor[Post]()
+      .list(nb)
 
   def countByCateg(categ: Categ): Fu[Int] =
     coll.countSel(selectCateg(categ.id))
@@ -77,6 +83,7 @@ final class PostRepo(val coll: Coll, filter: Filter = Safe)(
   def selectCategs(categIds: List[String]) = $doc("categId" $in categIds) ++ trollFilter
 
   val selectNotHidden = $doc("hidden" -> false)
+  val selectNotErased = $doc("erasedAt" $exists false)
 
   def selectLangs(langs: List[String]) =
     if (langs.isEmpty) $empty
@@ -93,14 +100,14 @@ final class PostRepo(val coll: Coll, filter: Filter = Safe)(
 
   def sortQuery = $sort.createdAsc
 
-  def userIdsByTopicId(topicId: String): Fu[List[String]] =
-    coll.distinctEasy[User.ID, List]("userId", $doc("topicId" -> topicId))
-
   def idsByTopicId(topicId: String): Fu[List[String]] =
-    coll.distinctEasy[String, List]("_id", $doc("topicId" -> topicId))
+    coll.distinctEasy[String, List]("_id", $doc("topicId" -> topicId), ReadPreference.secondaryPreferred)
 
-  def cursor =
-    coll.ext
-      .find($empty)
+  def allUserIdsByTopicId(topicId: String): Fu[List[User.ID]] =
+    coll.distinctEasy[User.ID, List]("userId", $doc("topicId" -> topicId), ReadPreference.secondaryPreferred)
+
+  def nonGhostCursor =
+    coll
+      .find($doc("userId" $ne User.ghostId))
       .cursor[Post](ReadPreference.secondaryPreferred)
 }

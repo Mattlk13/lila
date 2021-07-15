@@ -3,28 +3,27 @@ package lila.streamer
 import akka.actor._
 import org.joda.time.DateTime
 import play.api.libs.json._
-import play.api.libs.ws.WSClient
+import play.api.libs.ws.JsonBodyReadables._
+import play.api.libs.ws.StandaloneWSClient
 import scala.concurrent.duration._
+import scala.util.chaining._
 
 import lila.common.Bus
 import lila.common.config.Secret
 import lila.user.User
 
 final private class Streaming(
-    ws: WSClient,
-    renderer: lila.hub.actors.Renderer,
+    ws: StandaloneWSClient,
     api: StreamerApi,
     isOnline: User.ID => Boolean,
     timeline: lila.hub.actors.Timeline,
     keyword: Stream.Keyword,
-    alwaysFeatured: () => lila.common.Strings,
+    alwaysFeatured: () => lila.common.UserIds,
     googleApiKey: Secret,
-    twitchClientId: Secret,
-    lightUserApi: lila.user.LightUserApi
+    twitchApi: TwitchApi
 ) extends Actor {
 
   import Stream._
-  import Twitch.Reads._
   import YouTube.Reads._
 
   private case object Tick
@@ -35,14 +34,14 @@ final private class Streaming(
 
   def receive = {
 
-    case Streaming.Get => sender ! liveStreams
+    case Streaming.Get => sender() ! liveStreams
 
-    case Tick => updateStreams addEffectAnyway scheduleTick
+    case Tick => updateStreams.addEffectAnyway(scheduleTick()).unit
   }
 
-  private def scheduleTick = context.system.scheduler.scheduleOnce(15 seconds, self, Tick)
+  private def scheduleTick(): Unit = context.system.scheduler.scheduleOnce(15 seconds, self, Tick).unit
 
-  self ! Tick
+  scheduleTick()
 
   def updateStreams: Funit =
     for {
@@ -50,35 +49,45 @@ final private class Streaming(
       activeIds = streamerIds.filter { id =>
         liveStreams.has(id) || isOnline(id.value)
       }
-      streamers                       <- api byIds activeIds
-      (twitchStreams, youTubeStreams) <- fetchTwitchStreams(streamers) zip fetchYouTubeStreams(streamers)
+      streamers <- api byIds activeIds
+      (twitchStreams, youTubeStreams) <-
+        twitchApi.fetchStreams(streamers, 0, None) map {
+          _.collect { case Twitch.TwitchStream(name, title, _) =>
+            streamers.find { s =>
+              s.twitch.exists(_.userId.toLowerCase == name.toLowerCase) && {
+                title.toLowerCase.contains(keyword.toLowerCase) ||
+                alwaysFeatured().value.contains(s.userId)
+              }
+            } map { Twitch.Stream(name, title, _) }
+          }.flatten
+        } zip fetchYouTubeStreams(streamers)
       streams = LiveStreams {
-        scala.util.Random.shuffle {
-          (twitchStreams ::: youTubeStreams) |> dedupStreamers
+        lila.common.ThreadLocalRandom.shuffle {
+          (twitchStreams ::: youTubeStreams) pipe dedupStreamers
         }
       }
-      _ <- api.setLiveNow(streamers.filter(streams.has).map(_.id))
+      _ <- api.setLiveNow(streamers.withFilter(streams.has).map(_.id))
     } yield publishStreams(streamers, streams)
 
+  private val streamStartMemo = new lila.memo.ExpireSetMemo(2 hour)
+
   def publishStreams(streamers: List[Streamer], newStreams: LiveStreams) = {
-    import makeTimeout.short
-    import akka.pattern.ask
     if (newStreams != liveStreams) {
-      renderer.actor ? newStreams.autoFeatured.withTitles(lightUserApi) foreach {
-        case html: String =>
-          Bus.publish(lila.hub.actorApi.streamer.StreamsOnAir(html), "streams")
-      }
       newStreams.streams filterNot { s =>
         liveStreams has s.streamer
       } foreach { s =>
-        timeline ! {
-          import lila.hub.actorApi.timeline.{ Propagate, StreamStart }
-          Propagate(StreamStart(s.streamer.userId, s.streamer.name.value)) toFollowersOf s.streamer.userId
+        import s.streamer.userId
+        if (!streamStartMemo.get(userId)) {
+          streamStartMemo.put(userId)
+          timeline ! {
+            import lila.hub.actorApi.timeline.{ Propagate, StreamStart }
+            Propagate(StreamStart(userId, s.streamer.name.value)) toFollowersOf userId
+          }
+          Bus.publish(
+            lila.hub.actorApi.streamer.StreamStart(userId),
+            "streamStart"
+          )
         }
-        Bus.publish(
-          lila.hub.actorApi.streamer.StreamStart(s.streamer.userId),
-          "streamStart"
-        )
       }
     }
     liveStreams = newStreams
@@ -94,55 +103,6 @@ final private class Streaming(
     }
   }
 
-  def fetchTwitchStreams(streamers: List[Streamer]): Fu[List[Twitch.Stream]] = {
-    val maxIds = 100
-    val allTwitchStreamers = streamers.flatMap { s =>
-      s.twitch map (s.id -> _)
-    }
-    val futureTwitchStreamers: Fu[List[Streamer.Twitch]] =
-      if (allTwitchStreamers.size > maxIds)
-        api.mostRecentlySeenIds(allTwitchStreamers.map(_._1), maxIds) map { ids =>
-          allTwitchStreamers collect {
-            case (streamerId, twitch) if ids(streamerId) => twitch
-          }
-        } else fuccess(allTwitchStreamers.map(_._2))
-    futureTwitchStreamers flatMap { twitchStreamers =>
-      twitchStreamers.nonEmpty ?? {
-        val twitchUserIds = twitchStreamers.map(_.userId)
-        val url = ws
-          .url("https://api.twitch.tv/helix/streams")
-          .withQueryStringParameters(
-            (("first" -> maxIds.toString) :: twitchUserIds.map("user_login" -> _)): _*
-          )
-          .withHttpHeaders(
-            "Client-ID" -> twitchClientId.value
-          )
-        url
-          .get()
-          .flatMap { res =>
-            res.json.validate[Twitch.Result](twitchResultReads) match {
-              case JsSuccess(data, _) =>
-                fuccess(
-                  data.streams(
-                    keyword,
-                    streamers,
-                    alwaysFeatured().value.map(_.toLowerCase)
-                  )
-                )
-              case JsError(err) =>
-                fufail(s"twitch ${res.status} $err ${~res.body.linesIterator.toList.headOption}")
-            }
-          }
-          .monSuccess(_.tv.streamer.twitch)
-          .recover {
-            case e: Exception =>
-              logger.warn(e.getMessage)
-              Nil
-          }
-      }
-    }
-  }
-
   private var prevYouTubeStreams = YouTube.StreamsFetched(Nil, DateTime.now)
 
   def fetchYouTubeStreams(streamers: List[Streamer]): Fu[List[YouTube.Stream]] = {
@@ -150,7 +110,9 @@ final private class Streaming(
     (youtubeStreamers.nonEmpty && googleApiKey.value.nonEmpty) ?? {
       val now = DateTime.now
       val res =
-        if (prevYouTubeStreams.list.isEmpty && prevYouTubeStreams.at.isAfter(now minusMinutes 2))
+        if (prevYouTubeStreams.list.isEmpty && prevYouTubeStreams.at.isAfter(now minusMinutes 3))
+          fuccess(prevYouTubeStreams)
+        else if (prevYouTubeStreams.at.isAfter(now minusMinutes 1))
           fuccess(prevYouTubeStreams)
         else {
           ws.url("https://www.googleapis.com/youtube/v3/search")
@@ -163,7 +125,7 @@ final private class Streaming(
             )
             .get()
             .flatMap { res =>
-              res.json.validate[YouTube.Result](youtubeResultReads) match {
+              res.body[JsValue].validate[YouTube.Result](youtubeResultReads) match {
                 case JsSuccess(data, _) =>
                   fuccess(YouTube.StreamsFetched(data.streams(keyword, youtubeStreamers), now))
                 case JsError(err) =>
@@ -171,10 +133,9 @@ final private class Streaming(
               }
             }
             .monSuccess(_.tv.streamer.youTube)
-            .recover {
-              case e: Exception =>
-                logger.warn(e.getMessage)
-                YouTube.StreamsFetched(Nil, now)
+            .recover { case e: Exception =>
+              logger.warn(e.getMessage)
+              YouTube.StreamsFetched(Nil, now)
             }
         }
       res dmap { r =>

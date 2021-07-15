@@ -1,6 +1,7 @@
 package lila.team
 
 import lila.db.dsl._
+import lila.user.User
 
 final class RequestRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionContext) {
 
@@ -17,9 +18,6 @@ final class RequestRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionC
   def countByTeam(teamId: ID): Fu[Int] =
     coll.countSel(teamQuery(teamId))
 
-  def countByTeams(teamIds: List[ID]): Fu[Int] =
-    teamIds.nonEmpty ?? coll.countSel(teamsQuery(teamIds))
-
   def findByTeam(teamId: ID): Fu[List[Request]] =
     coll.list[Request](teamQuery(teamId))
 
@@ -30,8 +28,15 @@ final class RequestRepo(val coll: Coll)(implicit ec: scala.concurrent.ExecutionC
   def teamQuery(teamId: ID)            = $doc("team" -> teamId)
   def teamsQuery(teamIds: List[ID])    = $doc("team" $in teamIds)
 
-  def getByUserId(userId: lila.user.User.ID) =
-    coll.ext.find($doc("user" -> userId)).list[Request]()
+  def getByUserId(userId: User.ID) =
+    coll.list[Request]($doc("user" -> userId))
 
   def remove(id: ID) = coll.delete.one($id(id))
+
+  def cancel(teamId: ID, user: User): Fu[Boolean] =
+    coll.delete.one(selectId(teamId, user.id)).map(_.n == 1)
+
+  def removeByTeam(teamId: ID) = coll.delete.one(teamQuery(teamId))
+
+  def removeByUser(userId: User.ID) = coll.delete.one($doc("user" -> userId))
 }

@@ -9,6 +9,7 @@ case class OpenGraph(
     url: String,
     `type`: String = "website",
     image: Option[String] = None,
+    twitterImage: Option[String] = None,
     siteName: String = "lichess.org",
     more: List[(String, String)] = Nil
 ) {
@@ -19,10 +20,11 @@ case class OpenGraph(
 
     private val property = attr("property")
 
-    private def tag(name: String, value: String) = meta(
-      property := s"og:$name",
-      content := value
-    )
+    private def tag(name: String, value: String) =
+      meta(
+        property := s"og:$name",
+        content := value
+      )
 
     private val tupledTag = (tag _).tupled
 
@@ -40,10 +42,11 @@ case class OpenGraph(
 
   object twitter {
 
-    private def tag(name: String, value: String) = meta(
-      st.name := s"twitter:$name",
-      content := value
-    )
+    private def tag(name: String, value: String) =
+      meta(
+        st.name := s"twitter:$name",
+        content := value
+      )
 
     private val tupledTag = (tag _).tupled
 
@@ -53,7 +56,7 @@ case class OpenGraph(
         "title"       -> title,
         "description" -> description
       ).map(tupledTag) :::
-        image.map { tag("image", _) }.toList :::
+        (twitterImage orElse image).map { tag("image", _) }.toList :::
         more.map(tupledTag)
   }
 }

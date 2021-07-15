@@ -9,11 +9,12 @@ import scala.concurrent.duration._
 import lila.db.dsl._
 import lila.memo.CacheApi._
 import lila.report.Room
-import lila.user.User.lichessId
+import lila.user.User
 
 final class Gamify(
     logRepo: ModlogRepo,
     reportApi: lila.report.ReportApi,
+    modApi: lila.mod.ModApi,
     cacheApi: lila.memo.CacheApi,
     historyRepo: HistoryRepo
 )(implicit ec: scala.concurrent.ExecutionContext) {
@@ -27,7 +28,7 @@ final class Gamify(
   def history(orCompute: Boolean = true): Fu[List[HistoryMonth]] = {
     val until  = DateTime.now minusMonths 1 withDayOfMonth 1
     val lastId = HistoryMonth.makeId(until.getYear, until.getMonthOfYear)
-    historyRepo.coll.ext
+    historyRepo.coll
       .find($empty)
       .sort(
         $doc(
@@ -35,7 +36,8 @@ final class Gamify(
           "month" -> -1
         )
       )
-      .list[HistoryMonth]() flatMap { months =>
+      .cursor[HistoryMonth]()
+      .list() flatMap { months =>
       months.headOption match {
         case Some(m) if m._id == lastId => fuccess(months)
         case _ if !orCompute            => fuccess(months)
@@ -77,39 +79,40 @@ final class Gamify(
       .buildAsyncFuture { _ =>
         mixedLeaderboard(DateTime.now minusDays 1, none) zip
           mixedLeaderboard(DateTime.now minusWeeks 1, none) zip
-          mixedLeaderboard(DateTime.now minusMonths 1, none) map {
-          case ((daily, weekly), monthly) => Leaderboards(daily, weekly, monthly)
-        }
+          mixedLeaderboard(DateTime.now minusMonths 1, none) map { case ((daily, weekly), monthly) =>
+            Leaderboards(daily, weekly, monthly)
+          }
       }
   }
 
   private def mixedLeaderboard(after: DateTime, before: Option[DateTime]): Fu[List[ModMixed]] =
-    actionLeaderboard(after, before) zip reportLeaderboard(after, before) map {
-      case (actions, reports) =>
-        actions.map(_.modId) intersect reports.map(_.modId) map { modId =>
-          ModMixed(
-            modId,
-            action = actions.find(_.modId == modId) ?? (_.count),
-            report = reports.find(_.modId == modId) ?? (_.count)
-          )
-        } sortBy (-_.score)
-    }
+    for {
+      actions <- actionLeaderboard(after, before)
+      reports <- reportLeaderboard(after, before)
+      modList <- modApi.allMods
+    } yield actions.map(_.modId) intersect modList.map(_.id) diff hidden map { modId =>
+      ModMixed(
+        modId,
+        action = actions.find(_.modId == modId) ?? (_.count),
+        report = reports.find(_.modId == modId) ?? (_.count)
+      )
+    } sortBy (-_.score)
 
   private def dateRange(from: DateTime, toOption: Option[DateTime]) =
     $doc("$gte" -> from) ++ toOption.?? { to =>
       $doc("$lt" -> to)
     }
 
-  private val notLichess = $doc("$ne" -> lichessId)
+  private val hidden = List(User.lichessId, "irwin")
 
   private def actionLeaderboard(after: DateTime, before: Option[DateTime]): Fu[List[ModCount]] =
     logRepo.coll
-      .aggregateList(maxDocs = 100) { framework =>
+      .aggregateList(maxDocs = 100, readPreference = ReadPreference.secondaryPreferred) { framework =>
         import framework._
         Match(
           $doc(
             "date" -> dateRange(after, before),
-            "mod"  -> notLichess
+            "mod"  -> $nin(hidden)
           )
         ) -> List(
           GroupField("mod")("nb" -> SumAll),
@@ -118,7 +121,8 @@ final class Gamify(
       }
       .map {
         _.flatMap { obj =>
-          obj.string("_id") |@| obj.int("nb") apply ModCount.apply
+          import cats.implicits._
+          (obj.string("_id"), obj.int("nb")) mapN ModCount.apply
         }
       }
 
@@ -131,19 +135,27 @@ final class Gamify(
         import framework._
         Match(
           $doc(
-            "atoms.0.at" -> dateRange(after, before),
-            "room" $in Room.all, // required to make use of the mongodb index room+atoms.0.at
-            "processedBy" -> notLichess
+            "done.at" -> dateRange(after, before),
+            "done.by" -> $nin(hidden),
+            "open"    -> false
           )
         ) -> List(
-          GroupField("processedBy")("nb" -> SumAll),
+          GroupField("done.by")(
+            "nb" -> Sum(
+              $doc(
+                "$cond" -> $arr($doc("$eq" -> $arr("$room", Room.Cheat.key)), 3, 1)
+              )
+            )
+          ),
           Sort(Descending("nb"))
         )
       }
-      .map {
-        _.flatMap { obj =>
-          obj.string("_id") |@| obj.int("nb") apply ModCount.apply
-        }
+      .map { docs =>
+        for {
+          doc <- docs
+          id  <- doc.string("_id")
+          nb  <- doc.int("nb")
+        } yield ModCount(id, nb)
       }
 }
 
@@ -167,15 +179,16 @@ object Gamify {
   }
 
   case class Leaderboards(daily: List[ModMixed], weekly: List[ModMixed], monthly: List[ModMixed]) {
-    def apply(period: Period) = period match {
-      case Period.Day   => daily
-      case Period.Week  => weekly
-      case Period.Month => monthly
-    }
+    def apply(period: Period) =
+      period match {
+        case Period.Day   => daily
+        case Period.Week  => weekly
+        case Period.Month => monthly
+      }
   }
 
-  case class ModCount(modId: String, count: Int)
-  case class ModMixed(modId: String, action: Int, report: Int) {
+  case class ModCount(modId: User.ID, count: Int)
+  case class ModMixed(modId: User.ID, action: Int, report: Int) {
     def score = action + report
   }
 }

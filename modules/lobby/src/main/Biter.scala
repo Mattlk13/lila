@@ -10,7 +10,10 @@ import lila.user.User
 final private class Biter(
     userRepo: lila.user.UserRepo,
     gameRepo: lila.game.GameRepo
-)(implicit ec: scala.concurrent.ExecutionContext, idGenerator: lila.game.IdGenerator) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    idGenerator: lila.game.IdGenerator
+) {
 
   def apply(hook: Hook, sri: Sri, user: Option[LobbyUser]): Fu[JoinHook] =
     if (canJoin(hook, user)) join(hook, sri, user)
@@ -53,12 +56,13 @@ final private class Biter(
       creatorUser: Option[User],
       joinerUser: Option[User],
       color: Color
-  ): Fu[chess.Color] = color match {
-    case Color.Random =>
-      userRepo.firstGetsWhite(creatorUser.map(_.id), joinerUser.map(_.id)) map chess.Color.apply
-    case Color.White => fuccess(chess.White)
-    case Color.Black => fuccess(chess.Black)
-  }
+  ): Fu[chess.Color] =
+    color match {
+      case Color.Random =>
+        userRepo.firstGetsWhite(creatorUser.map(_.id), joinerUser.map(_.id)) map chess.Color.fromWhite
+      case Color.White => fuccess(chess.White)
+      case Color.Black => fuccess(chess.Black)
+    }
 
   private def makeGame(hook: Hook, whiteUser: Option[User], blackUser: Option[User]) = {
     val clock      = hook.clock.toClock

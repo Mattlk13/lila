@@ -3,17 +3,21 @@ package lila.msg
 import play.api.data._
 import play.api.data.Forms._
 import play.api.libs.json._
+import reactivemongo.api.ReadPreference
 import scala.concurrent.duration._
 
 import lila.common.config._
 import lila.common.Json.jodaWrites
 import lila.common.LightUser
 import lila.common.paginator._
+import lila.db.dsl._
 import lila.user.{ LightUserApi, User }
 
 final class MsgCompat(
     api: MsgApi,
+    colls: MsgColls,
     security: MsgSecurity,
+    cacheApi: lila.memo.CacheApi,
     isOnline: lila.socket.IsOnline,
     lightUserApi: LightUserApi
 )(implicit ec: scala.concurrent.ExecutionContext) {
@@ -23,7 +27,8 @@ final class MsgCompat(
   def inbox(me: User, pageOpt: Option[Int]): Fu[JsObject] = {
     val page = pageOpt.fold(1)(_ atLeast 1 atMost 2)
     api.threadsOf(me) flatMap { allThreads =>
-      val threads = allThreads.drop((page - 1) * maxPerPage.value).take(maxPerPage.value)
+      val threads =
+        allThreads.slice((page - 1) * maxPerPage.value, (page - 1) * maxPerPage.value + maxPerPage.value)
       lightUserApi.preloadMany(threads.map(_ other me)) inject
         PaginatorJson {
           Paginator
@@ -47,6 +52,25 @@ final class MsgCompat(
     }
   }
 
+  def unreadCount(me: User): Fu[Int] = unreadCountCache.get(me.id)
+
+  private val unreadCountCache = cacheApi[User.ID, Int](256, "message.unreadCount") {
+    _.expireAfterWrite(10 seconds)
+      .buildAsyncFuture[User.ID, Int] { userId =>
+        colls.thread
+          .aggregateOne(ReadPreference.secondaryPreferred) { framework =>
+            import framework._
+            Match($doc("users" -> userId, "del" $ne userId)) -> List(
+              Sort(Descending("lastMsg.date")),
+              Limit(maxPerPage.value),
+              Match($doc("lastMsg.read" -> false, "lastMsg.user" $ne userId)),
+              Count("nb")
+            )
+          }
+          .map(~_.flatMap(_.getAsOpt[Int]("nb")))
+      }
+  }
+
   def thread(me: User, c: MsgConvo): JsObject =
     Json.obj(
       "id"   -> c.contact.id,
@@ -61,13 +85,16 @@ final class MsgCompat(
       }
     )
 
-  def create(me: User)(implicit req: play.api.mvc.Request[_]): Either[Form[_], Fu[User.ID]] =
+  def create(
+      me: User
+  )(implicit req: play.api.mvc.Request[_], formBinding: FormBinding): Either[Form[_], Fu[User.ID]] =
     Form(
       mapping(
-        "username" -> lila.user.DataForm.historicalUsernameField
+        "username" -> lila.user.UserForm.historicalUsernameField
           .verifying("Unknown username", { blockingFetchUser(_).isDefined })
           .verifying(
-            "Sorry, this player doesn't accept new messages", { name =>
+            "Sorry, this player doesn't accept new messages",
+            { name =>
               security.may
                 .post(me.id, User normalize name, isNew = true)
                 .await(2 seconds, "pmAccept") // damn you blocking API
@@ -76,7 +103,7 @@ final class MsgCompat(
         "subject" -> text(minLength = 3, maxLength = 100),
         "text"    -> text(minLength = 3, maxLength = 8000)
       )(ThreadData.apply)(ThreadData.unapply)
-    ).bindFromRequest
+    ).bindFromRequest()
       .fold(
         err => Left(err),
         data => {
@@ -85,15 +112,19 @@ final class MsgCompat(
         }
       )
 
-  def reply(me: User, userId: User.ID)(implicit req: play.api.mvc.Request[_]): Either[Form[_], Funit] =
-    Form(single("text" -> text(minLength = 3))).bindFromRequest
+  def reply(me: User, userId: User.ID)(implicit
+      req: play.api.mvc.Request[_],
+      formBinding: FormBinding
+  ): Either[Form[_], Funit] =
+    Form(single("text" -> text(minLength = 3)))
+      .bindFromRequest()
       .fold(
         err => Left(err),
-        text => Right(api.post(me.id, userId, text))
+        text => Right(api.post(me.id, userId, text).void)
       )
 
   private def blockingFetchUser(username: String) =
-    lightUserApi.async(User normalize username).await(1 second, "pmUser")
+    lightUserApi.async(User normalize username).await(500 millis, "pmUser")
 
   private case class ThreadData(user: String, subject: String, text: String)
 

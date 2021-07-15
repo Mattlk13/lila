@@ -1,17 +1,14 @@
-import { h } from 'snabbdom'
-import { VNode } from 'snabbdom/vnode'
-import { plyStep } from '../round';
-import { renderTable } from './table';
-import * as promotion from '../promotion';
-import { render as renderGround } from '../ground';
-import { read as fenRead } from 'chessground/fen';
-import * as util from '../util';
 import * as keyboard from '../keyboard';
-import * as gridHacks from './gridHacks';
+import * as util from '../util';
 import crazyView from '../crazy/crazyView';
-import { render as keyboardMove } from '../keyboardMove';
 import RoundController from '../ctrl';
+import { h, VNode } from 'snabbdom';
+import { plyStep } from '../round';
 import { Position, MaterialDiff, MaterialDiffSide, CheckCount } from '../interfaces';
+import { read as fenRead } from 'chessground/fen';
+import { render as keyboardMove } from '../keyboardMove';
+import { render as renderGround } from '../ground';
+import { renderTable } from './table';
 
 function renderMaterial(material: MaterialDiffSide, score: number, position: Position, checks?: number) {
   const children: VNode[] = [];
@@ -28,18 +25,18 @@ function renderMaterial(material: MaterialDiffSide, score: number, position: Pos
   return h('div.material.material-' + position, children);
 }
 
-function wheel(ctrl: RoundController, e: WheelEvent): boolean {
-  if (ctrl.isPlaying()) return true;
-  e.preventDefault();
-  if (e.deltaY > 0) keyboard.next(ctrl);
-  else if (e.deltaY < 0) keyboard.prev(ctrl);
-  ctrl.redraw();
-  return false;
+function wheel(ctrl: RoundController, e: WheelEvent): void {
+  if (!ctrl.isPlaying()) {
+    e.preventDefault();
+    if (e.deltaY > 0) keyboard.next(ctrl);
+    else if (e.deltaY < 0) keyboard.prev(ctrl);
+    ctrl.redraw();
+  }
 }
 
 const emptyMaterialDiff: MaterialDiff = {
   white: {},
-  black: {}
+  black: {},
 };
 
 export function main(ctrl: RoundController): VNode {
@@ -47,31 +44,34 @@ export function main(ctrl: RoundController): VNode {
     cgState = ctrl.chessground && ctrl.chessground.state,
     topColor = d[ctrl.flip ? 'player' : 'opponent'].color,
     bottomColor = d[ctrl.flip ? 'opponent' : 'player'].color;
-  let material: MaterialDiff, score: number = 0;
+  let material: MaterialDiff,
+    score = 0;
   if (d.pref.showCaptured) {
-    let pieces = cgState ? cgState.pieces : fenRead(plyStep(ctrl.data, ctrl.ply).fen);
+    const pieces = cgState ? cgState.pieces : fenRead(plyStep(ctrl.data, ctrl.ply).fen);
     material = util.getMaterialDiff(pieces);
     score = util.getScore(pieces) * (bottomColor === 'white' ? 1 : -1);
   } else material = emptyMaterialDiff;
 
-  const checks: CheckCount = (d.player.checks || d.opponent.checks) ?
-    util.countChecks(ctrl.data.steps, ctrl.ply) :
-    util.noChecks;
+  const checks: CheckCount =
+    d.player.checks || d.opponent.checks ? util.countChecks(ctrl.data.steps, ctrl.ply) : util.noChecks;
 
-  return ctrl.nvui ? ctrl.nvui.render(ctrl) : h('div.round__app.variant-' + d.game.variant.key, {
-    class: { 'move-confirm': !!(ctrl.moveToSubmit || ctrl.dropToSubmit) },
-    hook: util.onInsert(gridHacks.start)
-  }, [
-    h('div.round__app__board.main-board' + (ctrl.data.pref.blindfold ? '.blindfold' : ''), {
-      hook: window.lichess.hasTouchEvents ? undefined :
-        util.bind('wheel', (e: WheelEvent) => wheel(ctrl, e), undefined, false)
-    }, [
-      renderGround(ctrl),
-      promotion.view(ctrl)
-    ]),
-    crazyView(ctrl, topColor, 'top') || renderMaterial(material[topColor], -score, 'top', checks[topColor]),
-    ...renderTable(ctrl),
-    crazyView(ctrl, bottomColor, 'bottom') || renderMaterial(material[bottomColor], score, 'bottom', checks[bottomColor]),
-    ctrl.keyboardMove ? keyboardMove(ctrl.keyboardMove) : null
-  ])
-};
+  return ctrl.nvui
+    ? ctrl.nvui.render(ctrl)
+    : h('div.round__app.variant-' + d.game.variant.key, [
+        h(
+          'div.round__app__board.main-board' + (ctrl.data.pref.blindfold ? '.blindfold' : ''),
+          {
+            hook:
+              'ontouchstart' in window || lichess.storage.get('scrollMoves') == '0'
+                ? undefined
+                : util.bind('wheel', (e: WheelEvent) => wheel(ctrl, e), undefined, false),
+          },
+          [renderGround(ctrl), ctrl.promotion.view(ctrl.data.game.variant.key === 'antichess')]
+        ),
+        crazyView(ctrl, topColor, 'top') || renderMaterial(material[topColor], -score, 'top', checks[topColor]),
+        ...renderTable(ctrl),
+        crazyView(ctrl, bottomColor, 'bottom') ||
+          renderMaterial(material[bottomColor], score, 'bottom', checks[bottomColor]),
+        ctrl.keyboardMove ? keyboardMove(ctrl.keyboardMove) : null,
+      ]);
+}

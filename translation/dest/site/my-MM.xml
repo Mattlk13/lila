@@ -52,14 +52,65 @@
   <string name="requestAComputerAnalysis">Request a computer analysis</string>
   <string name="computerAnalysis">Computer analysis</string>
   <string name="computerAnalysisAvailable">Computer analysis available</string>
+  <string name="analysis">စစ်တုရင်ခုံ</string>
+  <string name="move">ရွှေ့ကွက်</string>
+  <string name="insufficientMaterial">နိုင်အား မရှိတော့ခြင်း</string>
+  <string name="pawnMove">pawn ရွှေ့ကွက်</string>
+  <string name="winning">နိုင်ပြီ</string>
+  <string name="losing">ရှုံးသည်</string>
+  <string name="drawn">သရေ</string>
+  <string name="cpus">cpu အရေအတွက်</string>
+  <string name="inaccuracy">မတိကျမှု</string>
+  <string name="moveTimes">အလှည့်ကြာချိန်</string>
+  <string name="flipBoard">ကစားခုံလှန်ပါ</string>
+  <string name="threefoldRepetition">အနေအထား  သုံးကြိမ် ထပ်သည်</string>
   <string name="time">အချိန်</string>
   <string name="username">ကစားသူအမည်</string>
   <string name="usernameOrEmail">ကစားသူအမည် သို့မဟုတ် email လိပ်စာ</string>
+  <string name="whiteTimeOut">အဖြူ အချိန်ကုန်</string>
+  <string name="blackTimeOut">အနက် အချိန်ကုန်</string>
   <string name="play">ကစားမည်</string>
+  <string name="thisAccountViolatedTos">ဤအကောင့်က Lichess ၏ ဝန်ဆောင်မှု ဆိုင်ရာ စည်းကမ်းသတ်မှတ်ချက်များကို ဖောက်ဖျက်ခဲ့ပါသည်</string>
   <string name="mustBeInTeam">Must be in team %s</string>
   <plurals name="lessThanNbMinutes">
     <item quantity="other">Less than %s minute</item>
   </plurals>
   <string name="ifNoneLeaveEmpty">If none, leave empty</string>
   <string name="help">အကူအညီ</string>
+  <string name="newPasswordsDontMatch">စကားဝှက် အသစ်တို့ အချင်းချင်း မကိုက်ညီပါ</string>
+  <string name="newPasswordStrength">စကားဝှက် အားကောင်းမှု</string>
+  <string name="privacyPolicy">ပုဂ္ဂိုလ်ဆိုင်ရာ အချက်အလက် လုံခြုံရေး မူဝါဒ</string>
+  <string name="readAboutOur">ကျွန်ုပ်တို့၏ %s အကြောင်း ဖတ်ရှုပါ။</string>
+  <string name="important">အရေးကြီးပါသည်</string>
+  <string name="yourQuestionMayHaveBeenAnswered">%1$s တွင် အဖြေ ရှိပြီး ဖြစ်နိုင်ပါသည်။</string>
+  <string name="inTheFAQ">အများသိလိုသော မေးခွန်းများတွင် ရှိပါသည်။</string>
+  <string name="toReportSomeoneForCheatingOrBadBehavior">မသမာမှု သို့မဟုတ် ရိုင်းပြမှုကို တိုင်ကြားလိုလျှင် %1$s</string>
+  <string name="useTheReportForm">တိုင်စာပုံစံ အသုံးပြုပါ</string>
+  <string name="toRequestSupport">အကူအညီ တောင်းလိုလျှင် %1$s</string>
+  <string name="tryTheContactPage">ဆက်သွယ်ရန်စာမျက်နှာတွင် ကြိုးစားကြည့်ပါ</string>
+  <string name="joinTheTeamXToPost">ဤ ဖိုရမ်တွင် ပို့စ် တင်လိုလျှင် %1$s အသင်းသို့ အသင်းဝင် အဖြစ် ဝင်ပါ။</string>
+  <string name="teamNamedX">%1$s အသင်း</string>
+  <string name="youCannotPostYetPlaySomeGames">ပွဲများ ထပ်ကစားပြီးမှ ဆွေးနွေးချက်များ တင်ခွင့်ရပါမည်။</string>
+  <string name="subscribe">ရယူလိုပါသည်။</string>
+  <string name="unsubscribe">မရယူလိုတော့ပါ။</string>
+  <string name="cancelTournament">ပြိုင်ပွဲကို ပယ်ဖျက်သည်</string>
+  <string name="tournDescription">ပြိုင်ပွဲ အကြောင်းအရာ</string>
+  <string name="tournDescriptionHelp">ပြိုင်ပွဲဝင်တို့ထံ အထူး မှာကြားချက် (တိုတိုရေးပါ)။ Markdown စာသားများထံ အညွှန်း ထည့်သွင်းနိုင်ပါသည် - [name](https://url)</string>
+  <string name="ratedFormHelp">လက်ရည် အတက်အကျ အတွက် အကျုံးဝင်သည်</string>
+  <string name="onlyMembersOfTeam">အသင်းဝင်များသာ</string>
+  <string name="noRestriction">ကန့်သတ်ချက် မရှိ</string>
+  <string name="minimumRatedGames">လက်ရည် ကန့်သတ်ချက်ဖြင့် ကစားပြီး ဖြစ်ရမည့် ကစားပွဲ အနည်းဆုံး အရေအတွက်</string>
+  <string name="minimumRating">အနိမ့်ဆုံး လက်ရည်</string>
+  <string name="maximumWeeklyRating">ရက်သတ္တ တစ်ပတ် အတွင်း ရရှိသော အမြင့်ဆုံး လက်ရည်</string>
+  <string name="onlyTitled">တရားဝင်ဘွဲ့ထူး ရရှိထားသော ကစားသမားများသာ</string>
+  <string name="onlyTitledHelp">ပြိုင်ပွဲသို့ ဝင်ရောက်နိုင်ရေး အတွက် တရားဝင်ဘွဲ့ထူး ရရှိထားရန် လိုအပ်သည်</string>
+  <string name="positionInputHelp">ကစားပွဲတိုင်းကို သတ်မှတ် အနေအထား တစ်မျိုးတည်းမှ စတင်ရန် အလို့ငှာ အမှားကင်းသော FEN တစ်ခု ထည့်သွင်းပါ။
+မူကွဲစနစ်များ အတွက် မရဘဲ စံနစ်သုံးပွဲများ အတွက်သာ လုပ်ဆောင်နိုင်ပါသည်။
+ထည့်သွင်းလိုသည့် FEN ကို %s အသုံးပြုကာ ထုတ်လုပ်နိုင်ပါသည်။
+ပုံမှန် အနေအထား အတိုင်း စတင်ရန် အတွက် FEN မထည့်ဘဲ အလွတ်ထားပါ။</string>
+  <string name="inYourLocalTimezone">သင်၏ ဒေသန္တရ စံတော်ချိန် ဇုံအတွင်း</string>
+  <string name="tournChat">ပြိုင်ပွဲ ဆိုင်ရာ ချက်ထ် စကားပြောခြင်း</string>
+  <string name="noChat">ချက်ထ် စကားပြောမှု ခွင့်မပြုပါ</string>
+  <string name="onlyTeamLeaders">အသင်းခေါင်းဆောင်များသာ</string>
+  <string name="onlyTeamMembers">အသင်းဝင်များသာ</string>
 </resources>

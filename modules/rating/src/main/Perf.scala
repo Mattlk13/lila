@@ -2,7 +2,7 @@ package lila.rating
 
 import org.goochjs.glicko2.Rating
 import org.joda.time.DateTime
-import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.{ BSONDocument, Macros }
 
 import lila.db.BSON
 
@@ -16,20 +16,30 @@ case class Perf(
   def intRating    = glicko.rating.toInt
   def intDeviation = glicko.deviation.toInt
 
-  def progress: Int = ~recent.headOption.flatMap { head =>
-    recent.lastOption map (head -)
+  def progress: Int =
+    ~recent.headOption.flatMap { head =>
+      recent.lastOption map (head -)
+    }
+
+  def add(g: Glicko, date: DateTime): Perf = {
+    val capped = g.cap
+    copy(
+      glicko = capped,
+      nb = nb + 1,
+      recent = updateRecentWith(capped),
+      latest = date.some
+    )
   }
 
-  def add(g: Glicko, date: DateTime): Perf = copy(
-    glicko = g.cap,
-    nb = nb + 1,
-    recent = updateRecentWith(g),
-    latest = date.some
-  )
-
   def add(r: Rating, date: DateTime): Option[Perf] = {
-    val glicko = Glicko(r.getRating, r.getRatingDeviation, r.getVolatility)
-    glicko.sanityCheck option add(glicko, date)
+    val newGlicko = Glicko(
+      rating = r.getRating
+        .atMost(glicko.rating + Glicko.maxRatingDelta)
+        .atLeast(glicko.rating - Glicko.maxRatingDelta),
+      deviation = r.getRatingDeviation,
+      volatility = r.getVolatility
+    )
+    newGlicko.sanityCheck option add(newGlicko, date)
   }
 
   def addOrReset(monitor: lila.mon.CounterPath, msg: => String)(r: Rating, date: DateTime): Perf =
@@ -38,10 +48,6 @@ case class Perf(
       monitor(lila.mon).increment()
       add(Glicko.default, date)
     }
-
-  def averageGlicko(other: Perf) = copy(
-    glicko = glicko average other.glicko
-  )
 
   def refund(points: Int): Perf = {
     val newGlicko = glicko refund points
@@ -55,18 +61,22 @@ case class Perf(
     if (nb < 10) recent
     else (glicko.intRating :: recent) take Perf.recentMaxSize
 
-  def toRating = new Rating(
-    math.max(Glicko.minRating, glicko.rating),
-    glicko.deviation,
-    glicko.volatility,
-    nb,
-    latest.orNull
-  )
+  def clearRecent = copy(recent = Nil)
+
+  def toRating =
+    new Rating(
+      math.max(Glicko.minRating, glicko.rating),
+      glicko.deviation,
+      glicko.volatility,
+      nb,
+      latest.orNull
+    )
 
   def isEmpty  = latest.isEmpty
   def nonEmpty = !isEmpty
 
   def rankable(variant: chess.variant.Variant) = glicko.rankable(variant)
+  def clueless                                 = glicko.clueless
   def provisional                              = glicko.provisional
   def established                              = glicko.established
 
@@ -88,6 +98,27 @@ case object Perf {
 
   val recentMaxSize = 12
 
+  case class Storm(score: Int, runs: Int) {
+    def nonEmpty = runs > 0
+  }
+  object Storm {
+    val default = Storm(0, 0)
+  }
+
+  case class Racer(score: Int, runs: Int) {
+    def nonEmpty = runs > 0
+  }
+  object Racer {
+    val default = Racer(0, 0)
+  }
+
+  case class Streak(score: Int, runs: Int) {
+    def nonEmpty = runs > 0
+  }
+  object Streak {
+    val default = Streak(0, 0)
+  }
+
   implicit val perfBSONHandler = new BSON[Perf] {
 
     import Glicko.glickoBSONHandler
@@ -99,14 +130,19 @@ case object Perf {
         latest = r dateO "la",
         recent = r intsD "re"
       )
-      p.copy(glicko = p.glicko.copy(deviation = Glicko.liveDeviation(p, false)))
+      p.copy(glicko = p.glicko.copy(deviation = Glicko.liveDeviation(p, reverse = false)))
     }
 
-    def writes(w: BSON.Writer, o: Perf) = BSONDocument(
-      "gl" -> o.glicko.copy(deviation = Glicko.liveDeviation(o, true)),
-      "nb" -> w.int(o.nb),
-      "re" -> w.listO(o.recent),
-      "la" -> o.latest.map(w.date)
-    )
+    def writes(w: BSON.Writer, o: Perf) =
+      BSONDocument(
+        "gl" -> o.glicko.copy(deviation = Glicko.liveDeviation(o, reverse = true)),
+        "nb" -> w.int(o.nb),
+        "re" -> w.listO(o.recent),
+        "la" -> o.latest.map(w.date)
+      )
   }
+
+  implicit val stormBSONHandler  = Macros.handler[Storm]
+  implicit val racerBSONHandler  = Macros.handler[Racer]
+  implicit val streakBSONHandler = Macros.handler[Streak]
 }

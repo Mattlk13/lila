@@ -28,7 +28,7 @@ object importGame {
       main(cls := "importer page-small box box-pad")(
         h1(trans.importGame()),
         p(cls := "explanation")(trans.importGameExplanation()),
-        postForm(cls := "form3 import", action := routes.Importer.sendGame())(
+        postForm(cls := "form3 import", action := routes.Importer.sendGame)(
           form3.group(form("pgn"), trans.pasteThePgnStringHere())(form3.textarea(_)()),
           form("pgn").value flatMap { pgn =>
             lila.importer
@@ -37,7 +37,7 @@ object importGame {
               .fold(
                 err =>
                   frag(
-                    pre(cls := "error")(err.toList mkString "\n"),
+                    pre(cls := "error")(err),
                     br,
                     br
                   ).some,
@@ -53,7 +53,7 @@ object importGame {
             help = Some(analyseHelp),
             disabled = ctx.isAnon
           ),
-          form3.action(form3.submit(trans.importGame(), "/".some))
+          form3.action(form3.submit(trans.importGame(), "".some))
         )
       )
     }

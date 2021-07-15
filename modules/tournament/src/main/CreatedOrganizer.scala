@@ -4,24 +4,24 @@ import akka.actor._
 import akka.stream.scaladsl._
 import scala.concurrent.duration._
 
-import lila.common.LilaStream
-
 final private class CreatedOrganizer(
     api: TournamentApi,
     tournamentRepo: TournamentRepo,
     playerRepo: PlayerRepo
-)(implicit ec: scala.concurrent.ExecutionContext, mat: akka.stream.Materializer)
-    extends Actor {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    mat: akka.stream.Materializer
+) extends Actor {
 
-  override def preStart: Unit = {
+  override def preStart(): Unit = {
     context setReceiveTimeout 15.seconds
-    context.system.scheduler.scheduleOnce(10 seconds, self, Tick)
+    context.system.scheduler.scheduleOnce(10 seconds, self, Tick).unit
   }
 
   case object Tick
 
-  def scheduleNext =
-    context.system.scheduler.scheduleOnce(2 seconds, self, Tick)
+  def scheduleNext(): Unit =
+    context.system.scheduler.scheduleOnce(2 seconds, self, Tick).unit
 
   def receive = {
 
@@ -31,29 +31,14 @@ final private class CreatedOrganizer(
       throw new RuntimeException(msg)
 
     case Tick =>
-      tournamentRepo
-        .startingSoonCursor(30)
+      tournamentRepo.shouldStartCursor
         .documentSource()
-        .mapAsync(1) { tour =>
-          tour.schedule match {
-            case None if tour.isPrivate && tour.hasWaitedEnough => api start tour
-            case None =>
-              playerRepo count tour.id flatMap {
-                case 0 => api destroy tour
-                case nb if tour.hasWaitedEnough =>
-                  if (nb >= Tournament.minPlayers) api start tour
-                  else api destroy tour
-                case _ => funit
-              }
-            case Some(_) if tour.hasWaitedEnough => api start tour
-            case Some(_)                         => funit
-          }
-        }
+        .mapAsync(1)(api.start)
         .log(getClass.getName)
-        .toMat(LilaStream.sinkCount)(Keep.right)
-        .run
-        .addEffect(lila.mon.tournament.created.update(_))
+        .toMat(Sink.ignore)(Keep.right)
+        .run()
         .monSuccess(_.tournament.createdOrganizer.tick)
-        .addEffectAnyway(scheduleNext)
+        .addEffectAnyway(scheduleNext())
+        .unit
   }
 }

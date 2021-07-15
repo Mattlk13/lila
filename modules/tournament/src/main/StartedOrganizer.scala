@@ -3,7 +3,7 @@ package lila.tournament
 import akka.actor._
 import akka.stream.scaladsl._
 import scala.concurrent.duration._
-import scala.util.Random
+import lila.common.ThreadLocalRandom
 
 final private class StartedOrganizer(
     api: TournamentApi,
@@ -13,17 +13,17 @@ final private class StartedOrganizer(
 )(implicit mat: akka.stream.Materializer)
     extends Actor {
 
-  override def preStart: Unit = {
-    context setReceiveTimeout 30.seconds
-    scheduleNext
+  override def preStart(): Unit = {
+    context setReceiveTimeout 120.seconds
+    scheduleNext()
   }
 
   implicit def ec = context.dispatcher
 
   case object Tick
 
-  def scheduleNext =
-    context.system.scheduler.scheduleOnce(3 seconds, self, Tick)
+  def scheduleNext(): Unit =
+    context.system.scheduler.scheduleOnce(2 seconds, self, Tick).unit
 
   def receive = {
 
@@ -35,32 +35,30 @@ final private class StartedOrganizer(
     case Tick =>
       tournamentRepo.startedCursor
         .documentSource()
-        .mapAsync(1) { tour =>
-          processTour(tour) recover {
-            case e: Exception =>
-              logger.error(s"StartedOrganizer $tour", e)
-              0
+        .mapAsyncUnordered(4) { tour =>
+          processTour(tour) recover { case e: Exception =>
+            logger.error(s"StartedOrganizer $tour", e)
+            0
           }
         }
-        .toMat(Sink.fold(0 -> 0) {
-          case ((tours, users), tourUsers) => (tours + 1, users + tourUsers)
+        .toMat(Sink.fold(0 -> 0) { case ((tours, users), tourUsers) =>
+          (tours + 1, users + tourUsers)
         })(Keep.right)
-        .run
-        .addEffect {
-          case (tours, users) =>
-            lila.mon.tournament.started.update(tours)
-            lila.mon.tournament.waitingPlayers.record(users)
+        .run()
+        .addEffect { case (tours, users) =>
+          lila.mon.tournament.started.update(tours)
+          lila.mon.tournament.waitingPlayers.record(users).unit
         }
         .monSuccess(_.tournament.startedOrganizer.tick)
-        .addEffectAnyway(scheduleNext)
+        .addEffectAnyway(scheduleNext())
+        .unit
   }
 
   private def processTour(tour: Tournament): Fu[Int] =
     if (tour.secondsToFinish <= 0) api finish tour inject 0
-    else if (!tour.isScheduled && tour.nbPlayers < 40 && Random.nextInt(10) == 0) {
+    else if (!tour.isScheduled && tour.nbPlayers < 30 && ThreadLocalRandom.nextInt(10) == 0) {
       playerRepo nbActiveUserIds tour.id flatMap { nb =>
-        if (nb < 2) api finish tour inject 0
-        else startPairing(tour)
+        (nb >= 2) ?? startPairing(tour)
       }
     } else startPairing(tour)
 

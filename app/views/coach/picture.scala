@@ -31,7 +31,7 @@ object picture {
             p("Max size: ", lila.db.Photographer.uploadMaxMb, "MB."),
             form3.file.image("picture"),
             form3.actions(
-              a(href := routes.Coach.edit())(trans.cancel()),
+              a(href := routes.Coach.edit)(trans.cancel()),
               form3.submit("Upload profile picture")
             )
           ),

@@ -33,8 +33,8 @@ object clas {
           )
         ),
         div(cls := "clas-home__onboard")(
-          a(cls := "button button-fat", href := routes.Clas.verifyTeacher)(
-            trans.clas.applyToBeLichessTeacher()
+          postForm(action := routes.Clas.becomeTeacher)(
+            submitButton(cls := "button button-fat")(trans.clas.applyToBeLichessTeacher())
           )
         )
       )
@@ -49,7 +49,7 @@ object clas {
           href := routes.Clas.form,
           cls := "new button button-empty",
           title := trans.clas.newClass.txt(),
-          dataIcon := "O"
+          dataIcon := ""
         )
       ),
       if (classes.isEmpty)
@@ -70,7 +70,7 @@ object clas {
       classes.map { clas =>
         div(
           cls := List("clas-widget" -> true, "clas-widget-archived" -> clas.isArchived),
-          dataIcon := "f"
+          dataIcon := ""
         )(
           a(cls := "overlay", href := routes.Clas.show(clas.id.value)),
           div(
@@ -84,7 +84,7 @@ object clas {
   def teachers(clas: Clas)(implicit lang: Lang) =
     div(cls := "clas-teachers")(
       trans.clas.teachersX(
-        fragList(clas.teachers.toList.map(t => userIdLink(t.value.some)))
+        fragList(clas.teachers.toList.map(t => userIdLink(t.some)))
       )
     )
 
@@ -101,7 +101,7 @@ object clas {
         innerForm(form, c.some),
         hr,
         c.isActive option postForm(
-          action := routes.Clas.archive(c.id.value, true),
+          action := routes.Clas.archive(c.id.value, v = true),
           cls := "clas-edit__archive"
         )(
           form3.submit(trans.clas.closeClass(), icon = none)(
@@ -134,7 +134,7 @@ object clas {
     )
 
   private def innerForm(form: Form[ClasData], clas: Option[Clas])(implicit ctx: Context) =
-    postForm(cls := "form3", action := clas.fold(routes.Clas.create())(c => routes.Clas.update(c.id.value)))(
+    postForm(cls := "form3", action := clas.fold(routes.Clas.create)(c => routes.Clas.update(c.id.value)))(
       form3.globalError(form),
       form3.group(form("name"), trans.clas.className())(form3.input(_)(autofocus)),
       form3.group(
@@ -148,15 +148,11 @@ object clas {
           form3.group(
             form("teachers"),
             trans.clas.teachersOfTheClass(),
-            help = frag(
-              trans.clas.addLichessUsernames(),
-              br,
-              trans.clas.theyMustFirstApply()
-            ).some
+            help = trans.clas.addLichessUsernames().some
           )(form3.textarea(_)(rows := 4))
       },
       form3.actions(
-        a(href := clas.fold(routes.Clas.index())(c => routes.Clas.show(c.id.value)))(trans.cancel()),
+        a(href := clas.fold(routes.Clas.index)(c => routes.Clas.show(c.id.value)))(trans.cancel()),
         form3.submit(trans.apply())
       )
     )

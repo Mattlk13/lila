@@ -19,15 +19,16 @@ object PublicLine {
   import reactivemongo.api.bson._
   import lila.db.dsl._
   implicit private val SourceHandler = lila.db.dsl.tryHandler[Source](
-    {
-      case BSONString(v) =>
-        v split ':' match {
-          case Array("t", id)     => Success(Source.Tournament(id))
-          case Array("s", id)     => Success(Source.Simul(id))
-          case Array("w", gameId) => Success(Source.Watcher(gameId))
-          case Array("u", id)     => Success(Source.Study(id))
-          case _                  => lila.db.BSON.handlerBadValue(s"Invalid PublicLine source $v")
-        }
+    { case BSONString(v) =>
+      v split ':' match {
+        case Array("t", id)     => Success(Source.Tournament(id))
+        case Array("s", id)     => Success(Source.Simul(id))
+        case Array("w", gameId) => Success(Source.Watcher(gameId))
+        case Array("u", id)     => Success(Source.Study(id))
+        case Array("e", id)     => Success(Source.Team(id))
+        case Array("i", id)     => Success(Source.Swiss(id))
+        case _                  => lila.db.BSON.handlerBadValue(s"Invalid PublicLine source $v")
+      }
     },
     x =>
       BSONString(x match {
@@ -35,6 +36,8 @@ object PublicLine {
         case Source.Simul(id)       => s"s:$id"
         case Source.Study(id)       => s"u:$id"
         case Source.Watcher(gameId) => s"w:$gameId"
+        case Source.Team(id)        => s"e:$id"
+        case Source.Swiss(id)       => s"i:$id"
       })
   )
 

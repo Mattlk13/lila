@@ -11,7 +11,7 @@ final class JsonView {
   case class Categ(name: String, items: List[JsValue])
   implicit private val categWrites = Json.writes[Categ]
 
-  def ui(ecos: Set[String])(implicit lang: Lang) = {
+  def ui(ecos: Set[String], asMod: Boolean)(implicit lang: Lang) = {
 
     val openingJson = Json.obj(
       "key"         -> D.Opening.key,
@@ -52,8 +52,12 @@ final class JsonView {
           Json.toJson(D.PieceRole: Dimension[_]),
           Json.toJson(D.MovetimeRange: Dimension[_]),
           Json.toJson(D.MaterialRange: Dimension[_]),
-          Json.toJson(D.Phase: Dimension[_])
-        )
+          Json.toJson(D.EvalRange: Dimension[_]),
+          Json.toJson(D.Phase: Dimension[_]),
+          Json.toJson(D.CplRange: Dimension[_])
+        ) ::: {
+          asMod ?? List(Json.toJson(D.Blur: Dimension[_]), Json.toJson(D.TimeVariance: Dimension[_]))
+        }
       ),
       Categ(
         "Result",
@@ -64,70 +68,77 @@ final class JsonView {
       )
     )
 
+    val metricCategs = List(
+      Categ(
+        "Setup",
+        List(
+          Json.toJson(M.OpponentRating: Metric)
+        )
+      ),
+      Categ(
+        "Move",
+        List(
+          Json.toJson(M.Movetime: Metric),
+          Json.toJson(M.PieceRole: Metric),
+          Json.toJson(M.Material: Metric),
+          Json.toJson(M.NbMoves: Metric)
+        ) ++ {
+          asMod ?? List(
+            Json.toJson(M.Blurs: Metric),
+            Json.toJson(M.TimeVariance: Metric)
+          )
+        }
+      ),
+      Categ(
+        "Evaluation",
+        List(
+          Json.toJson(M.MeanCpl: Metric),
+          Json.toJson(M.CplBucket: Metric),
+          Json.toJson(M.Opportunism: Metric),
+          Json.toJson(M.Luck: Metric)
+        )
+      ),
+      Categ(
+        "Result",
+        List(
+          Json.toJson(M.Termination: Metric),
+          Json.toJson(M.Result: Metric),
+          Json.toJson(M.RatingDiff: Metric)
+        )
+      )
+    )
+
     Json.obj(
       "dimensionCategs" -> dimensionCategs,
       "metricCategs"    -> metricCategs,
-      "presets"         -> Preset.all
+      "presets"         -> { if (asMod) Preset.forMod else Preset.base }
     )
   }
 
-  private val metricCategs = List(
-    Categ(
-      "Setup",
-      List(
-        Json.toJson(M.OpponentRating: Metric)
-      )
-    ),
-    Categ(
-      "Move",
-      List(
-        Json.toJson(M.Movetime: Metric),
-        Json.toJson(M.PieceRole: Metric),
-        Json.toJson(M.Material: Metric),
-        Json.toJson(M.NbMoves: Metric)
-      )
-    ),
-    Categ(
-      "Evaluation",
-      List(
-        Json.toJson(M.MeanCpl: Metric),
-        Json.toJson(M.Opportunism: Metric),
-        Json.toJson(M.Luck: Metric)
-      )
-    ),
-    Categ(
-      "Result",
-      List(
-        Json.toJson(M.Termination: Metric),
-        Json.toJson(M.Result: Metric),
-        Json.toJson(M.RatingDiff: Metric)
-      )
-    )
-  )
-
   private object writers {
 
-    implicit def presetWriter[X]: Writes[Preset] = Writes { p =>
-      Json.obj(
-        "name"      -> p.name,
-        "dimension" -> p.question.dimension.key,
-        "metric"    -> p.question.metric.key,
-        "filters" -> JsObject(p.question.filters.map {
-          case Filter(dimension, selected) =>
+    implicit def presetWriter[X]: Writes[Preset] =
+      Writes { p =>
+        Json.obj(
+          "name"      -> p.name,
+          "dimension" -> p.question.dimension.key,
+          "metric"    -> p.question.metric.key,
+          "filters" -> JsObject(p.question.filters.map { case Filter(dimension, selected) =>
             dimension.key -> JsArray(selected.map(Dimension.valueKey(dimension)).map(JsString.apply))
-        })
-      )
-    }
+          })
+        )
+      }
 
-    implicit def dimensionWriter[X](implicit lang: Lang): Writes[Dimension[X]] = Writes { d =>
-      Json.obj(
-        "key"         -> d.key,
-        "name"        -> d.name,
-        "position"    -> d.position,
-        "description" -> d.description.render,
-        "values"      -> Dimension.valuesOf(d).map(Dimension.valueToJson(d))
-      )
-    }
+    implicit def dimensionWriter[X](implicit lang: Lang): Writes[Dimension[X]] =
+      Writes { d =>
+        Json.obj(
+          "key"         -> d.key,
+          "name"        -> d.name,
+          "position"    -> d.position,
+          "description" -> d.description.render,
+          "values"      -> Dimension.valuesOf(d).map(Dimension.valueToJson(d))
+        )
+      }
 
     implicit val metricWriter: Writes[Metric] = Writes { m =>
       Json.obj(
@@ -152,16 +163,17 @@ final class JsonView {
     def apply(c: Chart) = ChartWrites writes c
   }
 
-  def question(metric: String, dimension: String, filters: String) = Json.obj(
-    "metric"    -> metric,
-    "dimension" -> dimension,
-    "filters" -> (filters
-      .split('/')
-      .view
-      .map(_ split ':')
-      .collect {
-        case Array(key, values) => key -> JsArray(values.split(',').map(JsString.apply))
-      }
-      .toMap: Map[String, JsArray])
-  )
+  def question(metric: String, dimension: String, filters: String) =
+    Json.obj(
+      "metric"    -> metric,
+      "dimension" -> dimension,
+      "filters" -> (filters
+        .split('/')
+        .view
+        .map(_ split ':')
+        .collect { case Array(key, values) =>
+          key -> JsArray(values.split(',').map(JsString.apply))
+        }
+        .toMap: Map[String, JsArray])
+    )
 }

@@ -1,12 +1,13 @@
 package lila.user
 
-import org.apache.commons.codec.binary.Base32
-import reactivemongo.api.bson._
-
-import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import java.nio.ByteBuffer
+import org.apache.commons.codec.binary.Base32
+import reactivemongo.api.bson._
+
+import lila.common.SecureRandom
+
 import User.TotpToken
 
 case class TotpSecret(secret: Array[Byte]) extends AnyVal {
@@ -18,16 +19,17 @@ case class TotpSecret(secret: Array[Byte]) extends AnyVal {
 
   def currentTotp = totp(System.currentTimeMillis / 30000)
 
-  def totp(period: Long): TotpToken = TotpToken {
-    val msg = ByteBuffer.allocate(8).putLong(0, period).array
+  def totp(period: Long): TotpToken =
+    TotpToken {
+      val msg = ByteBuffer.allocate(8).putLong(0, period).array
 
-    val hmac = Mac.getInstance("HMACSHA1")
-    hmac.init(new SecretKeySpec(secret, "RAW"))
-    val hash = hmac.doFinal(msg)
+      val hmac = Mac.getInstance("HMACSHA1")
+      hmac.init(new SecretKeySpec(secret, "RAW"))
+      val hash = hmac.doFinal(msg)
 
-    val offset = hash.last & 0xf
-    otpString(ByteBuffer.wrap(hash).getInt(offset) & 0x7fffffff)
-  }
+      val offset = hash.last & 0xf
+      otpString(ByteBuffer.wrap(hash).getInt(offset) & 0x7fffffff)
+    }
 
   def verify(token: TotpToken): Boolean = {
     val period = System.currentTimeMillis / 30000
@@ -41,19 +43,12 @@ object TotpSecret {
 
   private def otpString(otp: Int) = {
     val s = (otp % 1000000).toString
-    if (s.length == 6) s
-    else "0" * (6 - s.length) + s
+    "0" * (6 - s.length) + s
   }
-
-  private[this] val secureRandom = new SecureRandom()
 
   def apply(base32: String) = new TotpSecret(new Base32().decode(base32))
 
-  def random: TotpSecret = {
-    val secret = new Array[Byte](20)
-    secureRandom.nextBytes(secret)
-    TotpSecret(secret)
-  }
+  def random = TotpSecret(SecureRandom.nextBytes(20))
 
   private[user] val totpSecretBSONHandler = lila.db.dsl.quickHandler[TotpSecret](
     { case v: BSONBinary => TotpSecret(v.byteArray) },

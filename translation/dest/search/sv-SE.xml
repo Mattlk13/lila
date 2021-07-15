@@ -24,4 +24,10 @@
   <string name="sortBy">Sortera efter</string>
   <string name="analysis">Analys</string>
   <string name="onlyAnalysed">Endast partier där en datoranalys finns tillgänglig</string>
+  <string name="color">Färg</string>
+  <string name="evaluation">Utvärdering</string>
+  <string name="maxNumber" comment="maxNumber&#10;&#10;The maximum number of games to return as search results">Maximalt antal</string>
+  <string name="maxNumberExplanation">Det maximala antalet paartier att visa</string>
+  <string name="include">Inkludera</string>
+  <string name="generateURL">Generera URL</string>
 </resources>

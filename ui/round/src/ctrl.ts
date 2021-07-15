@@ -1,3 +1,6 @@
+/// <reference types="../types/ab" />
+
+import * as ab from 'ab';
 import * as round from './round';
 import * as game from 'game';
 import * as status from 'game/status';
@@ -5,7 +8,6 @@ import * as ground from './ground';
 import notify from 'common/notification';
 import { make as makeSocket, RoundSocket } from './socket';
 import * as title from './title';
-import * as promotion from './promotion';
 import * as blur from './blur';
 import * as speech from './speech';
 import * as cg from 'chessground/types';
@@ -15,17 +17,30 @@ import { ClockController } from './clock/clockCtrl';
 import { CorresClockController, ctrl as makeCorresClock } from './corresClock/corresClockCtrl';
 import MoveOn from './moveOn';
 import TransientMove from './transientMove';
-import atomic = require('./atomic');
-import sound = require('./sound');
-import util = require('./util');
-import xhr = require('./xhr');
+import * as atomic from './atomic';
+import * as sound from './sound';
+import * as util from './util';
+import * as xhr from './xhr';
 import { valid as crazyValid, init as crazyInit, onEnd as crazyEndHook } from './crazy/crazyCtrl';
 import { ctrl as makeKeyboardMove, KeyboardMove } from './keyboardMove';
-import renderUser = require('./view/user');
-import cevalSub = require('./cevalSub');
+import * as renderUser from './view/user';
+import * as cevalSub from './cevalSub';
 import * as keyboard from './keyboard';
+import { PromotionCtrl, promote } from 'chess/promotion';
 
-import { RoundOpts, RoundData, ApiMove, ApiEnd, Redraw, SocketMove, SocketDrop, SocketOpts, MoveMetadata, Position, NvuiPlugin } from './interfaces';
+import {
+  RoundOpts,
+  RoundData,
+  ApiMove,
+  ApiEnd,
+  Redraw,
+  SocketMove,
+  SocketDrop,
+  SocketOpts,
+  MoveMetadata,
+  Position,
+  NvuiPlugin,
+} from './interfaces';
 
 interface GoneBerserk {
   white?: boolean;
@@ -34,10 +49,7 @@ interface GoneBerserk {
 
 type Timeout = number;
 
-const li = window.lichess;
-
 export default class RoundController {
-
   data: RoundData;
   socket: RoundSocket;
   chessground: CgApi;
@@ -47,13 +59,14 @@ export default class RoundController {
   noarg: TransNoArg;
   keyboardMove?: KeyboardMove;
   moveOn: MoveOn;
+  promotion: PromotionCtrl;
 
   ply: number;
-  firstSeconds: boolean = true;
-  flip: boolean = false;
-  loading: boolean = false;
+  firstSeconds = true;
+  flip = false;
+  loading = false;
   loadingTimeout: number;
-  redirecting: boolean = false;
+  redirecting = false;
   transientMove: TransientMove;
   moveToSubmit?: SocketMove;
   dropToSubmit?: SocketDrop;
@@ -61,90 +74,114 @@ export default class RoundController {
   resignConfirm?: Timeout = undefined;
   drawConfirm?: Timeout = undefined;
   // will be replaced by view layer
-  autoScroll: () => void = $.noop;
-  challengeRematched: boolean = false;
+  autoScroll: () => void = () => {};
+  challengeRematched = false;
   justDropped?: cg.Role;
   justCaptured?: cg.Piece;
-  shouldSendMoveTime: boolean = false;
+  shouldSendMoveTime = false;
   preDrop?: cg.Role;
   lastDrawOfferAtPly?: Ply;
   nvui?: NvuiPlugin;
-
+  sign: string = Math.random().toString(36);
   private music?: any;
 
   constructor(readonly opts: RoundOpts, readonly redraw: Redraw) {
-
     round.massage(opts.data);
 
-    const d = this.data = opts.data;
+    const d = (this.data = opts.data);
 
     this.ply = round.lastPly(d);
     this.goneBerserk[d.player.color] = d.player.berserk;
     this.goneBerserk[d.opponent.color] = d.opponent.berserk;
 
-    setTimeout(() => { this.firstSeconds = false; this.redraw(); }, 3000);
+    setTimeout(() => {
+      this.firstSeconds = false;
+      this.redraw();
+    }, 3000);
 
     this.socket = makeSocket(opts.socketSend, this);
 
-    if (li.RoundNVUI) this.nvui = li.RoundNVUI(redraw) as NvuiPlugin;
+    if (lichess.RoundNVUI) this.nvui = lichess.RoundNVUI(redraw) as NvuiPlugin;
 
-    if (d.clock) this.clock = new ClockController(d, {
-      onFlag: this.socket.outoftime,
-      soundColor: (d.simul || d.player.spectator || !d.pref.clockSound) ? undefined : d.player.color,
-      nvui: !!this.nvui
-    });
+    if (d.clock)
+      this.clock = new ClockController(d, {
+        onFlag: this.socket.outoftime,
+        soundColor: d.simul || d.player.spectator || !d.pref.clockSound ? undefined : d.player.color,
+        nvui: !!this.nvui,
+      });
     else {
       this.makeCorrespondenceClock();
       setInterval(this.corresClockTick, 1000);
     }
+
+    this.promotion = new PromotionCtrl(
+      f => f(this.chessground),
+      () => {
+        this.chessground.cancelPremove();
+        xhr.reload(this).then(this.reload, lichess.reload);
+      },
+      this.redraw,
+      d.pref.autoQueen
+    );
 
     this.setQuietMode();
 
     this.moveOn = new MoveOn(this, 'move-on');
     this.transientMove = new TransientMove(this.socket);
 
-    this.trans = li.trans(opts.i18n);
+    this.trans = lichess.trans(opts.i18n);
     this.noarg = this.trans.noarg;
 
     setTimeout(this.delayedInit, 200);
 
     setTimeout(this.showExpiration, 350);
 
-    if (!document.referrer || document.referrer.indexOf('/service-worker.js') === -1)
-      setTimeout(this.showYourMoveNotification, 500);
+    if (!document.referrer?.includes('/serviceWorker.')) setTimeout(this.showYourMoveNotification, 500);
 
     // at the end:
-    li.pubsub.on('jump', ply => { this.jump(parseInt(ply)); this.redraw(); });
+    lichess.pubsub.on('jump', ply => {
+      this.jump(parseInt(ply));
+      this.redraw();
+    });
 
-    li.pubsub.on('sound_set', set => {
+    lichess.pubsub.on('sound_set', set => {
       if (!this.music && set === 'music')
-        li.loadScript('javascripts/music/play.js').then(() => {
-          this.music = li.playMusic();
+        lichess.loadScript('javascripts/music/play.js').then(() => {
+          this.music = lichess.playMusic();
         });
       if (this.music && set !== 'music') this.music = undefined;
     });
 
-    li.pubsub.on('zen', () => {
-      if (this.isPlaying()) {
-        const zen = !$('body').hasClass('zen');
-        $('body').toggleClass('zen', zen);
-        li.dispatchEvent(window, 'resize');
-        $.post('/pref/zen', { zen: zen ? 1 : 0 });
+    lichess.pubsub.on('zen', () => {
+      if (!this.data.player.spectator) {
+        const zen = $('body').toggleClass('zen').hasClass('zen');
+        window.dispatchEvent(new Event('resize'));
+        xhr.setZen(zen);
       }
     });
 
-    if (li.ab && this.isPlaying()) li.ab.init(this);
+    if (this.isPlaying()) ab.init(this);
   }
 
   private showExpiration = () => {
     if (!this.data.expiration) return;
     this.redraw();
     setTimeout(this.showExpiration, 250);
-  }
+  };
 
   private onUserMove = (orig: cg.Key, dest: cg.Key, meta: cg.MoveMetadata) => {
-    if (li.ab && (!this.keyboardMove || !this.keyboardMove.usedSan)) li.ab.move(this, meta);
-    if (!promotion.start(this, orig, dest, meta)) this.sendMove(orig, dest, undefined, meta);
+    if (!this.keyboardMove || !this.keyboardMove.usedSan) ab.move(this, meta);
+    if (
+      !this.promotion.start(
+        orig,
+        dest,
+        (orig, dest, role) => this.sendMove(orig, dest, role, meta),
+        meta,
+        this.keyboardMove?.justSelected()
+      )
+    ) {
+      this.sendMove(orig, dest, undefined, meta);
+    }
   };
 
   private onUserNewPiece = (role: cg.Role, key: cg.Key, meta: cg.MoveMetadata) => {
@@ -153,8 +190,8 @@ export default class RoundController {
     } else this.jump(this.ply);
   };
 
-  private onMove = (_: cg.Key, dest: cg.Key, captured?: cg.Piece) => {
-    if (captured) {
+  private onMove = (orig: cg.Key, dest: cg.Key, captured?: cg.Piece) => {
+    if (captured || this.enpassant(orig, dest)) {
       if (this.data.game.variant.key === 'atomic') {
         sound.explode();
         atomic.capture(this, dest);
@@ -163,11 +200,22 @@ export default class RoundController {
   };
 
   private onPremove = (orig: cg.Key, dest: cg.Key, meta: cg.MoveMetadata) => {
-    promotion.start(this, orig, dest, meta);
+    this.promotion.start(
+      orig,
+      dest,
+      (orig, dest, role) => this.sendMove(orig, dest, role, meta),
+      meta,
+      this.keyboardMove?.justSelected()
+    );
   };
 
   private onCancelPremove = () => {
-    promotion.cancelPrePromotion(this);
+    this.promotion.cancelPrePromotion();
+  };
+
+  private onNewPiece = (piece: cg.Piece, key: cg.Key): void => {
+    if (piece.role === 'pawn' && (key[1] === '1' || key[1] === '8')) return;
+    sound.move();
   };
 
   private onPredrop = (role: cg.Role | undefined, _?: Key) => {
@@ -179,17 +227,26 @@ export default class RoundController {
     return this.data.simul && this.data.simul.hostId === this.opts.userId;
   };
 
+  private enpassant = (orig: cg.Key, dest: cg.Key): boolean => {
+    if (orig[0] === dest[0] || this.chessground.state.pieces.get(dest)?.role !== 'pawn') return false;
+    const pos = (dest[0] + orig[1]) as cg.Key;
+    this.chessground.setPieces(new Map([[pos, undefined]]));
+    return true;
+  };
+
+  lastPly = () => round.lastPly(this.data);
+
   makeCgHooks = () => ({
     onUserMove: this.onUserMove,
     onUserNewPiece: this.onUserNewPiece,
     onMove: this.onMove,
-    onNewPiece: sound.move,
+    onNewPiece: this.onNewPiece,
     onPremove: this.onPremove,
     onCancelPremove: this.onCancelPremove,
-    onPredrop: this.onPredrop
+    onPredrop: this.onPredrop,
   });
 
-  replaying = (): boolean => this.ply !== round.lastPly(this.data);
+  replaying = (): boolean => this.ply !== this.lastPly();
 
   userJump = (ply: Ply): void => {
     this.cancelMove();
@@ -201,7 +258,7 @@ export default class RoundController {
   isPlaying = () => game.isPlayerPlaying(this.data);
 
   jump = (ply: Ply): boolean => {
-    ply = Math.max(round.firstPly(this.data), Math.min(round.lastPly(this.data), ply));
+    ply = Math.max(round.firstPly(this.data), Math.min(this.lastPly(), ply));
     const isForwardStep = ply === this.ply + 1;
     this.ply = ply;
     this.justDropped = undefined;
@@ -211,13 +268,14 @@ export default class RoundController {
         fen: s.fen,
         lastMove: util.uci2move(s.uci),
         check: !!s.check,
-        turnColor: this.ply % 2 === 0 ? 'white' : 'black'
+        turnColor: this.ply % 2 === 0 ? 'white' : 'black',
       };
     if (this.replaying()) this.chessground.stop();
-    else config.movable = {
-      color: this.isPlaying() ? this.data.player.color : undefined,
-      dests: util.parsePossibleMoves(this.data.possibleMoves)
-    }
+    else
+      config.movable = {
+        color: this.isPlaying() ? this.data.player.color : undefined,
+        dests: util.parsePossibleMoves(this.data.possibleMoves),
+      };
     this.chessground.set(config);
     if (s.san && isForwardStep) {
       if (s.san.includes('x')) sound.capture();
@@ -226,14 +284,16 @@ export default class RoundController {
     }
     this.autoScroll();
     if (this.keyboardMove) this.keyboardMove.update(s);
-    li.pubsub.emit('ply', ply);
+    lichess.pubsub.emit('ply', ply);
     return true;
   };
 
   replayEnabledByPref = (): boolean => {
     const d = this.data;
-    return d.pref.replay === 2 || (
-      d.pref.replay === 1 && (d.game.speed === 'classical' || d.game.speed === 'unlimited' || d.game.speed === 'correspondence')
+    return (
+      d.pref.replay === Prefs.Replay.Always ||
+      (d.pref.replay === Prefs.Replay.OnlySlowGames &&
+        (d.game.speed === 'classical' || d.game.speed === 'unlimited' || d.game.speed === 'correspondence'))
     );
   };
 
@@ -245,7 +305,7 @@ export default class RoundController {
   flipNow = () => {
     this.flip = !this.nvui && !this.flip;
     this.chessground.set({
-      orientation: ground.boardOrientation(this.data, this.flip)
+      orientation: ground.boardOrientation(this.data, this.flip),
     });
     this.redraw();
   };
@@ -254,10 +314,11 @@ export default class RoundController {
 
   actualSendMove = (tpe: string, data: any, meta: MoveMetadata = {}) => {
     const socketOpts: SocketOpts = {
-      ackable: true
+      sign: this.sign,
+      ackable: true,
     };
     if (this.clock) {
-      socketOpts.withLag = !this.shouldSendMoveTime || !this.clock.isRunning;
+      socketOpts.withLag = !this.shouldSendMoveTime || !this.clock.isRunning();
       if (meta.premove && this.shouldSendMoveTime) {
         this.clock.hardStopClock();
         socketOpts.millis = 0;
@@ -275,13 +336,13 @@ export default class RoundController {
     this.preDrop = undefined;
     this.transientMove.register();
     this.redraw();
-  }
+  };
 
   sendMove = (orig: cg.Key, dest: cg.Key, prom: cg.Role | undefined, meta: cg.MoveMetadata) => {
     const move: SocketMove = {
-      u: orig + dest
+      u: orig + dest,
     };
-    if (prom) move.u += (prom === 'knight' ? 'n' : prom[0]);
+    if (prom) move.u += prom === 'knight' ? 'n' : prom[0];
     if (blur.get()) move.b = 1;
     this.resign(false);
     if (this.data.pref.submitMove && !meta.premove) {
@@ -290,15 +351,15 @@ export default class RoundController {
     } else {
       this.actualSendMove('move', move, {
         justCaptured: meta.captured,
-        premove: meta.premove
-      })
+        premove: meta.premove,
+      });
     }
   };
 
   sendNewPiece = (role: cg.Role, key: cg.Key, isPredrop: boolean): void => {
     const drop: SocketDrop = {
       role: role,
-      pos: key
+      pos: key,
     };
     if (blur.get()) drop.b = 1;
     this.resign(false);
@@ -308,34 +369,33 @@ export default class RoundController {
     } else {
       this.actualSendMove('drop', drop, {
         justDropped: role,
-        premove: isPredrop
+        premove: isPredrop,
       });
     }
   };
 
   showYourMoveNotification = () => {
     const d = this.data;
-    if (game.isPlayerTurn(d)) notify(() => {
-      let txt = this.trans('yourTurn'),
-        opponent = renderUser.userTxt(this, d.opponent);
-      if (this.ply < 1) txt = opponent + '\njoined the game.\n' + txt;
-      else {
-        let move = d.steps[d.steps.length - 1].san,
-          turn = Math.floor((this.ply - 1) / 2) + 1;
-        move = turn + (this.ply % 2 === 1 ? '.' : '...') + ' ' + move;
-        txt = opponent + '\nplayed ' + move + '.\n' + txt;
-      }
-      return txt;
-    });
-    else if (this.isPlaying() && this.ply < 1) notify(() => {
-      return renderUser.userTxt(this, d.opponent) + '\njoined the game.';
-    });
+    const opponent = $('body').hasClass('zen') ? 'Your opponent' : renderUser.userTxt(this, d.opponent);
+    const joined = `${opponent}\njoined the game.`;
+    if (game.isPlayerTurn(d))
+      notify(() => {
+        let txt = this.noarg('yourTurn');
+        if (this.ply < 1) txt = `${joined}\n${txt}`;
+        else {
+          let move = d.steps[d.steps.length - 1].san;
+          const turn = Math.floor((this.ply - 1) / 2) + 1;
+          move = `${turn}${this.ply % 2 === 1 ? '.' : '...'} ${move}`;
+          txt = `${opponent}\nplayed ${move}.\n${txt}`;
+        }
+        return txt;
+      });
+    else if (this.isPlaying() && this.ply < 1) notify(joined);
   };
 
-  playerByColor = (c: Color) =>
-    this.data[c === this.data.player.color ? 'player' : 'opponent'];
+  playerByColor = (c: Color) => this.data[c === this.data.player.color ? 'player' : 'opponent'];
 
-  apiMove = (o: ApiMove): void => {
+  apiMove = (o: ApiMove): true => {
     const d = this.data,
       playing = this.isPlaying();
 
@@ -353,57 +413,46 @@ export default class RoundController {
     this.setTitle();
     if (!this.replaying()) {
       this.ply++;
-      if (o.role) this.chessground.newPiece({
-        role: o.role,
-        color: playedColor
-      }, o.uci.substr(2, 2) as cg.Key);
+      if (o.role)
+        this.chessground.newPiece(
+          {
+            role: o.role,
+            color: playedColor,
+          },
+          o.uci.substr(2, 2) as cg.Key
+        );
       else {
-        const keys = util.uci2move(o.uci);
-        this.chessground.move(keys![0], keys![1]);
+        // This block needs to be idempotent, even for castling moves in
+        // Chess960.
+        const keys = util.uci2move(o.uci)!,
+          pieces = this.chessground.state.pieces;
+        if (
+          !o.castle ||
+          (pieces.get(o.castle.king[0])?.role === 'king' && pieces.get(o.castle.rook[0])?.role === 'rook')
+        ) {
+          this.chessground.move(keys[0], keys[1]);
+        }
       }
-      if (o.enpassant) {
-        const p = o.enpassant, pieces: cg.PiecesDiff = {};
-        pieces[p.key] = undefined;
-        this.chessground.setPieces(pieces);
-        if (d.game.variant.key === 'atomic') {
-          atomic.enpassant(this, p.key, p.color);
-          sound.explode();
-        } else sound.capture();
-      }
-      if (o.promotion) ground.promote(this.chessground, o.promotion.key, o.promotion.pieceClass);
-      if (o.castle && !this.chessground.state.autoCastle) {
-        const c = o.castle, pieces: cg.PiecesDiff = {};
-        pieces[c.king[0]] = undefined;
-        pieces[c.rook[0]] = undefined;
-        pieces[c.king[1]] = {
-          role: 'king',
-          color: c.color
-        };
-        pieces[c.rook[1]] = {
-          role: 'rook',
-          color: c.color
-        };
-        this.chessground.setPieces(pieces);
-      }
+      if (o.promotion) promote(this.chessground, o.promotion.key, o.promotion.pieceClass);
       this.chessground.set({
         turnColor: d.game.player,
         movable: {
-          dests: playing ? util.parsePossibleMoves(d.possibleMoves) : {}
+          dests: playing ? util.parsePossibleMoves(d.possibleMoves) : new Map(),
         },
-        check: !!o.check
+        check: !!o.check,
       });
       if (o.check) sound.check();
       blur.onMove();
-      li.pubsub.emit('ply', this.ply);
+      lichess.pubsub.emit('ply', this.ply);
     }
     d.game.threefold = !!o.threefold;
     const step = {
-      ply: round.lastPly(this.data) + 1,
+      ply: this.lastPly() + 1,
       fen: o.fen,
       san: o.san,
       uci: o.uci,
       check: o.check,
-      crazy: o.crazyhouse
+      crazy: o.crazyhouse,
     };
     d.steps.push(step);
     this.justDropped = undefined;
@@ -413,11 +462,9 @@ export default class RoundController {
     if (o.clock) {
       this.shouldSendMoveTime = true;
       const oc = o.clock,
-        delay = (playing && activeColor) ? 0 : (oc.lag || 1);
+        delay = playing && activeColor ? 0 : oc.lag || 1;
       if (this.clock) this.clock.setClock(d, oc.white, oc.black, delay);
-      else if (this.corresClock) this.corresClock.update(
-        oc.white,
-        oc.black);
+      else if (this.corresClock) this.corresClock.update(oc.white, oc.black);
     }
     if (this.data.expiration) {
       if (this.data.steps.length > 2) this.data.expiration = undefined;
@@ -436,7 +483,7 @@ export default class RoundController {
       const premoveDelay = d.game.variant.key === 'atomic' ? 100 : 1;
       setTimeout(() => {
         if (!this.chessground.playPremove() && !this.playPredrop()) {
-          promotion.cancel(this);
+          this.promotion.cancel();
           this.showYourMoveNotification();
         }
       }, premoveDelay);
@@ -446,6 +493,7 @@ export default class RoundController {
     if (this.keyboardMove) this.keyboardMove.update(step, playedColor != d.player.color);
     if (this.music) this.music.jump(o);
     speech.step(step);
+    return true; // prevents default socket pubsub
   };
 
   private playPredrop = () => {
@@ -484,88 +532,94 @@ export default class RoundController {
     d.game.winner = o.winner;
     d.game.status = o.status;
     d.game.boosted = o.boosted;
-    this.userJump(round.lastPly(d));
+    this.userJump(this.lastPly());
     this.chessground.stop();
     if (o.ratingDiff) {
       d.player.ratingDiff = o.ratingDiff[d.player.color];
       d.opponent.ratingDiff = o.ratingDiff[d.opponent.color];
     }
-    if (!d.player.spectator && d.game.turns > 1)
-      li.sound[o.winner ? (d.player.color === o.winner ? 'victory' : 'defeat') : 'draw']();
+    if (!d.player.spectator && d.game.turns > 1) {
+      const key = o.winner ? (d.player.color === o.winner ? 'victory' : 'defeat') : 'draw';
+      lichess.sound.play(key);
+      if (key != 'victory' && d.game.turns > 6 && !d.tournament && !d.swiss && lichess.storage.get('courtesy') == '1')
+        this.opts.chat?.instance?.then(c => c.post('Good game, well played'));
+    }
     if (d.crazyhouse) crazyEndHook();
     this.clearJust();
     this.setTitle();
     this.moveOn.next();
     this.setQuietMode();
     this.setLoading(false);
-    if (this.clock && o.clock) this.clock.setClock(d, o.clock.wc * .01, o.clock.bc * .01);
+    if (this.clock && o.clock) this.clock.setClock(d, o.clock.wc * 0.01, o.clock.bc * 0.01);
     this.redraw();
     this.autoScroll();
     this.onChange();
-    if (d.tv) setTimeout(li.reload, 10000);
+    if (d.tv) setTimeout(lichess.reload, 10000);
     speech.status(this);
   };
 
   challengeRematch = (): void => {
     this.challengeRematched = true;
-    xhr.challengeRematch(this.data.game.id).then(() => {
-      li.challengeApp.open();
-      if (li.once('rematch-challenge')) setTimeout(() => {
-        li.hopscotch(function() {
-          window.hopscotch.configure({
-            i18n: { doneBtn: 'OK, got it' }
-          }).startTour({
-            id: "rematch-challenge",
-            showPrevButton: true,
-            steps: [{
-              title: "Challenged to a rematch",
-              content: 'Your opponent is offline, but they can accept this challenge later!',
-              target: "#challenge-app",
-              placement: "bottom"
-            }]
-          });
-        });
-      }, 1000);
-    }, _ => {
-      this.challengeRematched = false;
-    });
+    xhr.challengeRematch(this.data.game.id).then(
+      () => {
+        lichess.pubsub.emit('challenge-app.open');
+        if (lichess.once('rematch-challenge'))
+          setTimeout(() => {
+            lichess.hopscotch(function () {
+              window.hopscotch
+                .configure({
+                  i18n: { doneBtn: 'OK, got it' },
+                })
+                .startTour({
+                  id: 'rematch-challenge',
+                  showPrevButton: true,
+                  steps: [
+                    {
+                      title: 'Challenged to a rematch',
+                      content: 'Your opponent is offline, but they can accept this challenge later!',
+                      target: '#challenge-app',
+                      placement: 'bottom',
+                    },
+                  ],
+                });
+            });
+          }, 1000);
+      },
+      _ => {
+        this.challengeRematched = false;
+      }
+    );
   };
 
   private makeCorrespondenceClock = (): void => {
     if (this.data.correspondence && !this.corresClock)
-      this.corresClock = makeCorresClock(
-        this,
-        this.data.correspondence,
-        this.socket.outoftime
-      );
+      this.corresClock = makeCorresClock(this, this.data.correspondence, this.socket.outoftime);
   };
 
   private corresClockTick = (): void => {
-    if (this.corresClock && game.playable(this.data))
-      this.corresClock.tick(this.data.game.player);
+    if (this.corresClock && game.playable(this.data)) this.corresClock.tick(this.data.game.player);
   };
 
   private setQuietMode = () => {
-    const was = li.quietMode;
+    const was = lichess.quietMode;
     const is = this.isPlaying();
     if (was !== is) {
-      li.quietMode = is;
+      lichess.quietMode = is;
       $('body')
-        .toggleClass('playing', is)
-        .toggleClass('no-select',
-          is && this.clock && this.clock.millisOf(this.data.player.color) <= 3e5);
+        .toggleClass('playing', !this.data.player.spectator)
+        .toggleClass('no-select', is && this.clock && this.clock.millisOf(this.data.player.color) <= 3e5);
     }
   };
 
   takebackYes = () => {
     this.socket.sendLoading('takeback-yes');
     this.chessground.cancelPremove();
-    promotion.cancel(this);
+    this.promotion.cancel();
   };
 
-  resign = (v: boolean): void => {
+  resign = (v: boolean, immediately?: boolean): void => {
     if (v) {
-      if (this.resignConfirm || !this.data.pref.confirmResign) {
+      if (this.resignConfirm || !this.data.pref.confirmResign || immediately) {
         this.socket.sendLoading('resign');
         clearTimeout(this.resignConfirm);
       } else {
@@ -577,21 +631,22 @@ export default class RoundController {
       this.resignConfirm = undefined;
       this.redraw();
     }
-  }
+  };
 
   goBerserk = () => {
     this.socket.berserk();
-    li.sound.berserk();
+    lichess.sound.play('berserk');
   };
 
   setBerserk = (color: Color): void => {
     if (this.goneBerserk[color]) return;
     this.goneBerserk[color] = true;
-    if (color !== this.data.player.color) li.sound.berserk();
+    if (color !== this.data.player.color) lichess.sound.play('berserk');
     this.redraw();
+    $('<i data-icon="">').appendTo($(`.game__meta .player.${color} .user-link`));
   };
 
-  setLoading = (v: boolean, duration: number = 1500) => {
+  setLoading = (v: boolean, duration = 1500) => {
     clearTimeout(this.loadingTimeout);
     if (v) {
       this.loading = true;
@@ -608,6 +663,7 @@ export default class RoundController {
 
   setRedirecting = () => {
     this.redirecting = true;
+    lichess.unload.expected = true;
     setTimeout(() => {
       this.redirecting = false;
       this.redraw();
@@ -620,7 +676,7 @@ export default class RoundController {
     if (v && toSubmit) {
       if (this.moveToSubmit) this.actualSendMove('move', this.moveToSubmit);
       else this.actualSendMove('drop', this.dropToSubmit);
-      li.sound.confirmation();
+      lichess.sound.play('confirmation');
     } else this.jump(this.ply);
     this.cancelMove();
     if (toSubmit) this.setLoading(true, 300);
@@ -635,7 +691,7 @@ export default class RoundController {
     if (this.opts.onChange) setTimeout(() => this.opts.onChange(this.data), 150);
   };
 
-  private goneTick;
+  private goneTick?: number;
   setGone = (gone: number | boolean) => {
     game.setGone(this.data, this.data.opponent.color, gone);
     clearTimeout(this.goneTick);
@@ -645,18 +701,14 @@ export default class RoundController {
         if (g > 1) this.setGone(g - 1);
       }, 1000);
     this.redraw();
-  }
+  };
 
   opponentGone = (): number | boolean => {
     const d = this.data;
-    return d.opponent.gone !== false &&
-      !game.isPlayerTurn(d) &&
-      game.resignable(d) &&
-      d.opponent.gone;
-  }
+    return d.opponent.gone !== false && !game.isPlayerTurn(d) && game.resignable(d) && d.opponent.gone;
+  };
 
-  canOfferDraw = (): boolean =>
-    game.drawable(this.data) && (this.lastDrawOfferAtPly || -99) < (this.ply - 20);
+  canOfferDraw = (): boolean => game.drawable(this.data) && (this.lastDrawOfferAtPly || -99) < this.ply - 20;
 
   offerDraw = (v: boolean): void => {
     if (this.canOfferDraw()) {
@@ -665,9 +717,10 @@ export default class RoundController {
         clearTimeout(this.drawConfirm);
         this.drawConfirm = undefined;
       } else if (v) {
-        if (this.data.pref.confirmResign) this.drawConfirm = setTimeout(() => {
-          this.offerDraw(false);
-        }, 3000);
+        if (this.data.pref.confirmResign)
+          this.drawConfirm = setTimeout(() => {
+            this.offerDraw(false);
+          }, 3000);
         else this.doOfferDraw();
       }
     }
@@ -676,14 +729,14 @@ export default class RoundController {
 
   private doOfferDraw = () => {
     this.lastDrawOfferAtPly = this.ply;
-    this.socket.sendLoading('draw-yes', null)
+    this.socket.sendLoading('draw-yes', null);
   };
 
   setChessground = (cg: CgApi) => {
     this.chessground = cg;
     if (this.data.pref.keyboardMove) {
       this.keyboardMove = makeKeyboardMove(this, this.stepAt(this.ply), this.redraw);
-      li.raf(this.redraw);
+      requestAnimationFrame(() => this.redraw());
     }
   };
 
@@ -692,9 +745,10 @@ export default class RoundController {
   private delayedInit = () => {
     const d = this.data;
     if (this.isPlaying() && game.nbMoves(d, d.player.color) === 0 && !this.isSimulHost()) {
-      li.sound.genericNotify();
+      lichess.sound.play('genericNotify');
     }
-    li.requestIdleCallback(() => {
+    lichess.requestIdleCallback(() => {
+      const d = this.data;
       if (this.isPlaying()) {
         if (!d.simul) blur.init(d.steps.length > 2);
 
@@ -704,12 +758,16 @@ export default class RoundController {
         if (d.crazyhouse) crazyInit(this);
 
         window.addEventListener('beforeunload', e => {
-          if (li.hasToReload ||
+          const d = this.data;
+          if (
+            lichess.unload.expected ||
             this.nvui ||
             !game.playable(d) ||
             !d.clock ||
             d.opponent.ai ||
-            this.isSimulHost()) return;
+            this.isSimulHost()
+          )
+            return;
           this.socket.send('bye2');
           const msg = 'There is a game in progress!';
           (e || window.event).returnValue = msg;
@@ -720,8 +778,7 @@ export default class RoundController {
           window.Mousetrap.bind('esc', () => {
             this.submitMove(false);
             this.chessground.cancelMove();
-          });
-          window.Mousetrap.bind('return', () => this.submitMove(true));
+          }).bind('return', () => this.submitMove(true));
         }
         cevalSub.subscribe(this);
       }
@@ -731,6 +788,6 @@ export default class RoundController {
       speech.setup(this);
 
       this.onChange();
-    });
+    }, 800);
   };
 }

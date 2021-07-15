@@ -2,7 +2,7 @@ package lila.evalCache
 
 import reactivemongo.api.bson._
 import scala.util.{ Success, Try }
-import scalaz.NonEmptyList
+import cats.data.NonEmptyList
 
 import chess.format.Uci
 import lila.db.dsl._
@@ -20,7 +20,8 @@ private object BSONHandlers {
     private def scoreRead(str: String): Option[Score] =
       if (str startsWith "#") str.drop(1).toIntOption map { m =>
         Score mate Mate(m)
-      } else
+      }
+      else
         str.toIntOption map { c =>
           Score cp Cp(c)
         }
@@ -30,24 +31,25 @@ private object BSONHandlers {
     private val scoreSeparator = ':'
     private val pvSeparator    = '/'
     private val pvSeparatorStr = pvSeparator.toString
-    def readTry(bs: BSONValue) = bs match {
-      case BSONString(value) =>
-        Try {
-          value.split(pvSeparator).toList.map { pvStr =>
-            pvStr.split(scoreSeparator) match {
-              case Array(score, moves) =>
-                Pv(
-                  scoreRead(score) err s"Invalid score $score",
-                  movesRead(moves) err s"Invalid moves $moves"
-                )
-              case x => sys error s"Invalid PV $pvStr: ${x.toList} (in ${value})"
+    def readTry(bs: BSONValue) =
+      bs match {
+        case BSONString(value) =>
+          Try {
+            value.split(pvSeparator).toList.map { pvStr =>
+              pvStr.split(scoreSeparator) match {
+                case Array(score, moves) =>
+                  Pv(
+                    scoreRead(score) err s"Invalid score $score",
+                    movesRead(moves) err s"Invalid moves $moves"
+                  )
+                case x => sys error s"Invalid PV $pvStr: ${x.toList} (in $value)"
+              }
             }
+          }.flatMap {
+            _.toNel toTry s"Empty PVs $value"
           }
-        }.flatMap {
-          _.toNel toTry s"Empty PVs ${value}"
-        }
-      case b => lila.db.BSON.handlerBadType[NonEmptyList[Pv]](b)
-    }
+        case b => lila.db.BSON.handlerBadType[NonEmptyList[Pv]](b)
+      }
     def writeTry(x: NonEmptyList[Pv]) =
       Success(BSONString {
         x.toList.map { pv =>
@@ -57,23 +59,22 @@ private object BSONHandlers {
   }
 
   implicit val EntryIdHandler = tryHandler[Id](
-    {
-      case BSONString(value) =>
-        value split ':' match {
-          case Array(fen) => Success(Id(chess.variant.Standard, SmallFen raw fen))
-          case Array(variantId, fen) =>
-            Success(
-              Id(
-                variantId.toIntOption flatMap chess.variant.Variant.apply err s"Invalid evalcache variant $variantId",
-                SmallFen raw fen
-              )
+    { case BSONString(value) =>
+      value split ':' match {
+        case Array(fen) => Success(Id(chess.variant.Standard, SmallFen raw fen))
+        case Array(variantId, fen) =>
+          Success(
+            Id(
+              variantId.toIntOption flatMap chess.variant.Variant.apply err s"Invalid evalcache variant $variantId",
+              SmallFen raw fen
             )
-          case _ => lila.db.BSON.handlerBadValue(s"Invalid evalcache id ${value}")
-        }
+          )
+        case _ => lila.db.BSON.handlerBadValue(s"Invalid evalcache id $value")
+      }
     },
     x =>
       BSONString {
-        if (x.variant.standard || x.variant == chess.variant.FromPosition) x.smallFen.value
+        if (x.variant.standard || x.variant.fromPosition) x.smallFen.value
         else s"${x.variant.id}:${x.smallFen.value}"
       }
   )

@@ -10,4 +10,7 @@ object log {
 
     def branch(childName: String) = new Logger(name = s"$name.$childName")
   }
+
+  def http(status: Int, body: String) =
+    s"$status ${body.linesIterator.take(1).toList.headOption getOrElse "-"}"
 }

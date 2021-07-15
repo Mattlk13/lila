@@ -11,17 +11,18 @@ import controllers.routes
 
 object gamify {
 
-  def index(leaderboards: lila.mod.Gamify.Leaderboards, history: List[lila.mod.Gamify.HistoryMonth])(
-      implicit ctx: Context
+  def index(leaderboards: lila.mod.Gamify.Leaderboards, history: List[lila.mod.Gamify.HistoryMonth])(implicit
+      ctx: Context
   ) = {
     val title = "Moderator hall of fame"
-    def yearHeader(year: Int) = tr(cls := "year")(
-      th(year),
-      th("Champions of the past"),
-      th("Score"),
-      th("Actions taken"),
-      th("Reports closed")
-    )
+    def yearHeader(year: Int) =
+      tr(cls := "year")(
+        th(year),
+        th("Champions of the past"),
+        th("Score"),
+        th("Actions taken"),
+        th("Report points")
+      )
 
     views.html.base.layout(
       title = title,
@@ -60,8 +61,8 @@ object gamify {
     }
   }
 
-  def period(leaderboards: lila.mod.Gamify.Leaderboards, period: lila.mod.Gamify.Period)(
-      implicit ctx: Context
+  def period(leaderboards: lila.mod.Gamify.Leaderboards, period: lila.mod.Gamify.Period)(implicit
+      ctx: Context
   ) = {
     val title = s"Moderators of the ${period.name}"
     views.html.base.layout(
@@ -72,7 +73,7 @@ object gamify {
         views.html.mod.menu("gamify"),
         div(id := "mod-gamify", cls := "page-menu__content box")(
           h1(
-            a(href := routes.Mod.gamify, dataIcon := "I"),
+            a(href := routes.Mod.gamify, dataIcon := ""),
             title
           ),
           div(cls := "period")(
@@ -86,15 +87,14 @@ object gamify {
                 )
               ),
               tbody(
-                leaderboards(period).zipWithIndex.map {
-                  case (m, i) =>
-                    tr(
-                      th(i + 1),
-                      th(userIdLink(m.modId.some, withOnline = false)),
-                      td(m.action.localize),
-                      td(m.report.localize),
-                      td(cls := "score")(m.score.localize)
-                    )
+                leaderboards(period).zipWithIndex.map { case (m, i) =>
+                  tr(
+                    th(i + 1),
+                    th(userIdLink(m.modId.some, withOnline = false)),
+                    td(m.action.localize),
+                    td(m.report.localize),
+                    td(cls := "score")(m.score.localize)
+                  )
                 }
               )
             )
@@ -104,11 +104,11 @@ object gamify {
     }
   }
 
-  def champion(champ: Option[lila.mod.Gamify.ModMixed], img: String, period: lila.mod.Gamify.Period)(
-      implicit lang: Lang
+  def champion(champ: Option[lila.mod.Gamify.ModMixed], img: String, period: lila.mod.Gamify.Period)(implicit
+      lang: Lang
   ) =
     div(cls := "champ")(
-      st.img(src := staticUrl(s"images/mod/$img.png")),
+      st.img(src := assetUrl(s"images/mod/$img.png")),
       h2("Mod of the ", period.name),
       champ.map { m =>
         frag(
@@ -124,7 +124,7 @@ object gamify {
                 td(m.action)
               ),
               tr(
-                th("Reports closed"),
+                th("Report points"),
                 td(m.report)
               )
             )

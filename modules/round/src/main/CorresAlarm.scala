@@ -3,7 +3,7 @@ package lila.round
 import akka.stream.scaladsl._
 import org.joda.time.DateTime
 import reactivemongo.akkastream.cursorProducer
-import reactivemongo.api._
+
 import scala.concurrent.duration._
 
 import lila.common.Bus
@@ -15,7 +15,10 @@ final private class CorresAlarm(
     coll: Coll,
     hasUserId: (Game, lila.user.User.ID) => Fu[Boolean],
     proxyGame: Game.ID => Fu[Option[Game]]
-)(implicit ec: scala.concurrent.ExecutionContext, system: akka.actor.ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: akka.actor.ActorSystem
+) {
 
   private case class Alarm(
       _id: String,       // game id
@@ -25,19 +28,18 @@ final private class CorresAlarm(
 
   implicit private val AlarmHandler = reactivemongo.api.bson.Macros.handler[Alarm]
 
-  private def scheduleNext(): Unit = system.scheduler.scheduleOnce(10 seconds)(run)
+  private def scheduleNext(): Unit = system.scheduler.scheduleOnce(10 seconds) { run().unit }.unit
 
-  system.scheduler.scheduleOnce(10 seconds)(scheduleNext)
+  system.scheduler.scheduleOnce(10 seconds) { scheduleNext() }
 
-  Bus.subscribeFun("finishGame") {
-    case lila.game.actorApi.FinishGame(game, _, _) =>
-      if (game.hasCorrespondenceClock && !game.hasAi) coll.delete.one($id(game.id))
+  Bus.subscribeFun("finishGame") { case lila.game.actorApi.FinishGame(game, _, _) =>
+    if (game.hasCorrespondenceClock && !game.hasAi) coll.delete.one($id(game.id)).unit
   }
 
   Bus.subscribeFun("moveEventCorres") {
     case lila.hub.actorApi.round.CorresMoveEvent(move, _, _, alarmable, _) if alarmable =>
-      proxyGame(move.gameId) flatMap {
-        _ ?? { game =>
+      proxyGame(move.gameId) foreach {
+        _ foreach { game =>
           game.bothPlayersHaveMoved ?? {
             game.playableCorrespondenceClock ?? { clock =>
               val remainingTime = clock remainingTime game.turnColor
@@ -59,8 +61,8 @@ final private class CorresAlarm(
       }
   }
 
-  private def run(): Unit =
-    coll.ext
+  private def run(): Funit =
+    coll
       .find($doc("ringsAt" $lt DateTime.now))
       .cursor[Alarm]()
       .documentSource(200)
@@ -74,7 +76,8 @@ final private class CorresAlarm(
         } >> coll.delete.one($id(game.id))
       }
       .toMat(LilaStream.sinkCount)(Keep.right)
-      .run
+      .run()
       .mon(_.round.alarm.time)
-      .addEffectAnyway(scheduleNext)
+      .addEffectAnyway { scheduleNext() }
+      .void
 }

@@ -10,14 +10,14 @@ object UserMark {
   case object Boost     extends UserMark
   case object Engine    extends UserMark
   case object Troll     extends UserMark
-  case object Ipban     extends UserMark
   case object Reportban extends UserMark
   case object Rankban   extends UserMark
   case object Alt       extends UserMark
-  val all = List(Boost, Engine, Troll, Ipban, Reportban, Rankban, Alt)
+  val all = List(Boost, Engine, Troll, Reportban, Rankban, Alt)
   val indexed: Map[String, UserMark] = all.view.map { m =>
     m.key -> m
   }.toMap
+  val bannable: Set[UserMark]  = Set(Boost, Engine, Troll, Alt)
   implicit val markBsonHandler = stringAnyValHandler[UserMark](_.key, indexed.apply)
 }
 
@@ -26,17 +26,19 @@ case class UserMarks(value: List[UserMark]) extends AnyVal {
   def boost                 = apply(UserMark.Boost)
   def engine                = apply(UserMark.Engine)
   def troll                 = apply(UserMark.Troll)
-  def ipban                 = apply(UserMark.Ipban)
   def reportban             = apply(UserMark.Reportban)
   def rankban               = apply(UserMark.Rankban)
   def alt                   = apply(UserMark.Alt)
 
   def nonEmpty = value.nonEmpty option this
+  def dirty    = value.exists(UserMark.bannable.contains)
+  def clean    = !dirty
 
-  def set(sel: UserMark.type => UserMark, v: Boolean) = UserMarks {
-    if (v) sel(UserMark) :: value
-    else value.filter(sel(UserMark) !=)
-  }
+  def set(sel: UserMark.type => UserMark, v: Boolean) =
+    UserMarks {
+      if (v) sel(UserMark) :: value
+      else value.filter(sel(UserMark) !=)
+    }
 }
 object UserMarks {
   val empty = UserMarks(Nil)

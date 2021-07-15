@@ -2,8 +2,11 @@ package lila.notify
 
 import lila.common.LightUser
 import play.api.libs.json._
+import lila.i18n.{ I18nKeys => trans }
 
 import lila.common.Json.jodaWrites
+import play.api.i18n.Lang
+import lila.i18n.JsDump
 
 final class JSONHandlers(getLightUser: LightUser.GetterSync) {
 
@@ -30,11 +33,6 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
             "text" -> text.value
           )
         case TeamJoined(id, name) =>
-          Json.obj(
-            "id"   -> id.value,
-            "name" -> name.value
-          )
-        case TeamMadeOwner(id, name) =>
           Json.obj(
             "id"   -> id.value,
             "name" -> name.value
@@ -77,25 +75,51 @@ final class JSONHandlers(getLightUser: LightUser.GetterSync) {
       }
     }
 
-    def writes(notification: Notification) = Json.obj(
-      "content" -> writeBody(notification.content),
-      "type"    -> notification.content.key,
-      "read"    -> notification.read.value,
-      "date"    -> notification.createdAt
-    )
+    def writes(notification: Notification) =
+      Json.obj(
+        "content" -> writeBody(notification.content),
+        "type"    -> notification.content.key,
+        "read"    -> notification.read.value,
+        "date"    -> notification.createdAt
+      )
   }
 
   import lila.common.paginator.PaginatorJson._
   implicit val unreadWrites = Writes[Notification.UnreadCount] { v =>
     JsNumber(v.value)
   }
-  implicit val andUnreadWrites: Writes[Notification.AndUnread] = Json.writes[Notification.AndUnread]
+  implicit val andUnreadWrites: OWrites[Notification.AndUnread] = Json.writes[Notification.AndUnread]
 
-  implicit val newNotificationWrites: Writes[NewNotification] = new Writes[NewNotification] {
-
-    def writes(newNotification: NewNotification) = Json.obj(
+  implicit val newNotificationWrites: Writes[NewNotification] = (newNotification: NewNotification) =>
+    Json.obj(
       "notification" -> newNotification.notification,
       "unread"       -> newNotification.unreadNotifications
     )
-  }
+
+  private val i18nKeys: List[lila.i18n.MessageKey] = List(
+    trans.mentionedYouInX,
+    trans.xMentionedYouInY,
+    trans.invitedYouToX,
+    trans.xInvitedYouToY,
+    trans.youAreNowPartOfTeam,
+    trans.youHaveJoinedTeamX,
+    trans.thankYou,
+    trans.someoneYouReportedWasBanned,
+    trans.victory,
+    trans.defeat,
+    trans.draw,
+    trans.congratsYouWon,
+    trans.gameVsX,
+    trans.resVsX,
+    trans.newPendingReview,
+    trans.someoneReviewedYourCoachProfile,
+    trans.lostAgainstTOSViolator,
+    trans.refundXpointsTimeControlY,
+    trans.timeAlmostUp
+  ).map(_.key)
+
+  def apply(notify: Notification.AndUnread)(implicit lang: Lang) =
+    andUnreadWrites.writes(notify) ++ Json.obj(
+      "i18n" -> JsDump.keysToObject(i18nKeys, lang)
+    )
 }

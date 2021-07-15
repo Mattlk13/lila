@@ -1,13 +1,12 @@
 package views.html.streamer
 
+import controllers.routes
 import play.api.data.Form
 
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.String.html.richText
-
-import controllers.routes
 
 object edit extends Context.ToLang {
 
@@ -16,15 +15,12 @@ object edit extends Context.ToLang {
   def apply(
       s: lila.streamer.Streamer.WithUserAndStream,
       form: Form[_],
-      modData: Option[(List[lila.mod.Modlog], List[lila.user.Note])]
+      modData: Option[((List[lila.mod.Modlog], List[lila.user.Note]), List[lila.streamer.Streamer])]
   )(implicit ctx: Context) = {
-
-    val modsOnly = raw("Moderators only").some
 
     views.html.base.layout(
       title = s"${s.user.titleUsername} ${lichessStreamer.txt()}",
-      moreCss = cssTag("streamer.form"),
-      moreJs = jsTag("streamer.form.js")
+      moreCss = cssTag("streamer.form")
     ) {
       main(cls := "page-menu")(
         bits.menu("edit", s.withoutStream.some),
@@ -32,13 +28,18 @@ object edit extends Context.ToLang {
           if (ctx.is(s.user))
             div(cls := "streamer-header")(
               if (s.streamer.hasPicture)
-                a(target := "_blank", href := routes.Streamer.picture, title := changePicture.txt())(
+                a(
+                  targetBlank,
+                  cls := "picture-edit",
+                  href := routes.Streamer.picture,
+                  title := changePicture.txt()
+                )(
                   bits.pic(s.streamer, s.user)
                 )
               else
                 div(cls := "picture-create")(
                   ctx.is(s.user) option
-                    a(target := "_blank", cls := "button", href := routes.Streamer.picture)(
+                    a(targetBlank, cls := "button", href := routes.Streamer.picture)(
                       uploadPicture()
                     )
                 ),
@@ -47,15 +48,26 @@ object edit extends Context.ToLang {
                 bits.rules
               )
             )
-          else views.html.streamer.header(s, none),
+          else views.html.streamer.header(s),
           div(cls := "box__pad") {
             val granted = s.streamer.approval.granted
             frag(
               (ctx.is(s.user) && s.streamer.listed.value) option div(
                 cls := s"status is${granted ?? "-green"}",
-                dataIcon := (if (granted) "E" else "")
+                dataIcon := (if (granted) "" else "")
               )(
-                if (granted) approved()
+                if (granted)
+                  frag(
+                    approved(),
+                    s.streamer.approval.tier > 0 option frag(
+                      br,
+                      strong("You have been selected for frontpage featuring!"),
+                      p(
+                        "Note that we can only show a limited number of streams on the homepage, ",
+                        "so yours may not always appear."
+                      )
+                    )
+                  )
                 else
                   frag(
                     if (s.streamer.approval.requested) pendingReview()
@@ -80,40 +92,60 @@ object edit extends Context.ToLang {
                   )
                 )
               ),
-              modData.map {
-                case (log, notes) =>
-                  div(cls := "mod_log status")(
-                    strong(cls := "text", dataIcon := "!")(
-                      "Moderation history",
-                      log.isEmpty option ": nothing to show."
-                    ),
-                    log.nonEmpty option ul(
-                      log.map { e =>
-                        li(
-                          userIdLink(e.mod.some, withTitle = false),
-                          " ",
-                          b(e.showAction),
-                          " ",
-                          e.details,
-                          " ",
-                          momentFromNow(e.date)
-                        )
-                      }
-                    ),
-                    br,
-                    strong(cls := "text", dataIcon := "!")(
-                      "Moderator notes",
-                      notes.isEmpty option ": nothing to show."
-                    ),
-                    notes.nonEmpty option ul(
-                      notes.map { note =>
+              modData.map { case ((log, notes), same) =>
+                div(cls := "mod_log status")(
+                  strong(cls := "text", dataIcon := "")(
+                    "Moderation history",
+                    log.isEmpty option ": nothing to show."
+                  ),
+                  log.nonEmpty option ul(
+                    log.map { e =>
+                      li(
+                        userIdLink(e.mod.some, withTitle = false),
+                        " ",
+                        b(e.showAction),
+                        " ",
+                        e.details,
+                        " ",
+                        momentFromNow(e.date)
+                      )
+                    }
+                  ),
+                  br,
+                  strong(cls := "text", dataIcon := "")(
+                    "Moderator notes",
+                    notes.isEmpty option ": nothing to show."
+                  ),
+                  notes.nonEmpty option ul(
+                    notes.map { note =>
+                      (isGranted(_.Admin) || !note.dox) option
                         li(
                           p(cls := "meta")(userIdLink(note.from.some), " ", momentFromNow(note.date)),
                           p(cls := "text")(richText(note.text))
                         )
-                      }
-                    )
+                    }
+                  ),
+                  br,
+                  strong(cls := "text", dataIcon := "")(
+                    "Streamers with same Twitch or YouTube",
+                    same.isEmpty option ": nothing to show."
+                  ),
+                  same.nonEmpty option table(cls := "slist")(
+                    same.map { s =>
+                      tr(
+                        td(userIdLink(s.userId.some)),
+                        td(s.name),
+                        td(s.twitch.map(t => a(href := s"https://twitch.tv/${t.userId}")(t.userId))),
+                        td(
+                          s.youTube.map(t =>
+                            a(href := s"https://youtube.com/channel/${t.channelId}")(t.channelId)
+                          )
+                        ),
+                        td(momentFromNow(s.createdAt))
+                      )
+                    }
                   )
+                )
               },
               postForm(
                 cls := "form3",
@@ -124,13 +156,11 @@ object edit extends Context.ToLang {
                     form3.checkbox(
                       form("approval.granted"),
                       frag("Publish on the streamers list"),
-                      help = modsOnly,
                       half = true
                     ),
                     form3.checkbox(
                       form("approval.requested"),
                       frag("Active approval request"),
-                      help = modsOnly,
                       half = true
                     )
                   ),
@@ -138,26 +168,39 @@ object edit extends Context.ToLang {
                     form3.checkbox(
                       form("approval.chat"),
                       frag("Embed stream chat too"),
-                      help = modsOnly,
                       half = true
                     ),
                     if (granted)
-                      form3.checkbox(
-                        form("approval.featured"),
-                        frag("Feature on lichess homepage"),
-                        help = modsOnly,
+                      form3.group(
+                        form("approval.tier"),
+                        raw("Homepage tier"),
+                        help =
+                          frag("Higher tier has more chance to hit homepage. Set to zero to unfeature.").some,
                         half = true
-                      )
+                      )(form3.select(_, lila.streamer.Streamer.tierChoices))
                     else
                       form3.checkbox(
                         form("approval.ignored"),
                         frag("Ignore further approval requests"),
-                        help = modsOnly,
                         half = true
                       )
                   ),
-                  form3.action(form3.submit(trans.apply()))
+                  form3.actions(
+                    form3
+                      .submit("Approve and next")(
+                        cls := "button-green",
+                        name := "approval.quick",
+                        value := "approve"
+                      ),
+                    form3.submit("Decline and next", icon = "".some)(
+                      cls := "button-red",
+                      name := "approval.quick",
+                      value := "decline"
+                    ),
+                    form3.submit(trans.apply())
+                  )
                 ),
+                form3.globalError(form),
                 form3.split(
                   form3.group(
                     form("twitch"),
@@ -176,7 +219,7 @@ object edit extends Context.ToLang {
                   form3.group(
                     form("name"),
                     streamerName(),
-                    help = keepItShort(20).some,
+                    help = keepItShort(25).some,
                     half = true
                   )(form3.input(_)),
                   form3.checkbox(

@@ -20,7 +20,7 @@ case class FriendConfig(
 
   val strictFen = false
 
-  def >> = (variant.id, timeMode.id, time, increment, days, mode.id.some, color.name, fen.map(_.value)).some
+  def >> = (variant.id, timeMode.id, time, increment, days, mode.id.some, color.name, fen).some
 
   def isPersistent = timeMode == TimeMode.Unlimited || timeMode == TimeMode.Correspondence
 
@@ -29,7 +29,7 @@ case class FriendConfig(
 
 object FriendConfig extends BaseHumanConfig {
 
-  def <<(v: Int, tm: Int, t: Double, i: Int, d: Int, m: Option[Int], c: String, fen: Option[String]) =
+  def from(v: Int, tm: Int, t: Double, i: Int, d: Int, m: Option[Int], c: String, fen: Option[FEN]) =
     new FriendConfig(
       variant = chess.variant.Variant(v) err "Invalid game variant " + v,
       timeMode = TimeMode(tm) err s"Invalid time mode $tm",
@@ -38,7 +38,7 @@ object FriendConfig extends BaseHumanConfig {
       days = d,
       mode = m.fold(Mode.default)(Mode.orDefault),
       color = Color(c) err "Invalid color " + c,
-      fen = fen map FEN
+      fen = fen
     )
 
   val default = FriendConfig(
@@ -53,29 +53,30 @@ object FriendConfig extends BaseHumanConfig {
 
   import lila.db.BSON
   import lila.db.dsl._
-  import lila.game.BSONHandlers.FENBSONHandler
 
   implicit private[setup] val friendConfigBSONHandler = new BSON[FriendConfig] {
 
-    def reads(r: BSON.Reader): FriendConfig = FriendConfig(
-      variant = chess.variant.Variant orDefault (r int "v"),
-      timeMode = TimeMode orDefault (r int "tm"),
-      time = r double "t",
-      increment = r int "i",
-      days = r int "d",
-      mode = Mode orDefault (r int "m"),
-      color = Color.White,
-      fen = r.getO[FEN]("f") filter (_.value.nonEmpty)
-    )
+    def reads(r: BSON.Reader): FriendConfig =
+      FriendConfig(
+        variant = chess.variant.Variant orDefault (r int "v"),
+        timeMode = TimeMode orDefault (r int "tm"),
+        time = r double "t",
+        increment = r int "i",
+        days = r int "d",
+        mode = Mode orDefault (r int "m"),
+        color = Color.White,
+        fen = r.getO[FEN]("f") filter (_.value.nonEmpty)
+      )
 
-    def writes(w: BSON.Writer, o: FriendConfig) = $doc(
-      "v"  -> o.variant.id,
-      "tm" -> o.timeMode.id,
-      "t"  -> o.time,
-      "i"  -> o.increment,
-      "d"  -> o.days,
-      "m"  -> o.mode.id,
-      "f"  -> o.fen
-    )
+    def writes(w: BSON.Writer, o: FriendConfig) =
+      $doc(
+        "v"  -> o.variant.id,
+        "tm" -> o.timeMode.id,
+        "t"  -> o.time,
+        "i"  -> o.increment,
+        "d"  -> o.days,
+        "m"  -> o.mode.id,
+        "f"  -> o.fen
+      )
   }
 }

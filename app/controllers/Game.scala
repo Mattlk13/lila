@@ -3,6 +3,7 @@ package controllers
 import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
 import play.api.mvc._
+import scala.util.chaining._
 
 import lila.api.GameApiV2
 import lila.app._
@@ -15,56 +16,62 @@ final class Game(
     apiC: => Api
 ) extends LilaController(env) {
 
-  def delete(gameId: String) = Auth { implicit ctx => me =>
-    OptionFuResult(env.game.gameRepo game gameId) { game =>
-      if (game.pgnImport.flatMap(_.user) ?? (me.id ==)) {
-        env.hub.bookmark ! lila.hub.actorApi.bookmark.Remove(game.id)
-        (env.game.gameRepo remove game.id) >>
-          (env.analyse.analysisRepo remove game.id) >>
-          env.game.cached.clearNbImportedByCache(me.id) inject
-          Redirect(routes.User.show(me.username))
-      } else
-        fuccess {
-          Redirect(routes.Round.watcher(game.id, game.firstColor.name))
-        }
+  def bookmark(gameId: String) =
+    Auth { implicit ctx => me =>
+      env.bookmark.api.toggle(gameId, me.id)
     }
-  }
 
-  def exportOne(id: String) = Open { implicit ctx =>
-    OptionFuResult(env.game.gameRepo game id) { game =>
-      if (game.playable)
-        BadRequest("Only bots can access their games in progress. See https://lichess.org/api#tag/Chess-Bot").fuccess
-      else {
-        val config = GameApiV2.OneConfig(
-          format = if (HTTPRequest acceptsJson ctx.req) GameApiV2.Format.JSON else GameApiV2.Format.PGN,
-          imported = getBool("imported"),
-          flags = requestPgnFlags(ctx.req, extended = true)
-        )
+  def delete(gameId: String) =
+    Auth { implicit ctx => me =>
+      OptionFuResult(env.game.gameRepo game gameId) { game =>
+        if (game.pgnImport.flatMap(_.user) ?? (me.id.==)) {
+          env.hub.bookmark ! lila.hub.actorApi.bookmark.Remove(game.id)
+          (env.game.gameRepo remove game.id) >>
+            (env.analyse.analysisRepo remove game.id) >>
+            env.game.cached.clearNbImportedByCache(me.id) inject
+            Redirect(routes.User.show(me.username))
+        } else
+          fuccess {
+            Redirect(routes.Round.watcher(game.id, game.naturalOrientation.name))
+          }
+      }
+    }
+
+  def exportOne(id: String) = Action.async { exportGame(id, _) }
+
+  private[controllers] def exportGame(gameId: GameModel.ID, req: RequestHeader): Fu[Result] =
+    env.round.proxyRepo.gameIfPresent(gameId) orElse env.game.gameRepo.game(gameId) flatMap {
+      case None => NotFound.fuccess
+      case Some(game) =>
         lila.mon.export.pgn.game.increment()
+        val config = GameApiV2.OneConfig(
+          format = if (HTTPRequest acceptsJson req) GameApiV2.Format.JSON else GameApiV2.Format.PGN,
+          imported = getBool("imported", req),
+          flags = requestPgnFlags(req, extended = true),
+          playerFile = get("players", req)
+        )
         env.api.gameApiV2.exportOne(game, config) flatMap { content =>
           env.api.gameApiV2.filename(game, config.format) map { filename =>
             Ok(content)
+              .pipe(asAttachment(filename))
               .withHeaders(
-                CONTENT_DISPOSITION -> s"attachment; filename=$filename"
-              )
-              .withHeaders(
-                lila.app.http.ResponseHeaders.headersForApiOrApp(ctx.req): _*
+                lila.app.http.ResponseHeaders.headersForApiOrApp(req): _*
               ) as gameContentType(config)
           }
         }
-      }
     }
-  }
 
-  def exportByUser(username: String) = OpenOrScoped()(
-    open = ctx => handleExport(username, ctx.me, ctx.req, oauth = false),
-    scoped = req => me => handleExport(username, me.some, req, oauth = true)
-  )
+  def exportByUser(username: String) =
+    OpenOrScoped()(
+      open = ctx => handleExport(username, ctx.me, ctx.req, oauth = false),
+      scoped = req => me => handleExport(username, me.some, req, oauth = true)
+    )
 
-  def apiExportByUser(username: String) = AnonOrScoped()(
-    anon = req => handleExport(username, none, req, oauth = false),
-    scoped = req => me => handleExport(username, me.some, req, oauth = true)
-  )
+  def apiExportByUser(username: String) =
+    AnonOrScoped()(
+      anon = req => handleExport(username, none, req, oauth = false),
+      scoped = req => me => handleExport(username, me.some, req, oauth = true)
+    )
 
   private def handleExport(username: String, me: Option[lila.user.User], req: RequestHeader, oauth: Boolean) =
     env.user.repo named username flatMap {
@@ -79,28 +86,23 @@ final class Game(
             until = getLong("until", req) map { new DateTime(_) },
             max = getInt("max", req) map (_ atLeast 1),
             rated = getBoolOpt("rated", req),
-            perfType = ~get("perfType", req) split "," flatMap { lila.rating.PerfType(_) } toSet,
-            color = get("color", req) flatMap chess.Color.apply,
+            perfType = (~get("perfType", req) split "," flatMap { lila.rating.PerfType(_) }).toSet,
+            color = get("color", req) flatMap chess.Color.fromName,
             analysed = getBoolOpt("analysed", req),
-            ongoing = getBool("ongoing", req),
-            flags = requestPgnFlags(req, extended = false).copy(
-              literate = false
-            ),
+            flags = requestPgnFlags(req, extended = false).copy(literate = false),
             perSecond = MaxPerSecond(me match {
-              case Some(m) if m is user.id => 50
-              case Some(_) if oauth        => 25 // bonus for oauth logged in only (not for CSRF)
-              case _                       => 15
-            })
+              case Some(m) if m is user.id => 60
+              case Some(_) if oauth        => 30 // bonus for oauth logged in only (not for CSRF)
+              case _                       => 20
+            }),
+            playerFile = get("players", req)
           )
           val date = DateTimeFormat forPattern "yyyy-MM-dd" print new DateTime
           apiC
             .GlobalConcurrencyLimitPerIpAndUserOption(req, me)(env.api.gameApiV2.exportByUser(config)) {
               source =>
                 Ok.chunked(source)
-                  .withHeaders(
-                    noProxyBufferHeader,
-                    CONTENT_DISPOSITION -> s"attachment; filename=lichess_${user.username}_$date.${format.toString.toLowerCase}"
-                  )
+                  .pipe(asAttachmentStream(s"lichess_${user.username}_$date.${format.toString.toLowerCase}"))
                   .as(gameContentType(config))
             }
             .fuccess
@@ -108,25 +110,23 @@ final class Game(
       }
     }
 
-  def exportByIds = Action.async(parse.tolerantText) { req =>
-    val config = GameApiV2.ByIdsConfig(
-      ids = req.body.split(',').view.take(300).toSeq,
-      format = GameApiV2.Format byRequest req,
-      flags = requestPgnFlags(req, extended = false),
-      perSecond = MaxPerSecond(20)
-    )
-    apiC
-      .GlobalConcurrencyLimitPerIP(HTTPRequest lastRemoteAddress req)(
-        env.api.gameApiV2.exportByIds(config)
-      ) { source =>
-        Ok.chunked(source)
-          .withHeaders(
-            noProxyBufferHeader
-          )
-          .as(gameContentType(config))
-      }
-      .fuccess
-  }
+  def exportByIds =
+    Action.async(parse.tolerantText) { req =>
+      val config = GameApiV2.ByIdsConfig(
+        ids = req.body.split(',').view.take(300).toSeq,
+        format = GameApiV2.Format byRequest req,
+        flags = requestPgnFlags(req, extended = false),
+        perSecond = MaxPerSecond(30),
+        playerFile = get("players", req)
+      )
+      apiC
+        .GlobalConcurrencyLimitPerIP(HTTPRequest ipAddress req)(
+          env.api.gameApiV2.exportByIds(config)
+        ) { source =>
+          noProxyBuffer(Ok.chunked(source)).as(gameContentType(config))
+        }
+        .fuccess
+    }
 
   private def WithVs(req: RequestHeader)(f: Option[lila.user.User] => Fu[Result]): Fu[Result] =
     get("vs", req) match {
@@ -146,17 +146,19 @@ final class Game(
       evals = getBoolOpt("evals", req) | extended,
       opening = getBoolOpt("opening", req) | extended,
       literate = getBoolOpt("literate", req) | false,
-      pgnInJson = getBoolOpt("pgnInJson", req) | false
+      pgnInJson = getBoolOpt("pgnInJson", req) | false,
+      delayMoves = !get("key", req).exists(env.noDelaySecretSetting.get().value.contains)
     )
 
-  private[controllers] def gameContentType(config: GameApiV2.Config) = config.format match {
-    case GameApiV2.Format.PGN => pgnContentType
-    case GameApiV2.Format.JSON =>
-      config match {
-        case _: GameApiV2.OneConfig => JSON
-        case _                      => ndJsonContentType
-      }
-  }
+  private[controllers] def gameContentType(config: GameApiV2.Config) =
+    config.format match {
+      case GameApiV2.Format.PGN => pgnContentType
+      case GameApiV2.Format.JSON =>
+        config match {
+          case _: GameApiV2.OneConfig => JSON
+          case _                      => ndJsonContentType
+        }
+    }
 
   private[controllers] def preloadUsers(game: GameModel): Funit =
     env.user.lightUserApi preloadMany game.userIds

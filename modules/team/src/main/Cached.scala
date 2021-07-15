@@ -28,7 +28,11 @@ final class Cached(
   private val teamIdsCache = cacheApi.sync[User.ID, Team.IdsStr](
     name = "team.ids",
     initialCapacity = 65536,
-    compute = u => memberRepo.teamIdsByUser(u).dmap(Team.IdsStr.apply),
+    compute = u =>
+      for {
+        teamIds <- memberRepo.teamIdsByUser(u)
+        enabled <- teamRepo.filterEnabled(teamIds take 100)
+      } yield Team.IdsStr(enabled),
     default = _ => Team.IdsStr.empty,
     strategy = Syncache.WaitAfterUptime(20 millis),
     expireAfter = Syncache.ExpireAfterWrite(1 hour)
@@ -44,7 +48,17 @@ final class Cached(
     _.expireAfterAccess(25 minutes)
       .maximumSize(65536)
       .buildAsyncFuture[User.ID, Int] { userId =>
-        teamRepo teamIdsByCreator userId flatMap requestRepo.countByTeams,
+        teamIds(userId) flatMap { ids =>
+          ids.value.nonEmpty ?? teamRepo.countRequestsOfLeader(userId, requestRepo.coll)
+        }
       }
   }
+
+  val leaders = cacheApi[Team.ID, Set[User.ID]](128, "team.leaders") {
+    _.expireAfterWrite(1 minute)
+      .buildAsyncFuture(teamRepo.leadersOf)
+  }
+
+  def isLeader(teamId: Team.ID, userId: User.ID): Fu[Boolean] =
+    leaders.get(teamId).dmap(_ contains userId)
 }

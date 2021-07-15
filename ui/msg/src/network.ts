@@ -15,11 +15,13 @@ export function loadContacts(): Promise<MsgData> {
 }
 
 export function search(q: string): Promise<SearchResult> {
-  return json(`/inbox/search?q=${q}`)
-    .then(res => ({
-      ...res,
-      contacts: res.contacts.map(upgradeContact)
-    } as SearchResult));
+  return json(`/inbox/search?q=${q}`).then(
+    res =>
+      ({
+        ...res,
+        contacts: res.contacts.map(upgradeContact),
+      } as SearchResult)
+  );
 }
 
 export function block(u: string) {
@@ -31,8 +33,7 @@ export function unblock(u: string) {
 }
 
 export function del(u: string): Promise<MsgData> {
-  return json(`/inbox/${u}`, { method: 'delete' })
-    .then(upgradeData);
+  return json(`/inbox/${u}`, { method: 'delete' }).then(upgradeData);
 }
 
 export function report(name: string, text: string): Promise<any> {
@@ -41,29 +42,29 @@ export function report(name: string, text: string): Promise<any> {
     body: form({
       username: name,
       text: text,
-      resource: 'msg'
-    })
+      resource: 'msg',
+    }),
   });
 }
 
 export function post(dest: string, text: string) {
-  window.lichess.pubsub.emit('socket.send', 'msgSend', { dest, text });
+  lichess.pubsub.emit('socket.send', 'msgSend', { dest, text });
 }
 
 export function setRead(dest: string) {
-  window.lichess.pubsub.emit('socket.send', 'msgRead', dest);
+  lichess.pubsub.emit('socket.send', 'msgRead', dest);
 }
 
 export function typing(dest: string) {
-  window.lichess.pubsub.emit('socket.send', 'msgType', dest);
+  lichess.pubsub.emit('socket.send', 'msgType', dest);
 }
 
 export function websocketHandler(ctrl: MsgCtrl) {
-  const listen = window.lichess.pubsub.on;
+  const listen = lichess.pubsub.on;
   listen('socket.in.msgNew', msg => {
     ctrl.receive({
       ...upgradeMsg(msg),
-      read: false
+      read: false,
     });
   });
   listen('socket.in.msgType', ctrl.receiveTyping);
@@ -90,32 +91,32 @@ export function upgradeData(d: any): MsgData {
   return {
     ...d,
     convo: d.convo && upgradeConvo(d.convo),
-    contacts: d.contacts.map(upgradeContact)
+    contacts: d.contacts.map(upgradeContact),
   };
 }
 function upgradeMsg(m: any): Msg {
   return {
     ...m,
-    date: new Date(m.date)
+    date: new Date(m.date),
   };
 }
 function upgradeUser(u: any): User {
   return {
     ...u,
-    id: u.name.toLowerCase()
+    id: u.name.toLowerCase(),
   };
 }
 function upgradeContact(c: any): Contact {
   return {
     ...c,
     user: upgradeUser(c.user),
-    lastMsg: upgradeMsg(c.lastMsg)
+    lastMsg: upgradeMsg(c.lastMsg),
   };
 }
 function upgradeConvo(c: any): Convo {
   return {
     ...c,
     user: upgradeUser(c.user),
-    msgs: c.msgs.map(upgradeMsg)
+    msgs: c.msgs.map(upgradeMsg),
   };
 }

@@ -11,18 +11,31 @@
     "chess",
     "lichess"
   ],
-  "author": "Thibault Duplessis",
-  "license": "AGPL-3.0",
+  "author": "Thibault Duplessis and the gang",
+  "license": "AGPL-3.0-or-later",
   "bugs": {
     "url": "https://github.com/ornicar/lila/issues"
   },
   "homepage": "https://lichess.org",
   "engines": {
-    "node": ">=10"
+    "node": ">=10 <16",
+    "yarn": "^1"
   },
   "dependencies": {
-    "fs-extra": "^4.0.2",
-    "xml2js": "^0.4.19"
+    "prettier": "2.3.1",
+    "xml2js": "0.4.23"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.27.0",
+    "@typescript-eslint/parser": "^4.27.0",
+    "eslint": "^7.29.0",
+    "eslint-config-prettier": "^8.1.0",
+    "rollup-plugin-analyzer": "^4.0.0"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "check-format": "prettier --check .",
+    "lint": "eslint . --ext .ts"
   },
   "workspaces": [
     "ui",
@@ -48,15 +61,18 @@
     "ui/serviceWorker",
     "ui/simul",
     "ui/site",
+    "ui/swiss",
     "ui/tournament",
     "ui/tournamentSchedule",
     "ui/tournamentCalendar",
     "ui/tree",
     "ui/msg",
-    "ui/@build/cssProject",
-    "ui/@build/jsProject",
-    "ui/@build/tsProject",
-    "ui/@build/tsPlugins",
-    "ui/@types/lichess"
+    "ui/dgt",
+    "ui/puz",
+    "ui/storm",
+    "ui/racer",
+    "ui/@build/rollupProject",
+    "ui/@types/lichess",
+    "ui/@types/cash"
   ]
 }

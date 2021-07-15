@@ -10,32 +10,37 @@ case class Event(
     title: String,
     headline: String,
     description: Option[String],
-    homepageHours: Int,
+    homepageHours: Double,
     url: String,
     lang: Lang,
     enabled: Boolean,
     createdBy: Event.UserId,
     createdAt: DateTime,
+    updatedBy: Option[Event.UserId],
+    updatedAt: Option[DateTime],
     startsAt: DateTime,
     finishesAt: DateTime,
-    hostedBy: Option[User.ID] = None
+    hostedBy: Option[User.ID] = None,
+    icon: Option[String] = None,
+    countdown: Boolean
 ) {
 
-  def willStartLater = startsAt isAfter DateTime.now
+  def willStartLater = startsAt.isAfterNow
 
-  def secondsToStart = willStartLater option {
-    (startsAt.getSeconds - nowSeconds).toInt
-  }
+  def secondsToStart =
+    willStartLater option {
+      (startsAt.getSeconds - nowSeconds).toInt
+    }
 
-  def featureSince = startsAt minusHours homepageHours
+  def featureSince = startsAt minusMinutes (homepageHours * 60).toInt
 
-  def featureNow = featureSince.isBefore(DateTime.now) && !isFinishedSoon
+  def featureNow = featureSince.isBeforeNow && !isFinishedSoon
 
   def isFinishedSoon = finishesAt.isBefore(DateTime.now plusMinutes 5)
 
-  def isFinished = finishesAt.isBefore(DateTime.now)
+  def isFinished = finishesAt.isBeforeNow
 
-  def isNow = startsAt.isBefore(DateTime.now) && !isFinished
+  def isNow = startsAt.isBeforeNow && !isFinished
 
   def isNowOrSoon = startsAt.isBefore(DateTime.now plusMinutes 10) && !isFinished
 
@@ -44,7 +49,7 @@ case class Event(
 
 object Event {
 
-  def makeId = ornicar.scalalib.Random nextString 8
+  def makeId = lila.common.ThreadLocalRandom nextString 8
 
   case class UserId(value: String) extends AnyVal
 }

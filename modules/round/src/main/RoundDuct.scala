@@ -1,5 +1,7 @@
 package lila.round
 
+import actorApi._, round._
+import chess.{ Black, Centis, Color, White }
 import org.joda.time.DateTime
 import ornicar.scalalib.Zero
 import play.api.libs.json._
@@ -7,11 +9,6 @@ import scala.concurrent.duration._
 import scala.concurrent.Promise
 import scala.util.chaining._
 
-import actorApi._, round._
-import chess.{ Black, Centis, Color, White }
-import lila.chat.Chat
-import lila.common.Bus
-import lila.game.actorApi.UserStartGame
 import lila.game.Game.{ FullId, PlayerId }
 import lila.game.{ Game, GameRepo, Pov, Event, Progress, Player => GamePlayer }
 import lila.hub.actorApi.round.{
@@ -26,7 +23,6 @@ import lila.hub.actorApi.round.{
 }
 import lila.hub.Duct
 import lila.room.RoomSocket.{ Protocol => RP, _ }
-import lila.socket.RemoteSocket.{ Protocol => _, _ }
 import lila.socket.Socket.{ makeMessage, GetVersion, SocketVersion }
 import lila.socket.UserLagCache
 import lila.user.User
@@ -35,8 +31,10 @@ final private[round] class RoundDuct(
     dependencies: RoundDuct.Dependencies,
     gameId: Game.ID,
     socketSend: String => Unit
-)(implicit ec: scala.concurrent.ExecutionContext, proxy: GameProxy)
-    extends Duct {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    proxy: GameProxy
+) extends Duct {
 
   import RoundSocket.Protocol
   import RoundDuct._
@@ -46,19 +44,16 @@ final private[round] class RoundDuct(
 
   private var version = SocketVersion(0)
 
-  private var mightBeSimul = true // until proven false
-  private var chatIds = ChatIds(
-    priv = Left(Chat.Id(gameId)), // until replaced with tourney/simul chat
-    pub = Chat.Id(s"$gameId/w")
-  )
+  private var mightBeSimul = true // until proven otherwise
 
   final private class Player(color: Color) {
 
     private var offlineSince: Option[Long] = nowMillis.some
     // wether the player closed the window intentionally
-    private var bye: Boolean = false
-    // connected as a bot
-    private var botConnected: Boolean = false
+    private var bye: Boolean        = false
+    private var botConnections: Int = 0
+
+    def botConnected = botConnections > 0
 
     var userId     = none[User.ID]
     var goneWeight = 1f
@@ -66,7 +61,7 @@ final private[round] class RoundDuct(
     def isOnline = offlineSince.isEmpty || botConnected
 
     def setOnline(on: Boolean): Unit = {
-      isLongGone foreach { _ ?? notifyGone(color, false) }
+      isLongGone foreach { _ ?? notifyGone(color, gone = false) }
       offlineSince = if (on) None else offlineSince orElse nowMillis.some
       bye = bye && !on
     }
@@ -84,7 +79,7 @@ final private[round] class RoundDuct(
             RoundSocket.povDisconnectTimeout(g pov color)
           } | RoundSocket.disconnectTimeout
       }.toMillis * goneWeight
-      base atLeast RoundSocket.ragequitTimeout.toMillis
+      base atLeast RoundSocket.ragequitTimeout.toMillis.toFloat
     }.toLong
 
     def isLongGone: Fu[Boolean] = {
@@ -105,9 +100,7 @@ final private[round] class RoundDuct(
       }
 
     def setBotConnected(v: Boolean) =
-      botConnected = v
-
-    def isBotConnected = botConnected
+      botConnections = Math.max(0, botConnections + (if (v) 1 else -1))
   }
 
   private val whitePlayer = new Player(White)
@@ -123,10 +116,8 @@ final private[round] class RoundDuct(
         whitePlayer.userId = game.player(White).userId
         blackPlayer.userId = game.player(Black).userId
         mightBeSimul = game.isSimul
-        chatIds = chatIds update game
         whitePlayer.goneWeight = whiteGoneWeight
         blackPlayer.goneWeight = blackGoneWeight
-        buscriptions.chat()
         if (game.playableByAi) player.requestFishnet(game, this)
       }
 
@@ -135,7 +126,7 @@ final private[round] class RoundDuct(
     case ByePlayer(playerId) =>
       proxy.withPov(playerId) {
         _ ?? { pov =>
-          fuccess(getPlayer(pov.color).setBye)
+          fuccess(getPlayer(pov.color).setBye())
         }
       }
 
@@ -160,15 +151,14 @@ final private[round] class RoundDuct(
       }
 
     case GetSocketStatus(promise) =>
-      whitePlayer.isLongGone zip blackPlayer.isLongGone map {
-        case (whiteIsGone, blackIsGone) =>
-          promise success SocketStatus(
-            version = version,
-            whiteOnGame = whitePlayer.isOnline,
-            whiteIsGone = whiteIsGone,
-            blackOnGame = blackPlayer.isOnline,
-            blackIsGone = blackIsGone
-          )
+      whitePlayer.isLongGone zip blackPlayer.isLongGone map { case (whiteIsGone, blackIsGone) =>
+        promise success SocketStatus(
+          version = version,
+          whiteOnGame = whitePlayer.isOnline,
+          whiteIsGone = whiteIsGone,
+          blackOnGame = blackPlayer.isOnline,
+          blackIsGone = blackIsGone
+        )
       }
 
     case HasUserId(userId, promise) =>
@@ -179,33 +169,13 @@ final private[round] class RoundDuct(
         }
       }
 
-    // chat
-    case lila.chat.actorApi.ChatLine(chatId, line) =>
+    case lila.chat.actorApi.RoundLine(line, watcher) =>
       fuccess {
         publish(List(line match {
-          case l: lila.chat.UserLine   => Event.UserMessage(l, chatId == chatIds.pub)
+          case l: lila.chat.UserLine   => Event.UserMessage(l, watcher)
           case l: lila.chat.PlayerLine => Event.PlayerMessage(l)
         }))
       }
-    case lila.chat.actorApi.OnTimeout(userId) =>
-      fuccess {
-        socketSend(RP.Out.tellRoom(roomId, makeMessage("chat_timeout", userId)))
-      }
-    case lila.chat.actorApi.OnReinstate(userId) =>
-      fuccess {
-        socketSend(RP.Out.tellRoom(roomId, makeMessage("chat_reinstate", userId)))
-      }
-
-    case Protocol.In.PlayerChatSay(_, Right(color), msg) =>
-      fuccess {
-        chatIds.priv.left.toOption foreach { messenger.owner(_, color, msg) }
-      }
-    case Protocol.In.PlayerChatSay(_, Left(userId), msg) =>
-      fuccess(chatIds.priv match {
-        case Left(chatId) => messenger.owner(chatId, userId, msg)
-        case Right(setup) => messenger.external(setup, userId, msg)
-      })
-    // chat end
 
     case Protocol.In.HoldAlert(fullId, ip, mean, sd) =>
       handle(fullId.playerId) { pov =>
@@ -222,16 +192,6 @@ final private[round] class RoundDuct(
         } inject Nil
       }
 
-    case Protocol.In.UserTv(_, userId) =>
-      fuccess {
-        buscriptions tv userId
-      }
-
-    case UserStartGame(userId, _) =>
-      fuccess {
-        socketSend(Protocol.Out.userTvNewGame(Game.Id(gameId), userId))
-      }
-
     case a: lila.analyse.actorApi.AnalysisProgress =>
       fuccess {
         socketSend(
@@ -243,13 +203,10 @@ final private[round] class RoundDuct(
                 "analysis" -> lila.analyse.JsonView.bothPlayers(a.game, a.analysis),
                 "tree" -> lila.tree.Node.minimalNodeJsonWriter.writes {
                   TreeBuilder(
-                    id = a.analysis.id,
-                    pgnMoves = a.game.pgnMoves,
-                    variant = a.variant,
-                    analysis = a.analysis.some,
-                    initialFen = a.initialFen,
-                    withFlags = JsonView.WithFlags(),
-                    clocks = none
+                    a.game,
+                    a.analysis.some,
+                    a.initialFen,
+                    JsonView.WithFlags()
                   )
                 }
               )
@@ -310,16 +267,17 @@ final private[round] class RoundDuct(
         pov.game.resignable ?? finisher.other(pov.game, _.Resign, Some(!pov.color))
       }
 
-    case GoBerserk(color) =>
+    case GoBerserk(color, promise) =>
       handle(color) { pov =>
-        pov.game.goBerserk(color) ?? { progress =>
+        val berserked = pov.game.goBerserk(color)
+        berserked.?? { progress =>
           proxy.save(progress) >> gameRepo.goBerserk(pov) inject progress.events
-        }
+        } >>- promise.success(berserked.isDefined)
       }
 
     case ResignForce(playerId) =>
       handle(playerId) { pov =>
-        (pov.game.resignable && !pov.game.hasAi && pov.game.hasClock && !pov.isMyTurn && pov.forceResignable && pov.game.bothPlayersHaveMoved) ?? {
+        (pov.game.resignable && !pov.game.hasAi && pov.game.hasClock && !pov.isMyTurn) ?? {
           getPlayer(!pov.color).isLongGone flatMap {
             case true =>
               finisher.rageQuit(
@@ -339,6 +297,11 @@ final private[round] class RoundDuct(
             case _    => fuccess(List(Event.Reload))
           }
         }
+      }
+
+    case AbortForce =>
+      handle { game =>
+        game.playable ?? finisher.abortForce(game)
       }
 
     // checks if any player can safely (grace) be flagged
@@ -391,24 +354,22 @@ final private[round] class RoundDuct(
 
     case TakebackYes(playerId) =>
       handle(playerId) { pov =>
-        takebacker.yes(~takebackSituation)(pov) map {
-          case (events, situation) =>
-            takebackSituation = situation.some
-            events
+        takebacker.yes(~takebackSituation)(pov) map { case (events, situation) =>
+          takebackSituation = situation.some
+          events
         }
       }
     case TakebackNo(playerId) =>
       handle(playerId) { pov =>
-        takebacker.no(~takebackSituation)(pov) map {
-          case (events, situation) =>
-            takebackSituation = situation.some
-            events
+        takebacker.no(~takebackSituation)(pov) map { case (events, situation) =>
+          takebackSituation = situation.some
+          events
         }
       }
 
-    case Moretime(playerId) =>
+    case Moretime(playerId, duration) =>
       handle(playerId) { pov =>
-        moretimer(pov) flatMap {
+        moretimer(pov, duration) flatMap {
           _ ?? { progress =>
             proxy save progress inject progress.events
           }
@@ -419,7 +380,7 @@ final private[round] class RoundDuct(
       handle { game =>
         forecastApi.nextMove(game, lastMove) map { mOpt =>
           mOpt foreach { move =>
-            this ! HumanPlay(PlayerId(game.player.id), move, false)
+            this ! HumanPlay(PlayerId(game.player.id), move, blur = false)
           }
           Nil
         }
@@ -444,19 +405,31 @@ final private[round] class RoundDuct(
       handle { game =>
         game.playable ?? {
           messenger.system(game, "Lichess has been updated! Sorry for the inconvenience.")
-          val progress = moretimer.give(game, Color.all, MoretimeDuration(20 seconds))
+          val progress = moretimer.give(game, Color.all, 20 seconds)
           proxy save progress inject progress.events
         }
       }
 
-    case AbortForce =>
-      handle { game =>
-        game.playable ?? finisher.other(game, _.Aborted, None)
+    case BotConnected(color, v) =>
+      fuccess {
+        getPlayer(color) setBotConnected v
       }
 
     case NoStart =>
       handle { game =>
-        game.timeBeforeExpiration.exists(_.centis == 0) ?? finisher.noStart(game)
+        game.timeBeforeExpiration.exists(_.centis == 0) ?? {
+          if (game.isSwiss) game.startClock ?? { g =>
+            proxy save g inject List(Event.Reload)
+          }
+          else finisher.noStart(game)
+        }
+      }
+
+    case StartClock =>
+      handle { game =>
+        game.startClock ?? { g =>
+          proxy save g inject List(Event.Reload)
+        }
       }
 
     case FishnetStart =>
@@ -471,8 +444,8 @@ final private[round] class RoundDuct(
             if (!getPlayer(c).isOnline && getPlayer(!c).isOnline) {
               getPlayer(c).showMillisToGone foreach {
                 _ ?? { millis =>
-                  if (millis <= 0) notifyGone(c, true)
-                  else if (g.clock.exists(_.remainingTime(c).millis > millis + 3000)) notifyGoneIn(c, millis)
+                  if (millis <= 0) notifyGone(c, gone = true)
+                  else g.clock.exists(_.remainingTime(c).millis > millis + 3000) ?? notifyGoneIn(c, millis)
                 }
               }
             }
@@ -480,37 +453,7 @@ final private[round] class RoundDuct(
         }
       } | funit
 
-    case Stop =>
-      fuccess {
-        if (buscriptions.started) {
-          buscriptions.unsubAll
-          socketSend(RP.Out.stop(roomId))
-        }
-      }
-  }
-
-  private object buscriptions {
-
-    private var chans = Set.empty[String]
-
-    private def sub(chan: String) =
-      if (!chans(chan)) {
-        Bus.subscribe(RoundDuct.this, chan)
-        chans = chans + chan
-      }
-
-    def started = chans.nonEmpty
-
-    def unsubAll() = {
-      Bus.unsubscribe(RoundDuct.this, chans)
-      chans = Set.empty
-    }
-
-    def tv(userId: User.ID): Unit = sub(s"userStartGame:$userId")
-
-    def chat() = chatIds.allIds foreach { chatId =>
-      sub(lila.chat.Chat chanOf chatId)
-    }
+    case Stop => proxy.terminate() >>- socketSend(RP.Out.stop(roomId))
   }
 
   private def getPlayer(color: Color): Player = color.fold(whitePlayer, blackPlayer)
@@ -526,17 +469,19 @@ final private[round] class RoundDuct(
       } UserLagCache.put(user, lag)
     }
 
-  private def notifyGone(color: Color, gone: Boolean): Unit = proxy.withPov(color) { pov =>
-    fuccess {
-      socketSend(Protocol.Out.gone(FullId(pov.fullId), gone))
+  private def notifyGone(color: Color, gone: Boolean): Funit =
+    proxy.withPov(color) { pov =>
+      fuccess {
+        socketSend(Protocol.Out.gone(FullId(pov.fullId), gone))
+      }
     }
-  }
 
-  private def notifyGoneIn(color: Color, millis: Long): Unit = proxy.withPov(color) { pov =>
-    fuccess {
-      socketSend(Protocol.Out.goneIn(FullId(pov.fullId), millis))
+  private def notifyGoneIn(color: Color, millis: Long): Funit =
+    proxy.withPov(color) { pov =>
+      fuccess {
+        socketSend(Protocol.Out.goneIn(FullId(pov.fullId), millis))
+      }
     }
-  }
 
   private def handle(op: Game => Fu[Events]): Funit =
     proxy.withGame { g =>
@@ -567,28 +512,30 @@ final private[round] class RoundDuct(
 
   private def publish[A](events: Events): Unit =
     if (events.nonEmpty) {
-      events map { e =>
+      events foreach { e =>
         version = version.inc
         socketSend {
           Protocol.Out.tellVersion(roomId, version, e)
         }
       }
-      if (events exists {
-            case e: Event.Move => e.threefold
-            case _             => false
-          }) this ! Threefold
+      if (
+        events exists {
+          case e: Event.Move => e.threefold
+          case _             => false
+        }
+      ) this ! Threefold
     }
 
   private def errorHandler(name: String): PartialFunction[Throwable, Unit] = {
     case e: ClientError =>
       logger.info(s"Round client error $name: ${e.getMessage}")
-      lila.mon.round.error.client.increment()
+      lila.mon.round.error.client.increment().unit
     case e: FishnetError =>
       logger.info(s"Round fishnet error $name: ${e.getMessage}")
-      lila.mon.round.error.fishnet.increment()
+      lila.mon.round.error.fishnet.increment().unit
     case e: Exception =>
       logger.warn(s"$name: ${e.getMessage}")
-      lila.mon.round.error.other.increment()
+      lila.mon.round.error.other.increment().unit
   }
 
   def roomId = RoomId(gameId)
@@ -602,14 +549,6 @@ object RoundDuct {
   case object Stop
   case object WsBoot
   case class LilaStop(promise: Promise[Unit])
-
-  case class ChatIds(priv: Either[Chat.Id, Chat.Setup], pub: Chat.Id) {
-    def allIds = Seq(priv.fold(identity, _.id), pub)
-    def update(g: Game) = {
-      g.tournamentId.map(Chat.tournamentSetup) orElse
-        g.simulId.map(Chat.simulSetup)
-    }.fold(this)(setup => copy(priv = Right(setup)))
-  }
 
   private[round] case class TakebackSituation(nbDeclined: Int, lastDeclined: Option[DateTime]) {
 

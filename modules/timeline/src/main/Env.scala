@@ -22,7 +22,10 @@ final class Env(
     userRepo: lila.user.UserRepo,
     relationApi: lila.relation.RelationApi,
     cacheApi: lila.memo.CacheApi
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem
+) {
 
   private val config = appConfig.get[TimelineConfig]("timeline")(AutoConfig.loader)
 
@@ -49,7 +52,7 @@ final class Env(
 
   system.actorOf(Props(wire[Push]), name = config.userActorName)
 
-  lila.common.Bus.subscribeFun("shadowban") {
-    case lila.hub.actorApi.mod.Shadowban(userId, true) => entryApi removeRecentFollowsBy userId
+  lila.common.Bus.subscribeFun("shadowban") { case lila.hub.actorApi.mod.Shadowban(userId, true) =>
+    entryApi.removeRecentFollowsBy(userId).unit
   }
 }

@@ -1,10 +1,11 @@
 package lila.evalCache
 
+import cats.implicits._
+import chess.format.{ FEN, Uci }
 import play.api.libs.json._
 
-import chess.format.{ FEN, Uci }
-import EvalCacheEntry._
 import lila.common.Json._
+import lila.evalCache.EvalCacheEntry._
 import lila.tree.Eval._
 
 object JsonHandlers {
@@ -13,12 +14,13 @@ object JsonHandlers {
   implicit private val mateWriter   = intAnyValWriter[Mate](_.value)
   implicit private val knodesWriter = intAnyValWriter[Knodes](_.value)
 
-  def writeEval(e: Eval, fen: FEN) = Json.obj(
-    "fen"    -> fen.value,
-    "knodes" -> e.knodes,
-    "depth"  -> e.depth,
-    "pvs"    -> e.pvs.toList.map(writePv)
-  )
+  def writeEval(e: Eval, fen: FEN) =
+    Json.obj(
+      "fen"    -> fen,
+      "knodes" -> e.knodes,
+      "depth"  -> e.depth,
+      "pvs"    -> e.pvs.toList.map(writePv)
+    )
 
   private def writePv(pv: Pv) =
     Json
@@ -54,14 +56,15 @@ object JsonHandlers {
   private def parsePv(d: JsObject): Option[Pv] =
     for {
       movesStr <- d str "moves"
-      moves <- movesStr
-        .split(' ')
-        .take(EvalCacheEntry.MAX_PV_SIZE)
-        .foldLeft(List.empty[Uci].some) {
-          case (Some(ucis), str) => Uci(str) map (_ :: ucis)
-          case _                 => None
-        }
-        .flatMap(_.reverse.toNel) map Moves.apply
+      moves <-
+        movesStr
+          .split(' ')
+          .take(EvalCacheEntry.MAX_PV_SIZE)
+          .foldLeft(List.empty[Uci].some) {
+            case (Some(ucis), str) => Uci(str) map (_ :: ucis)
+            case _                 => None
+          }
+          .flatMap(_.reverse.toNel) map Moves.apply
       cp   = d int "cp" map Cp.apply
       mate = d int "mate" map Mate.apply
       score <- cp.map(Score.cp) orElse mate.map(Score.mate)

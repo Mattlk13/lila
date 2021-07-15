@@ -16,7 +16,7 @@ object show {
       data: lila.study.JsonView.JsData,
       chatOption: Option[lila.chat.UserChat.Mine],
       socketVersion: lila.socket.Socket.SocketVersion,
-      streams: List[lila.streamer.Stream]
+      streamers: List[lila.user.User.ID]
   )(implicit ctx: Context) =
     views.html.base.layout(
       title = s.name.value,
@@ -24,7 +24,7 @@ object show {
       moreJs = frag(
         analyseTag,
         analyseNvuiTag,
-        embedJsUnsafe(s"""lichess=window.lichess||{};lichess.study=${safeJsonValue(
+        embedJsUnsafe(s"""lichess.study=${safeJsonValue(
           Json.obj(
             "study"    -> data.study.add("admin" -> isGranted(_.StudyAdmin)),
             "data"     -> data.analysis,
@@ -36,11 +36,11 @@ object show {
                 c.chat,
                 name = trans.chatRoom.txt(),
                 timeout = c.timeout,
-                writeable = ctx.userId.??(s.canChat),
+                writeable = ctx.userId exists s.canChat,
                 public = false,
                 resourceId = lila.chat.Chat.ResourceId(s"study/${c.chat.id}"),
-                palantir = ctx.userId ?? s.isMember,
-                localMod = ctx.userId ?? s.canContribute
+                palantir = ctx.userId exists s.isMember,
+                localMod = ctx.userId exists s.canContribute
               )
             },
             "explorer" -> Json.obj(
@@ -55,7 +55,7 @@ object show {
       robots = s.isPublic,
       chessground = false,
       zoomable = true,
-      csp = defaultCsp.withWebAssembly.withTwitch.withPeer.some,
+      csp = defaultCsp.withWebAssembly.withPeer.some,
       openGraph = lila.app.ui
         .OpenGraph(
           title = s.name.value,
@@ -66,9 +66,9 @@ object show {
     )(
       frag(
         main(cls := "analyse"),
-        bits.streamers(streams)
+        bits.streamers(streamers)
       )
     )
 
-  def socketUrl(id: String) = s"/study/$id/socket/v${apiVersion}"
+  def socketUrl(id: String) = s"/study/$id/socket/v$apiVersion"
 }

@@ -17,7 +17,7 @@
 package lila.db
 
 import ornicar.scalalib.Zero
-import reactivemongo.api._
+
 import reactivemongo.api.bson._
 
 trait dsl {
@@ -34,9 +34,7 @@ trait dsl {
 
   def $doc(elements: Iterable[(String, BSONValue)]): Bdoc = BSONDocument.strict(elements)
 
-  def $arr(elements: Producer[BSONValue]*): Barr = {
-    BSONArray(elements: _*)
-  }
+  def $arr(elements: Producer[BSONValue]*): Barr = BSONArray(elements: _*)
 
   def $id[T: BSONWriter](id: T): Bdoc = $doc("_id" -> id)
 
@@ -108,6 +106,11 @@ trait dsl {
     $doc("$unset" -> $doc((Seq(field) ++ fields).map(k => (k, BSONString("")))))
   }
 
+  def $unset(fields: Seq[String]): Bdoc =
+    fields.nonEmpty ?? {
+      $doc("$unset" -> $doc(fields.map(k => (k, BSONString("")))))
+    }
+
   def $setBoolOrUnset(field: String, value: Boolean): Bdoc = {
     if (value) $set(field -> true) else $unset(field)
   }
@@ -128,7 +131,7 @@ trait dsl {
   /** Matches values that are greater than or equal to the value specified in the query. */
   def $gte[T: BSONWriter](value: T) = $doc("$gte" -> value)
 
-  /** Matches any of the values that exist in an array specified in the query.*/
+  /** Matches any of the values that exist in an array specified in the query. */
   def $in[T: BSONWriter](values: T*) = $doc("$in" -> values)
 
   /** Matches values that are less than the value specified in the query. */
@@ -166,9 +169,6 @@ trait dsl {
     }
   }
 
-  def $currentDate(items: (String, CurrentDateValueProducer[_])*): Bdoc =
-    $doc("$currentDate" -> $doc(items.map(item => (item._1, item._2.produce))))
-
   // End of Top Level Field Update Operators
   //**********************************************************************************************//
 
@@ -205,8 +205,7 @@ trait dsl {
   // End ofTop Level Array Update Operators
   //**********************************************************************************************//
 
-  /**
-    * Represents the initial state of the expression which has only the name of the field.
+  /** Represents the initial state of the expression which has only the name of the field.
     * It does not know the value of the expression.
     */
   trait ElementBuilder {
@@ -233,14 +232,12 @@ trait dsl {
    */
   case class SimpleExpression[V <: BSONValue](field: String, value: V) extends Expression[V]
 
-  /**
-    * Expressions of this type can be cascaded. Examples:
+  /** Expressions of this type can be cascaded. Examples:
     *
     * {{{
     *  "age" $gt 50 $lt 60
     *  "age" $gte 50 $lte 60
     * }}}
-    *
     */
   case class CompositeExpression(field: String, value: Bdoc)
       extends Expression[Bdoc]
@@ -267,7 +264,7 @@ trait dsl {
       CompositeExpression(field, append($doc("$gte" -> value)))
     }
 
-    /** Matches any of the values that exist in an array specified in the query.*/
+    /** Matches any of the values that exist in an array specified in the query. */
     def $in[T: BSONWriter](values: Iterable[T]): SimpleExpression[Bdoc] = {
       SimpleExpression(field, $doc("$in" -> values))
     }
@@ -295,7 +292,7 @@ trait dsl {
   }
 
   trait LogicalOperators { self: ElementBuilder =>
-    def $not(f: (String => Expression[Bdoc])): SimpleExpression[Bdoc] = {
+    def $not(f: String => Expression[Bdoc]): SimpleExpression[Bdoc] = {
       val expression = f(field)
       SimpleExpression(field, $doc("$not" -> expression.value))
     }
@@ -344,6 +341,36 @@ trait dsl {
     val createdAsc  = asc("createdAt")
     val createdDesc = desc("createdAt")
     val updatedDesc = desc("updatedAt")
+  }
+
+  object $lookup {
+    def simple(from: String, as: String, local: String, foreign: String): Bdoc = $doc(
+      "$lookup" -> $doc(
+        "from"         -> from,
+        "as"           -> as,
+        "localField"   -> local,
+        "foreignField" -> foreign
+      )
+    )
+    def simple(from: Coll, as: String, local: String, foreign: String): Bdoc =
+      simple(from.name, as, local, foreign)
+    def simple(from: AsyncColl, as: String, local: String, foreign: String): Bdoc =
+      simple(from.name.value, as, local, foreign)
+    def pipeline(from: Coll, as: String, local: String, foreign: String, pipeline: List[Bdoc]): Bdoc =
+      $doc(
+        "$lookup" -> $doc(
+          "from" -> from.name,
+          "as"   -> as,
+          "let"  -> $doc("local" -> s"$$$local"),
+          "pipeline" -> {
+            $doc(
+              "$match" -> $doc(
+                "$expr" -> $doc($doc("$eq" -> $arr(s"$$$foreign", "$$local")))
+              )
+            ) :: pipeline
+          }
+        )
+      )
   }
 
   implicit class ElementBuilderLike(val field: String)

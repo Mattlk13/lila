@@ -3,11 +3,11 @@ package lila.security
 import akka.actor._
 import com.softwaremill.macwire._
 import play.api.Configuration
-import play.api.libs.ws.WSClient
+import play.api.libs.ws.StandaloneWSClient
 import scala.concurrent.duration._
 
 import lila.common.config._
-import lila.common.{ Bus, EmailAddress, Strings }
+import lila.common.Strings
 import lila.memo.SettingStore.Strings._
 import lila.oauth.OAuthServer
 import lila.user.{ Authenticator, UserRepo }
@@ -15,24 +15,33 @@ import lila.user.{ Authenticator, UserRepo }
 @Module
 final class Env(
     appConfig: Configuration,
-    ws: WSClient,
+    ws: StandaloneWSClient,
     net: NetConfig,
     captcher: lila.hub.actors.Captcher,
     userRepo: UserRepo,
     authenticator: Authenticator,
-    slack: lila.slack.SlackApi,
+    mailer: lila.mailer.Mailer,
+    irc: lila.irc.IrcApi,
     noteApi: lila.user.NoteApi,
     cacheApi: lila.memo.CacheApi,
     settingStore: lila.memo.SettingStore.Builder,
-    tryOAuthServer: OAuthServer.Try,
+    oAuthServer: OAuthServer,
     mongoCache: lila.memo.MongoCache.Api,
     db: lila.db.Db
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem, scheduler: Scheduler) {
-
-  private val config = appConfig.get[SecurityConfig]("security")(SecurityConfig.loader)
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem,
+    scheduler: Scheduler,
+    mode: play.api.Mode
+) {
   import net.{ baseUrl, domain }
 
-  val recaptchaPublicConfig = config.recaptcha.public
+  private val config = appConfig.get[SecurityConfig]("security")(SecurityConfig.loader)
+
+  private def hcaptchaPublicConfig = config.hcaptcha.public
+
+  def hcaptcha[A](form: play.api.data.Form[A]) =
+    HcaptchaForm(form, config.hcaptcha.public)
 
   lazy val firewall = new Firewall(
     coll = db(config.collection.firewall),
@@ -41,22 +50,23 @@ final class Env(
 
   lazy val flood = wire[Flood]
 
-  lazy val recaptcha: Recaptcha =
-    if (config.recaptcha.enabled) wire[RecaptchaGoogle]
-    else RecaptchaSkip
+  lazy val hcaptcha: Hcaptcha =
+    if (config.hcaptcha.enabled) wire[HcaptchaReal]
+    else HcaptchaSkip
 
-  lazy val forms = wire[DataForm]
+  lazy val forms = wire[SecurityForm]
 
   lazy val geoIP: GeoIP = wire[GeoIP]
 
-  lazy val userSpy = wire[UserSpyApi]
+  lazy val userLogins = wire[UserLoginsApi]
 
-  lazy val store = new Store(db(config.collection.security), net.ip)
+  lazy val store = new Store(db(config.collection.security), cacheApi)
 
-  lazy val ipIntel = {
-    def mk = (email: EmailAddress) => wire[IpIntel]
-    mk(config.ipIntelEmail)
-  }
+  lazy val ip2proxy: Ip2Proxy =
+    if (config.ip2Proxy.enabled) {
+      def mk = (url: String) => wire[Ip2ProxyServer]
+      mk(config.ip2Proxy.url)
+    } else wire[Ip2ProxySkip]
 
   lazy val ugcArmedSetting = settingStore[Boolean](
     "ugcArmed",
@@ -71,13 +81,11 @@ final class Env(
     mk(ugcArmedSetting.get _)
   }
 
-  private lazy val mailgun: Mailgun = wire[Mailgun]
-
   lazy val emailConfirm: EmailConfirm =
     if (config.emailConfirm.enabled)
-      new EmailConfirmMailgun(
+      new EmailConfirmMailer(
         userRepo = userRepo,
-        mailgun = mailgun,
+        mailer = mailer,
         baseUrl = baseUrl,
         tokenerSecret = config.emailConfirm.secret
       )
@@ -105,8 +113,6 @@ final class Env(
 
   lazy val loginToken = new LoginToken(config.loginTokenSecret, userRepo)
 
-  lazy val automaticEmail = wire[AutomaticEmail]
-
   lazy val signup = wire[Signup]
 
   private lazy val dnsApi: DnsApi = wire[DnsApi]
@@ -121,8 +127,6 @@ final class Env(
     checkMailBlocked = () => checkMail.fetchAllBlocked
   )
 
-  // import reactivemongo.api.bson._
-
   lazy val spamKeywordsSetting = settingStore[Strings](
     "spamKeywords",
     default = Strings(Nil),
@@ -131,16 +135,26 @@ final class Env(
 
   lazy val spam = new Spam(spamKeywordsSetting.get _)
 
-  scheduler.scheduleOnce(30 seconds)(disposableEmailDomain.refresh)
-  scheduler.scheduleWithFixedDelay(config.disposableEmail.refreshDelay, config.disposableEmail.refreshDelay) {
-    () =>
-      disposableEmailDomain.refresh
+  lazy val promotion = wire[PromotionApi]
+
+  if (config.disposableEmail.enabled) {
+    scheduler.scheduleOnce(30 seconds)(disposableEmailDomain.refresh())
+    scheduler.scheduleWithFixedDelay(
+      config.disposableEmail.refreshDelay,
+      config.disposableEmail.refreshDelay
+    ) { () =>
+      disposableEmailDomain.refresh()
+    }
   }
 
   lazy val tor: Tor = wire[Tor]
-  scheduler.scheduleOnce(31 seconds)(tor.refresh(_ => funit))
-  scheduler.scheduleWithFixedDelay(config.tor.refreshDelay, config.tor.refreshDelay) { () =>
-    tor.refresh(firewall.unblockIps)
+
+  if (config.tor.enabled) {
+    scheduler.scheduleOnce(31 seconds)(tor.refresh.unit)
+    scheduler.scheduleWithFixedDelay(config.tor.refreshDelay, config.tor.refreshDelay) { () =>
+      tor.refresh flatMap firewall.unblockIps
+      ()
+    }
   }
 
   lazy val ipTrust: IpTrust = wire[IpTrust]
@@ -150,9 +164,4 @@ final class Env(
   lazy val csrfRequestHandler = wire[CSRFRequestHandler]
 
   def cli = wire[Cli]
-
-  Bus.subscribeFun("fishnet") {
-    case lila.hub.actorApi.fishnet.NewKey(userId, key) =>
-      automaticEmail.onFishnetKey(userId, key)
-  }
 }

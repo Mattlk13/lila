@@ -2,8 +2,7 @@ package lila.pref
 
 case class Pref(
     _id: String, // user id
-    dark: Boolean,
-    transp: Boolean,
+    bg: Int,
     bgImg: Option[String],
     is3d: Boolean,
     theme: String,
@@ -33,6 +32,7 @@ case class Pref(
     coordColor: Int,
     submitMove: Int,
     confirmResign: Int,
+    mention: Boolean,
     insightShare: Int,
     keyboardMove: Int,
     zen: Int,
@@ -52,52 +52,52 @@ case class Pref(
   def realTheme3d    = Theme3d(theme3d)
   def realPieceSet3d = PieceSet3d(pieceSet3d)
 
-  def themeColor = if (transp || dark) "#2e2a24" else "#dbd7d1"
+  def themeColor = if (bg == Bg.LIGHT) "#dbd7d1" else "#2e2a24"
 
   def realSoundSet = SoundSet(soundSet)
 
   def coordColorName = Color.choices.toMap.get(coordColor).fold("random")(_.toLowerCase)
   def coordsClass    = Coords classOf coords
 
-  def hasSeenVerifyTitle = tags contains Tag.verifyTitle
+  def hasDgt = tags contains Tag.dgt
 
-  def set(name: String, value: String): Option[Pref] = name match {
-    case "bg" =>
-      if (value == "transp") copy(dark = true, transp = true).some
-      else copy(dark = value == "dark", transp = false).some
-    case "bgImg" => copy(bgImg = value.some).some
-    case "theme" =>
-      Theme.allByName get value map { t =>
-        copy(theme = t.name)
-      }
-    case "pieceSet" =>
-      PieceSet.allByName get value map { p =>
-        copy(pieceSet = p.name)
-      }
-    case "theme3d" =>
-      Theme3d.allByName get value map { t =>
-        copy(theme3d = t.name)
-      }
-    case "pieceSet3d" =>
-      PieceSet3d.allByName get value map { p =>
-        copy(pieceSet3d = p.name)
-      }
-    case "is3d" => copy(is3d = value == "true").some
-    case "soundSet" =>
-      SoundSet.allByKey get value map { s =>
-        copy(soundSet = s.key)
-      }
-    case "zen" => copy(zen = if (value == "1") 1 else 0).some
-    case _     => none
-  }
+  def set(name: String, value: String): Option[Pref] =
+    name match {
+      case "bg"    => Pref.Bg.fromString.get(value).map { bg => copy(bg = bg) }
+      case "bgImg" => copy(bgImg = value.some).some
+      case "theme" =>
+        Theme.allByName get value map { t =>
+          copy(theme = t.name)
+        }
+      case "pieceSet" =>
+        PieceSet.allByName get value map { p =>
+          copy(pieceSet = p.name)
+        }
+      case "theme3d" =>
+        Theme3d.allByName get value map { t =>
+          copy(theme3d = t.name)
+        }
+      case "pieceSet3d" =>
+        PieceSet3d.allByName get value map { p =>
+          copy(pieceSet3d = p.name)
+        }
+      case "is3d" => copy(is3d = value == "true").some
+      case "soundSet" =>
+        SoundSet.allByKey get value map { s =>
+          copy(soundSet = s.key)
+        }
+      case "zen" => copy(zen = if (value == "1") 1 else 0).some
+      case _     => none
+    }
 
-  def animationFactor = animation match {
-    case Animation.NONE   => 0
-    case Animation.FAST   => 0.5f
-    case Animation.NORMAL => 1
-    case Animation.SLOW   => 2
-    case _                => 1
-  }
+  def animationMillis: Int =
+    animation match {
+      case Animation.NONE   => 0
+      case Animation.FAST   => 120
+      case Animation.NORMAL => 250
+      case Animation.SLOW   => 500
+      case _                => 250
+    }
 
   def isBlindfold = blindfold == Pref.Blindfold.YES
 
@@ -133,8 +133,31 @@ object Pref {
     val verify = (v: Int) => v == 0 || v == 1
   }
 
+  object Bg {
+    val LIGHT       = 100
+    val DARK        = 200
+    val DARKBOARD   = 300
+    val TRANSPARENT = 400
+
+    val choices = Seq(
+      LIGHT       -> "Light",
+      DARK        -> "Dark",
+      DARKBOARD   -> "Dark Board",
+      TRANSPARENT -> "Transparent"
+    )
+
+    val fromString = Map(
+      "light"     -> LIGHT,
+      "dark"      -> DARK,
+      "darkBoard" -> DARKBOARD,
+      "transp"    -> TRANSPARENT
+    )
+
+    val asString = fromString.map(_.swap)
+  }
+
   object Tag {
-    val verifyTitle = "verifyTitle"
+    val dgt = "dgt"
   }
 
   object Color {
@@ -188,6 +211,8 @@ object Pref {
       EVERYBODY -> "With everybody"
     )
   }
+
+  object Mention extends BooleanPref
 
   object KeyboardMove extends BooleanPref
 
@@ -291,11 +316,12 @@ object Pref {
       OUTSIDE -> "Outside the board"
     )
 
-    def classOf(v: Int) = v match {
-      case INSIDE  => "in"
-      case OUTSIDE => "out"
-      case _       => "no"
-    }
+    def classOf(v: Int) =
+      v match {
+        case INSIDE  => "in"
+        case OUTSIDE => "out"
+        case _       => "no"
+      }
   }
 
   object Replay {
@@ -344,7 +370,7 @@ object Pref {
     val ALWAYS = 3
 
     val choices = Seq(
-      NEVER  -> "Never",
+      NEVER  -> "Only existing conversations",
       FRIEND -> "Only friends",
       ALWAYS -> "Always"
     )
@@ -380,8 +406,7 @@ object Pref {
 
   lazy val default = Pref(
     _id = "",
-    dark = false,
-    transp = false,
+    bg = Bg.LIGHT,
     bgImg = none,
     is3d = false,
     theme = Theme.default.name,
@@ -397,7 +422,7 @@ object Pref {
     clockBar = true,
     clockSound = true,
     premove = true,
-    animation = 2,
+    animation = Animation.NORMAL,
     captured = true,
     follow = true,
     highlight = true,
@@ -411,6 +436,7 @@ object Pref {
     coordColor = Color.RANDOM,
     submitMove = SubmitMove.CORRESPONDENCE_ONLY,
     confirmResign = ConfirmResign.YES,
+    mention = true,
     insightShare = InsightShare.FRIENDS,
     keyboardMove = KeyboardMove.NO,
     zen = Zen.NO,

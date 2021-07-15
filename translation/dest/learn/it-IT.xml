@@ -48,8 +48,8 @@ Fuggi e conquista le stelle!</string>
 Ma quando raggiungono l\'altro lato della scacchiera si trasformano in un pezzo più forte!</string>
   <string name="mostOfTheTimePromotingToAQueenIsBest">La maggior parte delle volte è opportuno promuovere in regina.
 Ma talvolta un cavallo può tornare utile!</string>
-  <string name="pawnsMoveForward">I pedono si muovono in avanti,
-ma catturano in diagonale!</string>
+  <string name="pawnsMoveForward">I pedoni si muovono in avanti,
+ma catturano diagonalmente!</string>
   <string name="captureThenPromote">Cattura, poi promuovi!</string>
   <string name="useAllThePawns">Usa tutti i pedoni!
 Non c\'è bisogno di promuovere.</string>
@@ -183,6 +183,12 @@ Il re è inestimabile! Perdere il re significa essere sconfitti.</string>
   <string name="queenOverBishop">Cattura il pezzo
 con il più alto valore!
 Regina &gt; Alfiere</string>
+  <string name="pieceValueExchange">Cattura il pezzo con il valore più alto!
+ Non scambiare
+ un pezzo di valore più alto con uno meno valido.</string>
+  <string name="pieceValueLegal">Cattura il pezzo
+con il valore più alto!
+Assicurati che la tua mossa sia legale!</string>
   <string name="takeThePieceWithTheHighestValue">Cattura il pezzo 
 con il valore più alto!</string>
   <string name="pieceValueComplete">Congratulazioni! Ora conosci il valore dei pezzi! 

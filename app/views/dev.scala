@@ -30,13 +30,16 @@ object dev {
                     span(cls := "form-check-input")(form3.cmnToggle(s.id, "v", v))
                   )
                 case v =>
-                  input(name := "v", value := (v match {
-                    case None    => ""
-                    case Some(x) => x.toString
-                    case x       => x.toString
-                  }))
+                  input(
+                    name := "v",
+                    value := (v match {
+                      case None    => ""
+                      case Some(x) => x.toString
+                      case x       => x.toString
+                    })
+                  )
               },
-              submitButton(cls := "button button-empty", dataIcon := "E")
+              submitButton(cls := "button button-empty", dataIcon := "")
             )
           }
         )
@@ -68,14 +71,14 @@ object dev {
 announce 10 minutes Lichess will restart!
 announce cancel
 change asset version
-puzzle disable 70000
-team disable foobar
-team enable foobar
 fishnet client create {username}
 gdpr erase {username} forever
 patron lifetime {username}
 patron month {username}
-eval-cache drop 8/8/1k6/8/2K5/1P6/8/8 w - - 0 1
+patron remove {username}
+tournament feature {id}
+tournament unfeature {id}
+eval-cache drop standard 8/8/1k6/8/2K5/1P6/8/8 w - - 0 1
 """)
         )
       )

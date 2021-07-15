@@ -6,7 +6,7 @@ import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.clas.{ Clas, Student }
 
-private object bits {
+object bits {
 
   def layout(
       title: String,
@@ -16,7 +16,7 @@ private object bits {
     views.html.base.layout(
       title = title,
       moreCss = cssTag("clas"),
-      moreJs = jsAt("compiled/clas.js")
+      moreJs = jsModule("clas")
     )(
       if (isGranted(_.Teacher))
         main(cls := "page-menu")(
@@ -50,10 +50,8 @@ private object bits {
 
   def showArchived(archived: Clas.Recorded)(implicit ctx: Context) =
     div(
-      trans.clas.closedByX(userIdLink(archived.by.value.some)),
+      trans.clas.closedByX(userIdLink(archived.by.some)),
+      " ",
       momentFromNowOnce(archived.at)
     )
-
-  val sortNumberTh = th(attr("data-sort-method") := "number")
-  val dataSort     = attr("data-sort")
 }

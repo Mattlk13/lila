@@ -12,6 +12,7 @@ import lila.round.JsonView.WithFlags
 import lila.round.{ Forecast, JsonView }
 import lila.security.Granter
 import lila.simul.Simul
+import lila.swiss.{ GameView => SwissView }
 import lila.tournament.{ GameView => TourView }
 import lila.tree.Node.partitionTreeJsonWriter
 import lila.user.User
@@ -23,13 +24,14 @@ final private[api] class RoundApi(
     bookmarkApi: lila.bookmark.BookmarkApi,
     gameRepo: lila.game.GameRepo,
     tourApi: lila.tournament.TournamentApi,
+    swissApi: lila.swiss.SwissApi,
     simulApi: lila.simul.SimulApi,
     getTeamName: lila.team.GetTeamName,
     getLightUser: lila.common.LightUser.GetterSync
 )(implicit ec: scala.concurrent.ExecutionContext) {
 
-  def player(pov: Pov, tour: Option[TourView], apiVersion: ApiVersion)(
-      implicit ctx: Context
+  def player(pov: Pov, tour: Option[TourView], apiVersion: ApiVersion)(implicit
+      ctx: Context
   ): Fu[JsObject] =
     gameRepo
       .initialFen(pov.game)
@@ -45,19 +47,21 @@ final private[api] class RoundApi(
           nvui = ctx.blind
         ) zip
           (pov.game.simulId ?? simulApi.find) zip
+          swissApi.gameView(pov) zip
           (ctx.me.ifTrue(ctx.isMobileApi) ?? (me => noteApi.get(pov.gameId, me.id))) zip
           forecastApi.loadForDisplay(pov) zip
           bookmarkApi.exists(pov.game, ctx.me) map {
-          case json ~ simulOption ~ note ~ forecast ~ bookmarked =>
-            (
-              withTournament(pov, tour) _ compose
-                withSimul(simulOption) _ compose
-                withSteps(pov, initialFen) _ compose
-                withNote(note) _ compose
-                withBookmark(bookmarked) _ compose
-                withForecastCount(forecast.map(_.steps.size)) _
-            )(json)
-        }
+            case (((((json, simul), swiss), note), forecast), bookmarked) =>
+              (
+                withTournament(pov, tour) _ compose
+                  withSwiss(swiss) compose
+                  withSimul(simul) compose
+                  withSteps(pov, initialFen) compose
+                  withNote(note) compose
+                  withBookmark(bookmarked) compose
+                  withForecastCount(forecast.map(_.steps.size))
+              )(json)
+          }
       }
       .mon(_.round.api.player)
 
@@ -82,17 +86,18 @@ final private[api] class RoundApi(
           withFlags = WithFlags(blurs = ctx.me ?? Granter(_.ViewBlurs))
         ) zip
           (pov.game.simulId ?? simulApi.find) zip
+          swissApi.gameView(pov) zip
           (ctx.me.ifTrue(ctx.isMobileApi) ?? (me => noteApi.get(pov.gameId, me.id))) zip
-          bookmarkApi.exists(pov.game, ctx.me) map {
-          case json ~ simulOption ~ note ~ bookmarked =>
+          bookmarkApi.exists(pov.game, ctx.me) map { case ((((json, simul), swiss), note), bookmarked) =>
             (
               withTournament(pov, tour) _ compose
-                withSimul(simulOption) _ compose
-                withNote(note) _ compose
-                withBookmark(bookmarked) _ compose
-                withSteps(pov, initialFen) _
+                withSwiss(swiss) compose
+                withSimul(simul) compose
+                withNote(note) compose
+                withBookmark(bookmarked) compose
+                withSteps(pov, initialFen)
             )(json)
-        }
+          }
       }
       .mon(_.round.api.watcher)
 
@@ -102,7 +107,8 @@ final private[api] class RoundApi(
       tv: Option[lila.round.OnTv] = None,
       analysis: Option[Analysis] = None,
       initialFenO: Option[Option[FEN]] = None,
-      withFlags: WithFlags
+      withFlags: WithFlags,
+      owner: Boolean = false
   )(implicit ctx: Context): Fu[JsObject] =
     initialFenO
       .fold(gameRepo initialFen pov.game)(fuccess)
@@ -119,18 +125,24 @@ final private[api] class RoundApi(
         ) zip
           tourApi.gameView.analysis(pov.game) zip
           (pov.game.simulId ?? simulApi.find) zip
-          (ctx.me.ifTrue(ctx.isMobileApi) ?? (me => noteApi.get(pov.gameId, me.id))) zip
+          swissApi.gameView(pov) zip
+          ctx.userId.ifTrue(ctx.isMobileApi).?? {
+            noteApi.get(pov.gameId, _)
+          } zip
+          (owner.??(forecastApi loadForDisplay pov)) zip
           bookmarkApi.exists(pov.game, ctx.me) map {
-          case json ~ tour ~ simulOption ~ note ~ bookmarked =>
-            (
-              withTournament(pov, tour) _ compose
-                withSimul(simulOption) _ compose
-                withNote(note) _ compose
-                withBookmark(bookmarked) _ compose
-                withTree(pov, analysis, initialFen, withFlags) _ compose
-                withAnalysis(pov.game, analysis) _
-            )(json)
-        }
+            case ((((((json, tour), simul), swiss), note), fco), bookmarked) =>
+              (
+                withTournament(pov, tour) _ compose
+                  withSwiss(swiss) compose
+                  withSimul(simul) compose
+                  withNote(note) compose
+                  withBookmark(bookmarked) compose
+                  withTree(pov, analysis, initialFen, withFlags) compose
+                  withAnalysis(pov.game, analysis) compose
+                  withForecast(pov, owner, fco)
+              )(json)
+          }
       }
       .mon(_.round.api.watcher)
 
@@ -155,7 +167,7 @@ final private[api] class RoundApi(
         ) map { json =>
           (
             withTree(pov, analysis, initialFen, withFlags) _ compose
-              withAnalysis(pov.game, analysis) _
+              withAnalysis(pov.game, analysis)
           )(json)
         }
       }
@@ -192,15 +204,7 @@ final private[api] class RoundApi(
       obj: JsObject
   ) =
     obj + ("treeParts" -> partitionTreeJsonWriter.writes(
-      lila.round.TreeBuilder(
-        id = pov.gameId,
-        pgnMoves = pov.game.pgnMoves,
-        variant = pov.game.variant,
-        analysis = analysis,
-        initialFen = initialFen | FEN(pov.game.variant.initialFen),
-        withFlags = withFlags,
-        clocks = withFlags.clocks ?? pov.game.bothClockStates
-      )
+      lila.round.TreeBuilder(pov.game, analysis, initialFen | pov.game.variant.initialFen, withFlags)
     ))
 
   private def withSteps(pov: Pov, initialFen: Option[FEN])(obj: JsObject) =
@@ -208,7 +212,7 @@ final private[api] class RoundApi(
       id = pov.gameId,
       pgnMoves = pov.game.pgnMoves,
       variant = pov.game.variant,
-      initialFen = initialFen.fold(pov.game.variant.initialFen)(_.value)
+      initialFen = initialFen | pov.game.variant.initialFen
     ))
 
   private def withNote(note: String)(json: JsObject) =
@@ -229,22 +233,26 @@ final private[api] class RoundApi(
           if (pov.forecastable) fco.fold[JsValue](Json.obj("none" -> true)) { fc =>
             import Forecast.forecastJsonWriter
             Json toJson fc
-          } else Json.obj("onMyTurn" -> true)
+          }
+          else Json.obj("onMyTurn" -> true)
         }
       )
     else json
 
   private def withAnalysis(g: Game, o: Option[Analysis])(json: JsObject) =
-    json.add("analysis", o.map { a =>
-      analysisJson.bothPlayers(g, a)
-    })
+    json.add(
+      "analysis",
+      o.map { a =>
+        analysisJson.bothPlayers(g, a)
+      }
+    )
 
   def withTournament(pov: Pov, viewO: Option[TourView])(json: JsObject)(implicit lang: Lang) =
     json.add("tournament" -> viewO.map { v =>
       Json
         .obj(
           "id"      -> v.tour.id,
-          "name"    -> v.tour.name(false),
+          "name"    -> v.tour.name(full = false),
           "running" -> v.tour.isStarted
         )
         .add("secondsToFinish" -> v.tour.isStarted.option(v.tour.secondsToFinish))
@@ -259,21 +267,45 @@ final private[api] class RoundApi(
             "black" -> r.blackRank
           )
         })
-        .add("top", v.top.map {
-          lila.tournament.JsonView.top(_, getLightUser)
-        })
-        .add("team", v.teamVs.map(_.teams(pov.color)) map { id =>
-          Json.obj("name" -> getTeamName(id))
+        .add(
+          "top",
+          v.top.map {
+            lila.tournament.JsonView.top(_, getLightUser)
+          }
+        )
+        .add(
+          "team",
+          v.teamVs.map(_.teams(pov.color)) map { id =>
+            Json.obj("name" -> getTeamName(id))
+          }
+        )
+    })
+
+  def withSwiss(sv: Option[SwissView])(json: JsObject) =
+    json.add("swiss" -> sv.map { s =>
+      Json
+        .obj(
+          "id"      -> s.swiss.id.value,
+          "running" -> s.swiss.isStarted
+        )
+        .add("ranks" -> s.ranks.map { r =>
+          Json.obj(
+            "white" -> r.whiteRank,
+            "black" -> r.blackRank
+          )
         })
     })
 
   private def withSimul(simulOption: Option[Simul])(json: JsObject) =
-    json.add("simul", simulOption.map { simul =>
-      Json.obj(
-        "id"        -> simul.id,
-        "hostId"    -> simul.hostId,
-        "name"      -> simul.name,
-        "nbPlaying" -> simul.playingPairings.size
-      )
-    })
+    json.add(
+      "simul",
+      simulOption.map { simul =>
+        Json.obj(
+          "id"        -> simul.id,
+          "hostId"    -> simul.hostId,
+          "name"      -> simul.name,
+          "nbPlaying" -> simul.playingPairings.size
+        )
+      }
+    )
 }

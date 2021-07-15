@@ -27,7 +27,7 @@ object dailyPuzzleSlackApp {
               alt := "Add to Slack",
               height := 40,
               width := 139,
-              src := staticUrl("images/add-to-slack.png")
+              src := assetUrl("images/add-to-slack.png")
             )
           ),
           h2("Summary"),
@@ -63,9 +63,7 @@ object dailyPuzzleSlackApp {
             a(href := routes.ForumCateg.show("lichess-feedback"))(
               "in the forum"
             ),
-            ". Alternatively, use ",
-            contactEmailLink,
-            " to get in touch with us. The source code is available at ",
+            ". The source code is available at ",
             a(href := "https://github.com/arex1337/lichess-daily-puzzle-slack-app")(
               "github.com/arex1337/lichess-daily-puzzle-slack-app"
             ),

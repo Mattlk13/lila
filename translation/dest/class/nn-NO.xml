@@ -24,8 +24,7 @@
   <string name="visibleByBothStudentsAndTeachers">Synleg for klassens lærarar og elevar</string>
   <string name="teachersOfTheClass">Klassens lærarar</string>
   <string name="addLichessUsernames">Invitér lærarar ved å legge inn brukarnamna deira. Eitt brukarnamn på kvar linje.</string>
-  <string name="theyMustFirstApply">Dei må først søke om å bli Lichess-lærarar.</string>
-  <string name="resetPassword">Tilbakestill passord</string>
+  <string name="resetPassword">Attendestill passord</string>
   <string name="makeSureToCopy">Sørg for å kopiere eller skrive ned den nye adgangskoden med ein gong. Du vil ikkje få sjå den igjen!</string>
   <string name="passwordX">Passord: %s</string>
   <string name="generateANewPassword">Generer eit nytt passord til eleven</string>
@@ -51,6 +50,13 @@ Passord: %3$s</string>
   <string name="generateANewUsername">Generer eit nytt brukarnamn</string>
   <string name="welcomeToClass">Velkomen til klassen din: %s.
 Her er lenka som gir deg tilgjenge til klassen.</string>
+  <string name="invitationToClass">Du er invitert til å bli med som elev i klassen \"%s\".</string>
+  <string name="clickToViewInvitation">Klikk på lenka for å sjå invitasjonen:</string>
+  <plurals name="nbPendingInvitations">
+    <item quantity="one">Ein ventande invitasjon</item>
+    <item quantity="other">%s ventande invitasjonar</item>
+  </plurals>
+  <string name="noPendingInvitations">Ingen ventande invitasjonar</string>
   <string name="onlyVisibleToTeachers">Synleg berre for klassas lærarar</string>
   <string name="lastActiveDate">Aktiv</string>
   <string name="managed">Administrert</string>
@@ -60,4 +66,34 @@ Her er lenka som gir deg tilgjenge til klassen.</string>
   <string name="releaseTheAccount">Frigje kontoen slik at eleven kan styre den sjølv.</string>
   <string name="releaseDesc1">En frigjeven konto kan ikkje settast under administrasjon igjen. Eleven vil kunne endre barnemodus og sjølv nullstille passordet.</string>
   <string name="releaseDesc2">Eleven vil bli i klassa sjølv om kontoen er frigjeven.</string>
+  <string name="realUniqueEmail">Korrekt, unik e-postadresse for eleven. Vi sender ei stadfestingsmelding til adressa med ei lenke for å frigi kontoen.</string>
+  <string name="closeStudent">Steng elevkonto</string>
+  <string name="closeTheAccount">Steng elevkontoen permanent.</string>
+  <string name="closeDesc1">Eleven vil aldri kunne bruka denne kontoen att. Stenging er ei endeleg avgjerd. Ver heilt sikker på at eleven forstår og samtykkjer i dette.</string>
+  <string name="closeDesc2">Eit alternativ er å gje eleven kontroll over kontoen slik at den framleis kan vera til gagn.</string>
+  <string name="teachers">Lærarar</string>
+  <plurals name="nbTeachers">
+    <item quantity="one">Lærar</item>
+    <item quantity="other">%s lærarar</item>
+  </plurals>
+  <plurals name="nbStudents">
+    <item quantity="one">Elev</item>
+    <item quantity="other">%s elevar</item>
+  </plurals>
+  <string name="students">Elevar</string>
+  <string name="progress">Framgang</string>
+  <string name="noStudents">Ingen elevar i klassen så langt.</string>
+  <string name="noRemovedStudents">Ingen fjerna elevar.</string>
+  <string name="overDays">Over dagar</string>
+  <string name="timePlaying">Speletid</string>
+  <string name="variantXOverLastY">%1$s over siste %2$s</string>
+  <string name="winrate">Sigersrate</string>
+  <string name="na">N/A (ikkje tilgjengeleg)</string>
+  <string name="news">Klassenyhende</string>
+  <string name="editNews">Rediger nyhende</string>
+  <string name="notifyAllStudents">Send melding til alle elevar</string>
+  <string name="nothingHere">Tomt så langt.</string>
+  <string name="newsEdit1">Alle klassenyhende i eit enkelt felt.</string>
+  <string name="newsEdit2">Legg inn dei siste nyhendene på toppen. Ikkje slett tidlegare nyhende.</string>
+  <string name="newsEdit3">Sett inn --- mellom kvar nyhende, det vil visast med ei horisontal linje.</string>
 </resources>

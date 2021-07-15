@@ -10,6 +10,7 @@ import lila.db.paginator.Adapter
 import lila.hub.actorApi.socket.SendTo
 import lila.memo.CacheApi._
 import lila.user.UserRepo
+import lila.i18n.I18nLangPicker
 
 final class NotifyApi(
     jsonHandlers: JSONHandlers,
@@ -22,16 +23,17 @@ final class NotifyApi(
   import BSONHandlers.{ NotificationBSONHandler, NotifiesHandler }
   import jsonHandlers._
 
-  def getNotifications(userId: Notification.Notifies, page: Int): Fu[Paginator[Notification]] = Paginator(
-    adapter = new Adapter(
-      collection = repo.coll,
-      selector = repo.userNotificationsQuery(userId),
-      projection = none,
-      sort = repo.recentSort
-    ),
-    currentPage = page,
-    maxPerPage = maxPerPage
-  )
+  def getNotifications(userId: Notification.Notifies, page: Int): Fu[Paginator[Notification]] =
+    Paginator(
+      adapter = new Adapter(
+        collection = repo.coll,
+        selector = repo.userNotificationsQuery(userId),
+        projection = none,
+        sort = repo.recentSort
+      ),
+      currentPage = page,
+      maxPerPage = maxPerPage
+    )
 
   def getNotificationsAndCount(userId: Notification.Notifies, page: Int): Fu[Notification.AndUnread] =
     getNotifications(userId, page) zip unreadCount(userId) dmap (Notification.AndUnread.apply _).tupled
@@ -86,8 +88,7 @@ final class NotifyApi(
       }
     }
 
-  /**
-    * Inserts notification into the repository.
+  /** Inserts notification into the repository.
     *
     * If the user already has an unread notification on the topic, discard it.
     *
@@ -101,7 +102,17 @@ final class NotifyApi(
 
   private def notifyUser(notifies: Notification.Notifies): Funit =
     getNotificationsAndCount(notifies, 1) map { msg =>
-      import play.api.libs.json.Json
-      Bus.publish(SendTo(notifies.value, "notifications", Json toJson msg), "socketUsers")
+      Bus.publish(
+        SendTo.async(
+          notifies.value,
+          "notifications",
+          () => {
+            userRepo langOf notifies.value map I18nLangPicker.byStrOrDefault map { implicit lang =>
+              jsonHandlers(msg)
+            }
+          }
+        ),
+        "socketUsers"
+      )
     }
 }

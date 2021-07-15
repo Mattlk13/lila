@@ -1,12 +1,22 @@
 import { prop } from 'common';
 import { storedProp } from 'common/storage';
+import debounce from 'common/debounce';
 import { opposite } from 'chessground/util';
 import { controller as configCtrl } from './explorerConfig';
-import xhr = require('./explorerXhr');
+import * as xhr from './explorerXhr';
 import { winnerOf, colorOf } from './explorerUtil';
 import * as gameUtil from 'game';
 import AnalyseCtrl from '../ctrl';
-import { Hovering, ExplorerCtrl, ExplorerData, OpeningData, TablebaseData, SimpleTablebaseHit } from './interfaces';
+import {
+  Hovering,
+  ExplorerCtrl,
+  ExplorerData,
+  ExplorerDb,
+  OpeningData,
+  TablebaseData,
+  SimpleTablebaseHit,
+  ExplorerOpts,
+} from './interfaces';
 
 function pieceCount(fen: Fen) {
   const parts = fen.split(/\s/);
@@ -35,50 +45,77 @@ function tablebaseRelevant(variant: VariantKey, fen: Fen) {
   return pieceCount(fen) - 1 <= tablebasePieces(variant);
 }
 
-export default function(root: AnalyseCtrl, opts, allow: boolean): ExplorerCtrl {
+export default function (root: AnalyseCtrl, opts: ExplorerOpts, allow: boolean): ExplorerCtrl {
   const allowed = prop(allow),
-  enabled = root.embed ? prop(false) : storedProp('explorer.enabled', false),
-  loading = prop(true),
-  failing = prop(false),
-  hovering = prop<Hovering | null>(null),
-  movesAway = prop(0),
-  gameMenu = prop<string | null>(null);
+    enabled = root.embed ? prop(false) : storedProp('explorer.enabled', false),
+    loading = prop(true),
+    failing = prop<Error | null>(null),
+    hovering = prop<Hovering | null>(null),
+    movesAway = prop(0),
+    gameMenu = prop<string | null>(null);
 
-  if ((location.hash === '#explorer' || location.hash === '#opening') && !root.embed) enabled(true);
+  const checkHash = (e?: HashChangeEvent) => {
+    if ((location.hash === '#explorer' || location.hash === '#opening') && !root.embed) {
+      enabled(true);
+      if (e) root.redraw();
+    }
+  };
+  window.addEventListener('hashchange', checkHash, false);
+  checkHash();
 
-  let cache = {};
+  let cache: Dictionary<ExplorerData> = {};
   function onConfigClose() {
-    root.redraw();
     cache = {};
     setNode();
+    root.redraw();
   }
   const data = root.data,
-  withGames = root.synthetic || gameUtil.replayable(data) || !!data.opponent.ai,
-  effectiveVariant = data.game.variant.key === 'fromPosition' ? 'standard' : data.game.variant.key,
-  config = configCtrl(data.game, onConfigClose, root.trans, root.redraw);
+    withGames = root.synthetic || gameUtil.replayable(data) || !!data.opponent.ai,
+    effectiveVariant = data.game.variant.key === 'fromPosition' ? 'standard' : data.game.variant.key,
+    config = configCtrl(data.game, onConfigClose, root.trans, root.redraw);
 
-  const fetch = window.lichess.debounce(function() {
-    const fen = root.node.fen;
-    const request: JQueryPromise<ExplorerData> = (withGames && tablebaseRelevant(effectiveVariant, fen)) ?
-      xhr.tablebase(opts.tablebaseEndpoint, effectiveVariant, fen) :
-      xhr.opening(opts.endpoint, effectiveVariant, root.nodeList[0].fen, root.nodeList.slice(1).map(s => s.uci!), config.data, withGames);
+  const fetch = debounce(
+    () => {
+      const fen = root.node.fen;
+      const request: Promise<ExplorerData> =
+        withGames && tablebaseRelevant(effectiveVariant, fen)
+          ? xhr.tablebase(opts.tablebaseEndpoint, effectiveVariant, fen)
+          : xhr.opening({
+              endpoint: opts.endpoint,
+              db: config.data.db.selected() as ExplorerDb,
+              variant: effectiveVariant,
+              rootFen: root.nodeList[0].fen,
+              play: root.nodeList.slice(1).map(s => s.uci!),
+              fen,
+              speeds: config.data.speed.selected(),
+              ratings: config.data.rating.selected(),
+              withGames,
+            });
 
-    request.then((res: ExplorerData) => {
-      cache[fen] = res;
-      movesAway(res.moves.length ? 0 : movesAway() + 1);
-      loading(false);
-      failing(false);
-      root.redraw();
-    }, () => {
-      loading(false);
-      failing(true);
-      root.redraw();
-    });
-  }, 250, true);
+      request.then(
+        (res: ExplorerData) => {
+          cache[fen] = res;
+          movesAway(res.moves.length ? 0 : movesAway() + 1);
+          loading(false);
+          failing(null);
+          root.redraw();
+        },
+        err => {
+          loading(false);
+          failing(err);
+          root.redraw();
+        }
+      );
+    },
+    250,
+    true
+  );
 
-  const empty = {
+  const empty: OpeningData = {
     isOpening: true,
-    moves: {}
+    moves: [],
+    fen: '',
+    opening: root.data.game.opening,
   };
 
   function setNode() {
@@ -92,12 +129,12 @@ export default function(root: AnalyseCtrl, opts, allow: boolean): ExplorerCtrl {
     if (cached) {
       movesAway(cached.moves.length ? 0 : movesAway() + 1);
       loading(false);
-      failing(false);
+      failing(null);
     } else {
       loading(true);
       fetch();
     }
-  };
+  }
 
   return {
     allowed,
@@ -125,38 +162,45 @@ export default function(root: AnalyseCtrl, opts, allow: boolean): ExplorerCtrl {
       }
     },
     setHovering(fen, uci) {
-      hovering(uci ? {
-        fen,
-        uci,
-      } : null);
+      hovering(
+        uci
+          ? {
+              fen,
+              uci,
+            }
+          : null
+      );
       root.setAutoShapes();
     },
-    fetchMasterOpening: (function() {
-      const masterCache = {};
-      return (fen: Fen): JQueryPromise<OpeningData> => {
-        if (masterCache[fen]) return $.Deferred().resolve(masterCache[fen]).promise() as JQueryPromise<OpeningData>;
-        return xhr.opening(opts.endpoint, 'standard', fen, [], {
-          db: {
-            selected: prop('masters')
-          }
-        }, false).then((res: OpeningData) => {
-          masterCache[fen] = res;
-          return res;
-        });
-      }
+    fetchMasterOpening: (() => {
+      const masterCache: Dictionary<OpeningData> = {};
+      return (fen: Fen): Promise<OpeningData> => {
+        const val = masterCache[fen];
+        if (val) return Promise.resolve(val);
+        return xhr
+          .opening({
+            endpoint: opts.endpoint,
+            db: 'masters',
+            rootFen: fen,
+            play: [],
+            fen,
+          })
+          .then((res: OpeningData) => {
+            masterCache[fen] = res;
+            return res;
+          });
+      };
     })(),
-    fetchTablebaseHit(fen: Fen): JQueryPromise<SimpleTablebaseHit> {
+    fetchTablebaseHit(fen: Fen): Promise<SimpleTablebaseHit> {
       return xhr.tablebase(opts.tablebaseEndpoint, effectiveVariant, fen).then((res: TablebaseData) => {
         const move = res.moves[0];
         if (move && move.dtz == null) throw 'unknown tablebase position';
         return {
           fen: fen,
           best: move && move.uci,
-          winner: res.checkmate ? opposite(colorOf(fen)) : (
-            res.stalemate ? undefined : winnerOf(fen, move!)
-          )
-        } as SimpleTablebaseHit
+          winner: res.checkmate ? opposite(colorOf(fen)) : res.stalemate ? undefined : winnerOf(fen, move!),
+        } as SimpleTablebaseHit;
       });
-    }
+    },
   };
-};
+}

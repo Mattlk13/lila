@@ -2,12 +2,11 @@ package lila.fishnet
 
 import org.joda.time.DateTime
 import reactivemongo.api.bson._
-import scala.util.{ Failure, Success, Try }
 import scala.concurrent.duration._
+import scala.util.{ Failure, Success, Try }
 
 import Client.Skill
 import lila.common.IpAddress
-import lila.common.WorkQueue
 import lila.db.dsl._
 
 final class FishnetApi(
@@ -19,13 +18,16 @@ final class FishnetApi(
     socketExists: String => Fu[Boolean],
     clientVersion: Client.ClientVersion,
     config: FishnetApi.Config
-)(implicit ec: scala.concurrent.ExecutionContext, mat: akka.stream.Materializer) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: akka.actor.ActorSystem
+) {
 
   import FishnetApi._
   import JsonApi.Request.{ CompleteAnalysis, PartialAnalysis }
   import BSONHandlers._
 
-  private val workQueue = new WorkQueue(buffer = 128, timeout = 5 seconds, name = "fishnetApi")
+  private val workQueue = new lila.hub.DuctSequencer(maxSize = 256, timeout = 5 seconds, name = "fishnetApi")
 
   def keyExists(key: Client.Key) = repo.getEnabledClient(key).map(_.isDefined)
 
@@ -40,29 +42,30 @@ final class FishnetApi(
     case failure         => fuccess(failure)
   }
 
-  def acquire(client: Client): Fu[Option[JsonApi.Work]] =
+  def acquire(client: Client, slow: Boolean): Fu[Option[JsonApi.Work]] =
     (client.skill match {
       case Skill.Move                 => fufail(s"Can't acquire a move directly on lichess! $client")
-      case Skill.Analysis | Skill.All => acquireAnalysis(client)
+      case Skill.Analysis | Skill.All => acquireAnalysis(client, slow)
     }).monSuccess(_.fishnet.acquire)
-      .recover {
-        case e: Exception =>
-          logger.error("Fishnet.acquire", e)
-          none
+      .recover { case e: Exception =>
+        logger.error("Fishnet.acquire", e)
+        none
       }
 
-  private def acquireAnalysis(client: Client): Fu[Option[JsonApi.Work]] =
+  private def acquireAnalysis(client: Client, slow: Boolean): Fu[Option[JsonApi.Work]] =
     workQueue {
-      analysisColl.ext
+      analysisColl
         .find(
           $doc("acquired" $exists false) ++ {
             !client.offline ?? $doc("lastTryByKey" $ne client.key) // client alternation
+          } ++ {
+            slow ?? $doc("sender.system" -> true)
           }
         )
         .sort(
           $doc(
             "sender.system" -> 1, // user requests first, then lichess auto analysis
-            "createdAt"     -> 1  // oldest requests first
+            "createdAt"     -> 1 // oldest requests first
           )
         )
         .one[Work.Analysis]
@@ -86,29 +89,30 @@ final class FishnetApi(
           fufail(WorkNotFound)
         case Some(work) if work isAcquiredBy client =>
           data.completeOrPartial match {
-            case complete: CompleteAnalysis => {
-              if (complete.weak && work.game.variant.standard) {
-                Monitor.weak(work, client, complete)
-                repo.updateOrGiveUpAnalysis(work.weak) >> fufail(WeakAnalysis(client))
-              } else
-                analysisBuilder(client, work, complete.analysis) flatMap { analysis =>
-                  monitor.analysis(work, client, complete)
-                  repo.deleteAnalysis(work) inject PostAnalysisResult.Complete(analysis)
-                }
-            } recoverWith {
-              case e: Exception =>
+            case complete: CompleteAnalysis =>
+              {
+                if (complete.weak && work.game.variant.standard) {
+                  Monitor.weak(work, client, complete)
+                  repo.updateOrGiveUpAnalysis(work.weak) >> fufail(WeakAnalysis(client))
+                } else
+                  analysisBuilder(client, work, complete.analysis) flatMap { analysis =>
+                    monitor.analysis(work, client, complete)
+                    repo.deleteAnalysis(work) inject PostAnalysisResult.Complete(analysis)
+                  }
+              } recoverWith { case e: Exception =>
                 Monitor.failure(work, client, e)
                 repo.updateOrGiveUpAnalysis(work.invalid) >> fufail(e)
-            }
-            case partial: PartialAnalysis => {
-              fuccess(work.game.studyId.isDefined) >>| socketExists(work.game.id)
-            } flatMap {
-              case true =>
-                analysisBuilder.partial(client, work, partial.analysis) map { analysis =>
-                  PostAnalysisResult.Partial(analysis)
-                }
-              case false => fuccess(PostAnalysisResult.UnusedPartial)
-            }
+              }
+            case partial: PartialAnalysis =>
+              {
+                fuccess(work.game.studyId.isDefined) >>| socketExists(work.game.id)
+              } flatMap {
+                case true =>
+                  analysisBuilder.partial(client, work, partial.analysis) map { analysis =>
+                    PostAnalysisResult.Partial(analysis)
+                  }
+                case false => fuccess(PostAnalysisResult.UnusedPartial)
+              }
           }
         case Some(work) =>
           Monitor.notAcquired(work, client)
@@ -127,25 +131,40 @@ final class FishnetApi(
         case r @ PostAnalysisResult.UnusedPartial => fuccess(r)
       }
 
-  def abort(workId: Work.Id, client: Client): Funit = workQueue {
-    repo.getAnalysis(workId).map(_.filter(_ isAcquiredBy client)) flatMap {
-      _ ?? { work =>
-        Monitor.abort(client)
-        repo.updateAnalysis(work.abort)
+  def abort(workId: Work.Id, client: Client): Funit =
+    workQueue {
+      repo.getAnalysis(workId).map(_.filter(_ isAcquiredBy client)) flatMap {
+        _ ?? { work =>
+          Monitor.abort(client)
+          repo.updateAnalysis(work.abort)
+        }
       }
     }
-  }
 
-  def gameIdExists(gameId: String) = analysisColl.exists($doc("game.id" -> gameId))
-
-  def status = repo.countAnalysis(acquired = false) map { queued =>
-    import play.api.libs.json.Json
-    Json.obj(
-      "analysis" -> Json.obj(
-        "queued" -> queued
+  def userAnalysisExists(gameId: String) =
+    analysisColl.exists(
+      $doc(
+        "game.id"       -> gameId,
+        "sender.system" -> false
       )
     )
-  }
+
+  def status =
+    monitor.statusCache.get {} map { c =>
+      import play.api.libs.json.Json
+      def statusFor(s: Monitor.StatusFor) =
+        Json.obj(
+          "acquired" -> s.acquired,
+          "queued"   -> s.queued,
+          "oldest"   -> s.oldest
+        )
+      Json.obj(
+        "analysis" -> Json.obj(
+          "user"   -> statusFor(c.user),
+          "system" -> statusFor(c.system)
+        )
+      )
+    }
 
   private[fishnet] def createClient(userId: Client.UserId): Fu[Client] = {
     val client = Client(

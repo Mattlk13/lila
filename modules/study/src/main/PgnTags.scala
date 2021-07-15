@@ -1,11 +1,13 @@
 package lila.study
 
+import scala.util.chaining._
+
 import chess.format.pgn.{ Tag, TagType, Tags }
 
 object PgnTags {
 
   def apply(tags: Tags): Tags =
-    tags |> filterRelevant |> removeContradictingTermination |> sort
+    tags pipe filterRelevant pipe removeContradictingTermination pipe sort
 
   def setRootClockFromTags(c: Chapter): Option[Chapter] =
     c.updateRoot { _.setClockAt(c.tags.clockConfig map (_.limit), Path.root) } filter (c !=)
@@ -52,9 +54,10 @@ object PgnTags {
 
   private val typePositions: Map[TagType, Int] = sortedTypes.zipWithIndex.toMap
 
-  private def sort(tags: Tags) = Tags {
-    tags.value.sortBy { t =>
-      typePositions.getOrElse(t.name, Int.MaxValue)
+  private def sort(tags: Tags) =
+    Tags {
+      tags.value.sortBy { t =>
+        typePositions.getOrElse(t.name, Int.MaxValue)
+      }
     }
-  }
 }

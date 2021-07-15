@@ -46,9 +46,6 @@
   <string name="requestAComputerAnalysis">د کمپيوټر تحليل غوښتنه</string>
   <string name="computerAnalysis">کمپيوټر تحليل</string>
   <string name="analysis">تحلیل بورډ</string>
-  <string name="blunders">خطاوو</string>
-  <string name="mistakes">غلطي</string>
-  <string name="inaccuracies">ناسمه برخه</string>
   <string name="offerDraw">انډولست</string>
   <string name="draw">انډول</string>
   <plurals name="nbPlayers">
@@ -71,7 +68,6 @@
   <string name="rank">پوړ</string>
   <string name="gamesPlayed">ترسره شوي لوبې</string>
   <string name="cancel">ړنګول</string>
-  <string name="timeOut">وختپای</string>
   <string name="drawOfferSent">انډولست ولېږدېد</string>
   <string name="drawOfferDeclined">انډولست وغورځید</string>
   <string name="drawOfferAccepted">انډولست ومنل شو</string>
@@ -92,7 +88,6 @@
   <string name="composeMessage">پیام ولیکئ</string>
   <string name="incrementInSeconds">شېبې زیاتول</string>
   <string name="freeOnlineChess">وړیا پرلیکه شطرنج</string>
-  <string name="spectators">لیدونکی:</string>
   <plurals name="nbWins">
     <item quantity="one">%s  ګټلي</item>
     <item quantity="other">%s  ګټلي</item>

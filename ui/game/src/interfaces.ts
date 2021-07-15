@@ -2,9 +2,9 @@ export interface GameData {
   game: Game;
   player: Player;
   opponent: Player;
-  spectator?: boolean;
   tournament?: Tournament;
   simul?: Simul;
+  swiss?: Swiss;
   takebackable: boolean;
   moretimeable: boolean;
   clock?: Clock;
@@ -21,6 +21,7 @@ export interface Game {
   speed: Speed;
   variant: Variant;
   winner?: Color;
+  drawOffers?: number[];
   moveCentis?: number[];
   initialFen?: string;
   importedBy?: string;
@@ -36,15 +37,25 @@ export interface Status {
   name: StatusName;
 }
 
-export type StatusName = 'started' | 'aborted' | 'mate' | 'resign' |
-                         'stalemate' | 'timeout' | 'draw' | 'outoftime' |
-                         'noStart' | 'cheat' | 'variantEnd';
+export type StatusName =
+  | 'started'
+  | 'aborted'
+  | 'mate'
+  | 'resign'
+  | 'stalemate'
+  | 'timeout'
+  | 'draw'
+  | 'outoftime'
+  | 'noStart'
+  | 'cheat'
+  | 'variantEnd'
+  | 'unknownFinish';
 
 export type StatusId = number;
 
 export interface Player {
   id: string;
-  name: string;
+  name: string | null;
   user?: PlayerUser;
   spectator?: boolean;
   color: Color;
@@ -99,6 +110,12 @@ export interface Simul {
   nbPlaying: number;
 }
 
+export interface Swiss {
+  id: string;
+  running?: boolean;
+  ranks?: TournamentRanks;
+}
+
 export interface Clock {
   running: boolean;
   initial: number;
@@ -121,7 +138,7 @@ export interface PlayerUser {
   title?: string;
   perfs: {
     [key: string]: Perf;
-  }
+  };
 }
 
 export interface Perf {

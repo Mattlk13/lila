@@ -33,25 +33,19 @@ object created {
                 th(trans.players())
               )
             ),
-            tbody(cls := "infinitescroll")(
-              pager.nextPage.map { np =>
-                tr(
-                  th(cls := "pager none")(
-                    a(rel := "next", href := routes.UserTournament.path(u.username, path, np))("Next")
-                  )
-                )
-              },
+            tbody(cls := "infinite-scroll")(
               pager.currentPageResults.map { t =>
                 tr(cls := "paginated")(
                   td(cls := "icon")(iconTag(tournamentIconChar(t))),
-                  views.html.tournament.finishedPaginator.header(t),
+                  views.html.tournament.finishedList.header(t),
                   td(momentFromNow(t.startsAt)),
                   td(cls := "winner")(
                     t.winnerId.isDefined option userIdLink(t.winnerId, withOnline = false)
                   ),
-                  td(cls := "text", dataIcon := "r")(t.nbPlayers.localize)
+                  td(cls := "text", dataIcon := "")(t.nbPlayers.localize)
                 )
-              }
+              },
+              pagerNextTable(pager, np => routes.UserTournament.path(u.username, path, np).url)
             )
           )
         )

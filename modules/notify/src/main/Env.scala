@@ -21,7 +21,10 @@ final class Env(
     getLightUser: lila.common.LightUser.Getter,
     getLightUserSync: lila.common.LightUser.GetterSync,
     cacheApi: lila.memo.CacheApi
-)(implicit ec: scala.concurrent.ExecutionContext, system: ActorSystem) {
+)(implicit
+    ec: scala.concurrent.ExecutionContext,
+    system: ActorSystem
+) {
 
   private val config = appConfig.get[NotifyConfig]("notify")(AutoConfig.loader)
 
@@ -39,9 +42,9 @@ final class Env(
       Props(new Actor {
         def receive = {
           case lila.hub.actorApi.notify.Notified(userId) =>
-            api markAllRead Notification.Notifies(userId)
+            api.markAllRead(Notification.Notifies(userId)).unit
           case lila.hub.actorApi.notify.NotifiedBatch(userIds) =>
-            api markAllRead userIds.map(Notification.Notifies.apply)
+            api.markAllRead(userIds.map(Notification.Notifies.apply)).unit
           case lila.game.actorApi.CorresAlarmEvent(pov) =>
             pov.player.userId ?? { userId =>
               lila.game.Namer.playerText(pov.opponent)(getLightUser) foreach { opponent =>

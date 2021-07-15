@@ -1,17 +1,13 @@
 @import '../component/subnav';
 
 .page-menu {
-
   display: grid;
-  grid-template-areas:
-  'menu'
-  'content';
+  grid-template-areas: 'menu' 'content';
 
   @include breakpoint($mq-subnav-side) {
     grid-template-columns: max-content auto;
     grid-template-rows: min-content;
-    grid-template-areas:
-    'menu content';
+    grid-template-areas: 'menu content';
   }
 
   &.page-small {
@@ -22,9 +18,11 @@
   &__menu {
     grid-area: menu;
   }
+
   &__content {
     grid-area: content;
     height: 100%;
+
     // overflow: hidden; /* fixes crazy text overflow on Fx */
   }
 

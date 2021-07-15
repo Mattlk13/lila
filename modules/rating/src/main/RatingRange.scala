@@ -10,10 +10,11 @@ case class RatingRange(min: Int, max: Int) {
 
   def notBroad: Option[RatingRange] = (this != RatingRange.broad) option this
 
-  def withinLimits(rating: Int, delta: Int, multipleOf: Int) = copy(
-    min = closestMultipleOf(multipleOf, min.atMost(rating + delta)),
-    max = closestMultipleOf(multipleOf, max.atLeast(rating - delta))
-  )
+  def withinLimits(rating: Int, delta: Int, multipleOf: Int) =
+    copy(
+      min = closestMultipleOf(multipleOf, min.atMost(rating + delta)),
+      max = closestMultipleOf(multipleOf, max.atLeast(rating - delta))
+    )
 
   override def toString = s"$min-$max"
 }
@@ -36,7 +37,8 @@ object RatingRange {
       if min < max
     } yield RatingRange(min, max)
 
-  def orDefault(from: String) = apply(from) | default
+  def orDefault(from: String)         = apply(from) | default
+  def orDefault(from: Option[String]) = from.flatMap(apply) | default
 
   def noneIfDefault(from: String) =
     if (from == default.toString) none

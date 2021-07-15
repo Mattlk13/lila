@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="playWithAFriend">cheza na rafiki</string>
-  <string name="playWithTheMachine">cheza na tarakilishi</string>
-  <string name="toInviteSomeoneToPlayGiveThisUrl">kumwalika mtu acheze, mpe anwani hii</string>
-  <string name="gameOver">mchezo kwisha</string>
-  <string name="waitingForOpponent">ngojea mpinzani</string>
-  <string name="waiting">ngoja</string>
+  <string name="playWithTheMachine">Cheza Na Tarakilishi</string>
+  <string name="toInviteSomeoneToPlayGiveThisUrl">Kumwalika mtu acheze, mpe anwani hii</string>
+  <string name="gameOver">Mchezo umekwisha</string>
+  <string name="waitingForOpponent">Subiri mpinzani</string>
+  <string name="waiting">Subiri</string>
   <string name="yourTurn">nafasi ni yako</string>
   <string name="aiNameLevelAiLevel">%1$s kiwango %2$s</string>
   <string name="level">kiwango</string>
+  <string name="strength">Kipimo cha nguvu</string>
   <string name="toggleTheChat">geuza gumzo</string>
-  <string name="toggleSound">Badili Sauti
-Bonyeza ndio usikie ama usisikie Sauti. Hiki kitufe kiko katika upande wa kulia wa juu katika kiwambo ( screen). Kama unatumia internet explorer, pengine uwezi kuona</string>
+  <string name="toggleSound">Badili Sauti</string>
   <string name="chat">Piga Gumzo</string>
   <string name="resign">acha kucheza</string>
   <string name="checkmate">Maongezi</string>
@@ -22,6 +22,10 @@ Bonyeza ndio usikie ama usisikie Sauti. Hiki kitufe kiko katika upande wa kulia 
   <string name="createAGame">unda mchezo</string>
   <string name="whiteIsVictorious">nyeupe ameshinda</string>
   <string name="blackIsVictorious">nyeusi ameshinda</string>
+  <string name="youPlayTheWhitePieces">Unacheza na nyeupe</string>
+  <string name="youPlayTheBlackPieces">Unacheza na nyeusi</string>
+  <string name="itsYourTurn">Nafasi ni yako!</string>
+  <string name="cheatDetected">Wizi wa Mtandao</string>
   <string name="kingInTheCenter">Mfalme katika kituo</string>
   <string name="threeChecks">Kaguzi tatu</string>
   <string name="raceFinished">Mbio imemalizika</string>
@@ -71,6 +75,7 @@ Bonyeza ndio usikie ama usisikie Sauti. Hiki kitufe kiko katika upande wa kulia 
   <string name="unknown">Haijulikani</string>
   <string name="database">Databesi</string>
   <string name="whiteDrawBlack">Nyeupe/Usawa/Nyeusi</string>
+  <string name="recentGames">Michezo ya hivi karibuni</string>
   <string name="delete">Futa</string>
   <string name="realtimeReplay">Moja kwa moja</string>
   <string name="rematch">cheza tena</string>

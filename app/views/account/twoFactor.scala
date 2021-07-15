@@ -32,18 +32,26 @@ object twoFactor {
           div(cls := "form-group")(
             twoFactorApp(
               a(
-                href := "https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2"
+                href := "https://play.google.com/store/apps/details?id=org.shadowice.flocke.andotp"
               )("Android"),
               a(href := "https://itunes.apple.com/app/google-authenticator/id388497605?mt=8")("iOS")
             )
           ),
           div(cls := "form-group")(scanTheCode()),
           qrCode,
+          div(cls := "form-group")(
+            ifYouCannotScanEnterX(
+              span(style := "background:black;color:black;")(~form("secret").value)
+            )
+          ),
           div(cls := "form-group explanation")(enterPassword()),
           form3.hidden(form("secret")),
-          form3.passwordModified(form("passwd"), trans.password())(autofocus),
+          form3.passwordModified(form("passwd"), trans.password())(
+            autofocus,
+            autocomplete := "current-password"
+          ),
           form3.group(form("token"), authenticationCode())(
-            form3.input(_)(pattern := "[0-9]{6}", autocomplete := "off", required)
+            form3.input(_)(pattern := "[0-9]{6}", autocomplete := "one-time-code", required)
           ),
           form3.globalError(form),
           div(cls := "form-group")(ifYouLoseAccess()),
@@ -59,15 +67,15 @@ object twoFactor {
     ) {
       div(cls := "account twofactor box box-pad")(
         h1(
-          i(cls := "is-green text", dataIcon := "E"),
+          i(cls := "is-green text", dataIcon := ""),
           twoFactorEnabled()
         ),
         standardFlash(),
         postForm(cls := "form3", action := routes.Account.disableTwoFactor)(
           p(twoFactorDisable()),
-          form3.password(form("passwd"), trans.password()),
+          form3.passwordModified(form("passwd"), trans.password())(autocomplete := "current-password"),
           form3.group(form("token"), authenticationCode())(
-            form3.input(_)(pattern := "[0-9]{6}", autocomplete := "off", required)
+            form3.input(_)(pattern := "[0-9]{6}", autocomplete := "one-time-code", required)
           ),
           form3.action(form3.submit(disableTwoFactor()))
         )

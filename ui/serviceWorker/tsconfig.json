@@ -1,8 +1,8 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["src/*.ts"],
-  "lib": ["ES6"],
+  "include": ["src"],
   "compilerOptions": {
+    "lib": ["ES2017"],
     "types": ["types-serviceworker"]
   }
 }

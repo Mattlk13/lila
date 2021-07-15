@@ -1,6 +1,6 @@
 package lila.round
 
-import chess.Centis
+import chess.{ Centis, Color }
 import chess.format.pgn.Glyphs
 import chess.format.{ FEN, Forsyth, Uci, UciCharPair }
 import chess.opening._
@@ -12,44 +12,28 @@ import lila.tree._
 object TreeBuilder {
 
   private type Ply       = Int
-  private type OpeningOf = String => Option[FullOpening]
+  private type OpeningOf = FEN => Option[FullOpening]
 
-  private def makeEval(info: Info) = Eval(
-    cp = info.cp,
-    mate = info.mate,
-    best = info.best
-  )
+  private def makeEval(info: Info) =
+    Eval(
+      cp = info.cp,
+      mate = info.mate,
+      best = info.best
+    )
 
   def apply(
       game: lila.game.Game,
       analysis: Option[Analysis],
       initialFen: FEN,
       withFlags: WithFlags
-  ): Root = apply(
-    id = game.id,
-    pgnMoves = game.pgnMoves,
-    variant = game.variant,
-    analysis = analysis,
-    initialFen = initialFen,
-    withFlags = withFlags,
-    clocks = withFlags.clocks ?? game.bothClockStates
-  )
-
-  def apply(
-      id: String,
-      pgnMoves: Vector[String],
-      variant: Variant,
-      analysis: Option[Analysis],
-      initialFen: FEN,
-      withFlags: WithFlags,
-      clocks: Option[Vector[Centis]]
   ): Root = {
-    val withClocks: Option[Vector[Centis]] = withFlags.clocks ?? clocks
-    chess.Replay.gameMoveWhileValid(pgnMoves, initialFen.value, variant) match {
+    val withClocks: Option[Vector[Centis]] = withFlags.clocks ?? game.bothClockStates
+    val drawOfferPlies                     = game.drawOffers.normalizedPlies
+    chess.Replay.gameMoveWhileValid(game.pgnMoves, initialFen, game.variant) match {
       case (init, games, error) =>
-        error foreach logChessError(id)
+        error foreach logChessError(game.id)
         val openingOf: OpeningOf =
-          if (withFlags.opening && Variant.openingSensibleVariants(variant)) FullOpeningDB.findByFen
+          if (withFlags.opening && Variant.openingSensibleVariants(game.variant)) FullOpeningDB.findByFen
           else _ => None
         val fen                 = Forsyth >> init
         val infos: Vector[Info] = analysis.??(_.infos.toVector)
@@ -81,32 +65,37 @@ object TreeBuilder {
             eval = info map makeEval,
             glyphs = Glyphs.fromList(advice.map(_.judgment.glyph).toList),
             comments = Node.Comments {
-              advice.map(_.makeComment(false, true)).toList.map { text =>
-                Node.Comment(
-                  Node.Comment.Id.make,
-                  Node.Comment.Text(text),
-                  Node.Comment.Author.Lichess
-                )
-              }
+              drawOfferPlies(g.turns)
+                .option(makeLichessComment(s"${!Color.fromPly(g.turns)} offers draw"))
+                .toList :::
+                advice
+                  .map(_.makeComment(withEval = false, withBestMove = true))
+                  .toList
+                  .map(makeLichessComment)
             }
           )
           advices.get(g.turns + 1).flatMap { adv =>
-            games.lift(index - 1).map {
-              case (fromGame, _) =>
-                val fromFen = FEN(Forsyth >> fromGame)
-                withAnalysisChild(id, branch, variant, fromFen, openingOf)(adv.info)
+            games.lift(index - 1).map { case (fromGame, _) =>
+              withAnalysisChild(game.id, branch, game.variant, Forsyth >> fromGame, openingOf)(adv.info)
             }
           } getOrElse branch
         }
         games.zipWithIndex.reverse match {
           case Nil => root
           case ((g, m), i) :: rest =>
-            root prependChild rest.foldLeft(makeBranch(i + 1, g, m)) {
-              case (node, ((g, m), i)) => makeBranch(i + 1, g, m) prependChild node
+            root prependChild rest.foldLeft(makeBranch(i + 1, g, m)) { case (node, ((g, m), i)) =>
+              makeBranch(i + 1, g, m) prependChild node
             }
         }
     }
   }
+
+  private def makeLichessComment(text: String) =
+    Node.Comment(
+      Node.Comment.Id.make,
+      Node.Comment.Text(text),
+      Node.Comment.Author.Lichess
+    )
 
   private def withAnalysisChild(
       id: String,
@@ -128,15 +117,15 @@ object TreeBuilder {
         eval = none
       )
     }
-    chess.Replay.gameMoveWhileValid(info.variation take 20, fromFen.value, variant) match {
+    chess.Replay.gameMoveWhileValid(info.variation take 20, fromFen, variant) match {
       case (_, games, error) =>
         error foreach logChessError(id)
         games.reverse match {
           case Nil => root
           case (g, m) :: rest =>
             root addChild rest
-              .foldLeft(makeBranch(g, m)) {
-                case (node, (g, m)) => makeBranch(g, m) addChild node
+              .foldLeft(makeBranch(g, m)) { case (node, (g, m)) =>
+                makeBranch(g, m) addChild node
               }
               .setComp
         }

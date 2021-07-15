@@ -33,15 +33,19 @@ object config {
 
   case class NetConfig(
       domain: NetDomain,
+      prodDomain: NetDomain,
       @ConfigName("base_url") baseUrl: BaseUrl,
       @ConfigName("asset.domain") assetDomain: AssetDomain,
       @ConfigName("asset.base_url") assetBaseUrl: String,
+      @ConfigName("asset.minified") minifiedAssets: Boolean,
+      @ConfigName("stage.banner") stageBanner: Boolean,
       @ConfigName("socket.domains") socketDomains: List[String],
       crawlable: Boolean,
       @ConfigName("ratelimit") rateLimit: RateLimit,
-      email: EmailAddress,
-      ip: IpAddress
-  )
+      email: EmailAddress
+  ) {
+    def isProd = domain == prodDomain
+  }
 
   implicit val maxLoader          = intLoader(Max.apply)
   implicit val maxPerPageLoader   = intLoader(MaxPerPage.apply)
@@ -52,16 +56,16 @@ object config {
   implicit val emailAddressLoader = strLoader(EmailAddress.apply)
   implicit val netDomainLoader    = strLoader(NetDomain.apply)
   implicit val assetDomainLoader  = strLoader(AssetDomain.apply)
-  implicit val ipLoader           = strLoader(IpAddress.apply)
   implicit val rateLimitLoader    = boolLoader(RateLimit.apply)
   implicit val netLoader          = AutoConfig.loader[NetConfig]
 
   implicit val strListLoader: ConfigLoader[List[String]] = ConfigLoader { c => k =>
     c.getStringList(k).asScala.toList
   }
-  implicit def listLoader[A](implicit l: ConfigLoader[A]): ConfigLoader[List[A]] = ConfigLoader { c => k =>
-    c.getConfigList(k).asScala.toList map { l.load(_) }
-  }
+  implicit def listLoader[A](implicit l: ConfigLoader[A]): ConfigLoader[List[A]] =
+    ConfigLoader { c => k =>
+      c.getConfigList(k).asScala.toList map { l.load(_) }
+    }
 
   def strLoader[A](f: String => A): ConfigLoader[A]              = ConfigLoader(_.getString) map f
   def intLoader[A](f: Int => A): ConfigLoader[A]                 = ConfigLoader(_.getInt) map f

@@ -38,7 +38,7 @@
   <string name="leaveTheStudy">पाठ छोड्नुहोस्।</string>
   <string name="youAreNowAContributor">तपाई अब योगदान कर्ता हुनुभयो।</string>
   <string name="youAreNowASpectator">तपाई अब दर्शक हुनुभयो</string>
-  <string name="pgnTags">पिजिएन् ट्यागहरु</string>
+  <string name="pgnTags">PGN ट्यागहरु</string>
   <string name="like">लाईक</string>
   <string name="newTag">नयाँ ट्याग</string>
   <string name="commentThisPosition">यो पोजिसनमा कमेन्ट गर्नुहोस्।</string>
@@ -57,15 +57,12 @@
   <string name="last">अन्तिम</string>
   <string name="shareAndExport">सेयर</string>
   <string name="cloneStudy">क्लोन गर्नुहोस्</string>
-  <string name="studyPgn">पाठको पिजिएन</string>
-  <string name="chapterPgn">अध्यायको पिजिएन</string>
+  <string name="studyPgn">पाठको PGN</string>
+  <string name="chapterPgn">अध्यायको PGN</string>
   <string name="studyUrl">पाठको युआरएल</string>
   <string name="currentChapterUrl">यो अध्यायको युआरएल</string>
-  <string name="youCanPasteThisInTheForumToEmbedTheChapter">तपाई यसलाई फोरममा पेस्ट गरि अध्यायलाई सन्निविष्ट गर्न सक्नुहुन्छ</string>
   <string name="startAtInitialPosition">प्रारम्भिक पोजिशनमा शुरु गर्नुहोस्</string>
   <string name="startAtX">%s मा शुरु गर्नुहोस्</string>
-  <string name="embedThisChapter">यो अध्याय तपाइको वेबसाइट वा ब्लगमा सन्नीविष्ट गर्नुहोस्</string>
-  <string name="readMoreAboutEmbeddingAStudyChapter">अध्याय सन्निविष्ट गर्ने सम्बन्धमा थप सामग्री अध्ययन गर्नुहोस्</string>
   <string name="open">खोल्नुहोस्</string>
   <string name="xBroughtToYouByY">%1$s लाई %2$s द्वारा तपाईसम्म ल्याइएको छ</string>
   <string name="studyNotFound">पाठ भेटिएन</string>

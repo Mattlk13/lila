@@ -1,6 +1,6 @@
 package views.html.report
 
-import com.github.ghik.silencer.silent
+import scala.annotation.nowarn
 
 import lila.api.Context
 import lila.app.templating.Environment._
@@ -14,17 +14,13 @@ object thanks {
 
     val title = "Thanks for the report"
 
-    @silent val moreJs = embedJsUnsafe("""
+    @nowarn("msg=possible missing interpolator")
+    val moreJs = embedJsUnsafeLoadThen("""
 $('button.report-block').one('click', function() {
-var $button = $(this);
+const $button = $(this);
 $button.find('span').text('Blocking...');
-$.ajax({
-url:$button.data('action'),
-method:'post',
-success: function() {
-$button.find('span').text('Blocked!');
-}
-});
+fetch($button.data('action'), {method:'post'})
+  .then(() => $button.find('span').text('Blocked!'));
 });
 """)
 
@@ -41,13 +37,13 @@ $button.find('span').text('Blocked!');
             cls := "report-block button",
             st.title := trans.block.txt()
           )(
-            span(cls := "text", dataIcon := "k")("Block ", usernameOrId(userId))
+            span(cls := "text", dataIcon := "")("Block ", usernameOrId(userId))
           )
         ),
         br,
         br,
         p(
-          a(href := routes.Lobby.home)("Return to lichess homepage")
+          a(href := routes.Lobby.home)("Return to Lichess homepage")
         )
       )
 

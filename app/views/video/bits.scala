@@ -23,14 +23,14 @@ object bits {
         span(cls := "target")(vv.video.targets.map(lila.video.Target.name).mkString(", ")),
         span(cls := "tags")(
           vv.video.tags.map { tag =>
-            span(dataIcon := "o")(tag.capitalize)
+            span(dataIcon := "")(tag.capitalize)
           }
         )
       )
     )
 
-  def author(name: String, videos: Paginator[lila.video.VideoView], control: lila.video.UserControl)(
-      implicit ctx: Context
+  def author(name: String, videos: Paginator[lila.video.VideoView], control: lila.video.UserControl)(implicit
+      ctx: Context
   ) =
     layout(
       title = s"$name • Free Chess Videos",
@@ -38,7 +38,7 @@ object bits {
     )(
       div(cls := "box__top")(
         h1(
-          a(cls := "is4 text", dataIcon := "i", href := s"${routes.Video.index}?${control.queryString}"),
+          a(cls := "is4 text", dataIcon := "", href := s"${routes.Video.index}?${control.queryString}"),
           name
         ),
         span(
@@ -46,28 +46,22 @@ object bits {
           " found"
         )
       ),
-      div(cls := "list infinitescroll box__pad")(
+      div(cls := "list infinite-scroll box__pad")(
         videos.currentPageResults.map { card(_, control) },
-        videos.nextPage.map { next =>
-          div(cls := "pager none")(
-            a(rel := "next", href := s"${routes.Video.author(name)}?${control.queryString}&page=${next}")(
-              "Next"
-            )
-          )
-        }
+        pagerNext(videos, np => s"${routes.Video.author(name)}?${control.queryString}&page=$np")
       )
     )
 
   def notFound(control: lila.video.UserControl)(implicit ctx: Context) =
     layout(title = "Video not found", control = control)(
       div(cls := "content_box_top")(
-        a(cls := "is4 text lichess_title", dataIcon := "i", href := routes.Video.index)("Video library")
+        a(cls := "is4 text lichess_title", dataIcon := "", href := routes.Video.index)("Video library")
       ),
       div(cls := "not_found")(
         h1("Video Not Found!"),
         br,
         br,
-        a(cls := "big button text", dataIcon := "i", href := routes.Video.index)(
+        a(cls := "big button text", dataIcon := "", href := routes.Video.index)(
           "Return to the video library"
         )
       )
@@ -82,7 +76,7 @@ object bits {
     layout(title = s"Tags • Free Chess Videos", control = control)(
       div(cls := "box__top")(
         h1(cls := "lichess_title")(
-          a(cls := "text", dataIcon := "i", href := s"${routes.Video.index}?${control.queryString}")(
+          a(cls := "text", dataIcon := "", href := s"${routes.Video.index}?${control.queryString}")(
             "All ",
             ts.size,
             " video tags"

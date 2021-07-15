@@ -13,15 +13,15 @@ object index {
 
   import trans.search._
 
-  def apply(form: Form[_], paginator: Option[Paginator[lila.game.Game]] = None, nbGames: Int)(
-      implicit ctx: Context
+  def apply(form: Form[_], paginator: Option[Paginator[lila.game.Game]] = None, nbGames: Long)(implicit
+      ctx: Context
   ) = {
     val commons = bits of form
     import commons._
     views.html.base.layout(
       title = searchInXGames.txt(nbGames.localize, nbGames),
       moreJs = frag(
-        jsTag("search.js"),
+        jsModule("gameSearch"),
         infiniteScrollTag
       ),
       moreCss = cssTag("search")
@@ -29,7 +29,7 @@ object index {
       main(cls := "box page-small search")(
         h1(advancedSearch()),
         st.form(
-          rel := "nofollow",
+          noFollow,
           cls := "box__pad search__form",
           action := s"${routes.Search.index()}#results",
           method := "GET"
@@ -38,8 +38,8 @@ object index {
           table(
             tr(
               th(label(trans.players())),
-              td(cls := "usernames")(List("a", "b").map { p =>
-                div(cls := "half")(form3.input(form("players")(p))(tpe := "text"))
+              td(cls := "usernames two-columns")(List("a", "b").map { p =>
+                div(form3.input(form("players")(p))(tpe := "text"))
               })
             ),
             colors(hide = true),
@@ -66,7 +66,7 @@ object index {
                 submitButton(cls := "button")(trans.search.search()),
                 div(cls := "wait")(
                   spinner,
-                  searchInXGames(nbGames)
+                  searchInXGames(nbGames.localize)
                 )
               )
             )
@@ -75,7 +75,7 @@ object index {
         div(cls := "search__result", id := "results")(
           paginator.map { pager =>
             val permalink =
-              a(cls := "permalink", href := routes.Search.index(), rel := "nofollow")("Permalink")
+              a(cls := "permalink", href := routes.Search.index(), noFollow)("Permalink")
             if (pager.nbResults > 0)
               frag(
                 div(cls := "search__status box__pad")(
@@ -83,12 +83,17 @@ object index {
                   " • ",
                   permalink
                 ),
-                div(cls := "search__rows")(
-                  pagerNext(pager, np => routes.Search.index(np).url),
-                  views.html.game.widgets(pager.currentPageResults)
+                div(cls := "search__rows infinite-scroll")(
+                  views.html.game.widgets(pager.currentPageResults),
+                  pagerNext(pager, np => routes.Search.index(np).url)
                 )
               )
-            else div(cls := "search__status box__pad")(strong(xGamesFound(0)), " • ", permalink)
+            else
+              div(cls := "search__status box__pad")(
+                strong(xGamesFound(0)),
+                " • ",
+                permalink
+              )
           }
         )
       )

@@ -10,9 +10,9 @@ object TreeBuilder {
 
   def apply(root: Node.Root, variant: Variant): tree.Root = {
     val dests =
-      if (variant.standard && root.fen.value == chess.format.Forsyth.initial) initialStandardDests
+      if (variant.standard && root.fen.initial) initialStandardDests
       else {
-        val sit = chess.Game(variant.some, root.fen.value.some).situation
+        val sit = chess.Game(variant.some, root.fen.some).situation
         sit.playable(false) ?? sit.destinations
       }
     makeRoot(root, variant).copy(dests = dests.some)
@@ -23,7 +23,7 @@ object TreeBuilder {
       id = node.id,
       ply = node.ply,
       move = node.move,
-      fen = node.fen.value,
+      fen = node.fen,
       check = node.check,
       shapes = node.shapes,
       comments = node.comments,
@@ -33,14 +33,14 @@ object TreeBuilder {
       crazyData = node.crazyData,
       eval = node.score.map(_.eval),
       children = toBranches(node.children, variant),
-      opening = Variant.openingSensibleVariants(variant) ?? FullOpeningDB.findByFen(node.fen.value),
+      opening = Variant.openingSensibleVariants(variant) ?? FullOpeningDB.findByFen(node.fen),
       forceVariation = node.forceVariation
     )
 
   def makeRoot(root: Node.Root, variant: Variant): tree.Root =
     tree.Root(
       ply = root.ply,
-      fen = root.fen.value,
+      fen = root.fen,
       check = root.check,
       shapes = root.shapes,
       comments = root.comments,
@@ -50,7 +50,7 @@ object TreeBuilder {
       crazyData = root.crazyData,
       eval = root.score.map(_.eval),
       children = toBranches(root.children, variant),
-      opening = Variant.openingSensibleVariants(variant) ?? FullOpeningDB.findByFen(root.fen.value)
+      opening = Variant.openingSensibleVariants(variant) ?? FullOpeningDB.findByFen(root.fen)
     )
 
   private def toBranches(children: Node.Children, variant: Variant): List[tree.Branch] =

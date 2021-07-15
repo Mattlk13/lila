@@ -21,14 +21,15 @@ private[lobby] object LobbyUser {
 
   type PerfMap = Map[Perf.Key, LobbyPerf]
 
-  def make(user: User, blocking: Set[User.ID]) = LobbyUser(
-    id = user.id,
-    username = user.username,
-    lame = user.lame,
-    bot = user.isBot,
-    perfMap = perfMapOf(user.perfs),
-    blocking = blocking
-  )
+  def make(user: User, blocking: Set[User.ID]) =
+    LobbyUser(
+      id = user.id,
+      username = user.username,
+      lame = user.lame,
+      bot = user.isBot,
+      perfMap = perfMapOf(user.perfs),
+      blocking = blocking
+    )
 
   private def perfMapOf(perfs: lila.user.Perfs): PerfMap =
     perfs.perfs.view.collect {
@@ -41,5 +42,5 @@ case class LobbyPerf(rating: Int, provisional: Boolean)
 
 object LobbyPerf {
 
-  val default = LobbyPerf(Glicko.defaultIntRating, true)
+  val default = LobbyPerf(Glicko.default.intRating, provisional = true)
 }

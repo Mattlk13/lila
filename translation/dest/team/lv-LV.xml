@@ -13,16 +13,17 @@
   <string name="noTeamFound">Neatrada nevienu komandu</string>
   <string name="joinTeam">Pievienoties komandai</string>
   <string name="quitTeam">Pamest komandu</string>
-  <string name="anyoneCanJoin">Jebkurš var pievienoties</string>
-  <string name="aConfirmationIsRequiredToJoin">Lai pievienotos, nepieciešams apstiprinājums</string>
-  <string name="joiningPolicy">Pievienošanās noteikumi</string>
-  <string name="teamLeader">Komandas kapteinis</string>
+  <string name="manuallyReviewAdmissionRequests">Izskatīt katru pievienošanās pieprasījumu</string>
+  <string name="manuallyReviewAdmissionRequestsHelp">Ja iespējosiet, spēlētājiem būs jāiesniedz pieprasījums pievienoties komandai, kuru jūs varat noraidīt vai pieņemt.</string>
+  <plurals name="teamLeaders">
+    <item quantity="zero">Komandas vadītāji</item>
+    <item quantity="one">Komandas vadītājs</item>
+    <item quantity="other">Komandas vadītāji</item>
+  </plurals>
   <string name="teamBestPlayers">Labākie spēlētāji</string>
-  <string name="teamRecentMembers">Komandas bijušie dalībnieki</string>
+  <string name="teamRecentMembers">Jaunākie dalībnieki</string>
   <string name="kickSomeone">Izmest kādu no komandas</string>
   <string name="whoToKick">Kuru vēlaties izmest no komandas?</string>
-  <string name="appointOwner">Iecelt citu komandas īpašnieku</string>
-  <string name="changeOwner">Kuru vēlaties padarīt par komandas īpašnieku?</string>
   <plurals name="xJoinRequests">
     <item quantity="zero">%s pievienošanās pieprasījumu</item>
     <item quantity="one">%s pievienošanās pieprasījums</item>
@@ -30,5 +31,27 @@
   </plurals>
   <string name="willBeReviewed">Jūsu pieprasījumu pievienoties izskatīs komandas vadītājs.</string>
   <string name="beingReviewed">Jūsu pieprasījumu pievienoties izskata komandas vadītājs.</string>
+  <string name="subToTeamMessages">Abonēt komandas ziņas</string>
   <string name="teamBattle">Komandu cīņa</string>
+  <string name="teamBattleOverview">Cīņa starp vairākām komandām — katrs spēlētājs pelna punktus savai komandai</string>
+  <string name="teamTournament">Komandas turnīrs</string>
+  <string name="teamTournamentOverview">Arēnas turnīrs, kurā var piedalīties vienīgi komandas dalībnieki</string>
+  <string name="swissTournamentOverview">Šveices turnīrs, kam var pievienoties tikai jūsu komandas dalībnieki</string>
+  <string name="messageAllMembers">Rakstīt ziņu visiem dalībniekiem</string>
+  <string name="messageAllMembersOverview">Sūtīt privātu ziņu katram komandas dalībniekam</string>
+  <string name="messageAllMembersLongDescription">Sūtīt ziņu visiem komandas dalībniekiem.
+Varat izmantot šo funkciju, lai sauktu spēlētājus pievienoties turnīram vai komandu cīņai.
+Spēlētāji, kas nevēlēsies saņemt jūsu ziņas varētu pamest komandu.</string>
+  <string name="teamsIlead">Komandas, kuras vadu</string>
+  <string name="youWayWantToLinkOneOfTheseTournaments">Vai vēlaties pievienot saiti uz kādu no šiem turnīriem?</string>
+  <string name="usersWhoCanManageThisTeam">Lietotāji, kas var pārvaldīt šo komandu</string>
+  <string name="leadersChat">Vadītāju sarakste</string>
+  <string name="closeTeam">Slēgt komandu</string>
+  <string name="closeTeamDescription">Uz visiem laikiem slēdz komandu.</string>
+  <string name="teamPassword">Komandas parole</string>
+  <string name="teamPasswordDescriptionForLeader">(Neobligāta) Parole, kas jauniem dalībniekiem jāzina, lai pievienotos komandai.</string>
+  <string name="incorrectTeamPassword">Nepareiza komandas parole.</string>
+  <string name="teamAlreadyExists">Šī komanda jau pastāv.</string>
+  <string name="upcomingTourns">Gaidāmie turnīri</string>
+  <string name="completedTourns">Notikušie turnīri</string>
 </resources>

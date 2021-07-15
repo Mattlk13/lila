@@ -12,17 +12,18 @@ object userAnalysisI18n {
       withExplorer: Boolean = true,
       withForecast: Boolean = false,
       withAdvantageChart: Boolean = false
-  )(implicit lang: Lang) = i18nJsObject(
-    baseTranslations ++ {
-      withCeval ?? cevalTranslations
-    } ++ {
-      withExplorer ?? explorerTranslations
-    } ++ {
-      withForecast ?? forecastTranslations
-    } ++ {
-      withAdvantageChart ?? advantageChartTranslations
-    }
-  )
+  )(implicit lang: Lang) =
+    i18nJsObject(
+      baseTranslations ++ {
+        withCeval ?? cevalTranslations
+      } ++ {
+        withExplorer ?? explorerTranslations
+      } ++ {
+        withForecast ?? forecastTranslations
+      } ++ {
+        withAdvantageChart ?? advantageChartTranslations
+      }
+    )
 
   private val baseTranslations: Vector[MessageKey] = Vector(
     trans.analysis,
@@ -36,10 +37,12 @@ object userAnalysisI18n {
     trans.whiteLeftTheGame,
     trans.blackLeftTheGame,
     trans.draw,
-    trans.timeOut,
+    trans.whiteTimeOut,
+    trans.blackTimeOut,
     trans.playingRightNow,
     trans.whiteIsVictorious,
     trans.blackIsVictorious,
+    trans.cheatDetected,
     trans.kingInTheCenter,
     trans.threeChecks,
     trans.variantEnding,
@@ -51,12 +54,7 @@ object userAnalysisI18n {
     trans.computerAnalysis,
     trans.learnFromYourMistakes,
     trans.averageCentipawnLoss,
-    trans.inaccuracies,
-    trans.mistakes,
-    trans.blunders,
-    trans.goodMove,
     trans.viewTheSolution,
-    trans.spectators,
     // action menu
     trans.menu,
     trans.boardEditor,
@@ -79,7 +77,7 @@ object userAnalysisI18n {
     trans.forceVariation,
     // practice (also uses checkmate, draw)
     trans.practiceWithComputer,
-    trans.goodMove,
+    trans.puzzle.goodMove,
     trans.inaccuracy,
     trans.mistake,
     trans.blunder,
@@ -98,8 +96,8 @@ object userAnalysisI18n {
     trans.getAHint,
     trans.evaluatingYourMove,
     // gamebook
-    trans.findTheBestMoveForWhite,
-    trans.findTheBestMoveForBlack
+    trans.puzzle.findTheBestMoveForWhite,
+    trans.puzzle.findTheBestMoveForBlack
   ).map(_.key)
 
   private val cevalTranslations: Vector[MessageKey] = Vector(
@@ -168,6 +166,9 @@ object userAnalysisI18n {
   ).map(_.key)
 
   private val advantageChartTranslations: Vector[MessageKey] = Vector(
+    trans.nbInaccuracies,
+    trans.nbMistakes,
+    trans.nbBlunders,
     trans.advantage,
     trans.opening,
     trans.middlegame,

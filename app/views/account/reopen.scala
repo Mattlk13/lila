@@ -1,8 +1,6 @@
 package views.html
 package account
 
-import play.api.data.Form
-
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
@@ -11,35 +9,31 @@ import controllers.routes
 
 object reopen {
 
-  def form(form: Form[_], captcha: lila.common.Captcha, error: Option[String] = None)(
-      implicit ctx: Context
+  def form(form: lila.security.HcaptchaForm[_], error: Option[String] = None)(implicit
+      ctx: Context
   ) =
     views.html.base.layout(
-      title = "Reopen your account",
+      title = trans.reopenYourAccount.txt(),
       moreCss = cssTag("auth"),
-      moreJs = captchaTag
+      moreJs = views.html.base.hcaptcha.script(form),
+      csp = defaultCsp.withHcaptcha.some
     ) {
       main(cls := "page-small box box-pad")(
-        h1("Reopen your account"),
-        p(
-          "If you closed your account, but have since changed your mind, you get one chance of getting your account back."
-        ),
-        p(strong("This will only work once.")),
-        p("If you close your account a second time, there will be no way of recovering it."),
+        h1(trans.reopenYourAccount()),
+        p(trans.closedAccountChangedMind()),
+        p(strong(trans.onlyWorksOnce())),
+        p(trans.cantDoThisTwice()),
         hr,
-        p(
-          "Solve the chess captcha below, and we will send you an email containing a link to reopen your account."
-        ),
         postForm(cls := "form3", action := routes.Account.reopenApply)(
           error.map { err =>
             p(cls := "error")(strong(err))
           },
           form3.group(form("username"), trans.username())(form3.input(_)(autofocus)),
           form3
-            .group(form("email"), trans.email(), help = frag("Email address associated to the account").some)(
+            .group(form("email"), trans.email(), help = trans.emailAssociatedToaccount().some)(
               form3.input(_, typ = "email")
             ),
-          views.html.base.captcha(form, captcha),
+          views.html.base.hcaptcha.tag(form),
           form3.action(form3.submit(trans.emailMeALink()))
         )
       )
@@ -47,11 +41,11 @@ object reopen {
 
   def sent(implicit ctx: Context) =
     views.html.base.layout(
-      title = "Reopen your account"
+      title = trans.reopenYourAccount.txt()
     ) {
       main(cls := "page-small box box-pad")(
-        h1(cls := "is-green text", dataIcon := "E")(trans.checkYourEmail()),
-        p("We've sent you an email with a link."),
+        h1(cls := "is-green text", dataIcon := "")(trans.checkYourEmail()),
+        p(trans.sentEmailWithLink()),
         p(trans.ifYouDoNotSeeTheEmailCheckOtherPlaces())
       )
     }

@@ -2,6 +2,8 @@ package lila.search
 
 import play.api.libs.json._
 import play.api.libs.ws._
+import play.api.libs.ws.JsonBodyWritables._
+import scala.annotation.nowarn
 
 sealed trait ESClient {
 
@@ -19,23 +21,26 @@ sealed trait ESClient {
 }
 
 final class ESClientHttp(
-    ws: WSClient,
+    ws: StandaloneWSClient,
     config: SearchConfig,
     val index: Index
 )(implicit ec: scala.concurrent.ExecutionContext)
     extends ESClient {
 
-  def store(id: Id, doc: JsObject) = config.writeable ?? monitor("store") {
-    HTTP(s"store/${index.name}/${id.value}", doc)
-  }
+  def store(id: Id, doc: JsObject) =
+    config.writeable ?? monitor("store") {
+      HTTP(s"store/${index.name}/${id.value}", doc)
+    }
 
-  def search[Q: Writes](query: Q, from: From, size: Size) = monitor("search") {
-    HTTP(s"search/${index.name}/${from.value}/${size.value}", query, SearchResponse.apply)
-  }
+  def search[Q: Writes](query: Q, from: From, size: Size) =
+    monitor("search") {
+      HTTP(s"search/${index.name}/${from.value}/${size.value}", query, SearchResponse.apply)
+    }
 
-  def count[Q: Writes](query: Q) = monitor("count") {
-    HTTP(s"count/${index.name}", query, CountResponse.apply)
-  }
+  def count[Q: Writes](query: Q) =
+    monitor("count") {
+      HTTP(s"count/${index.name}", query, CountResponse.apply)
+    }
 
   def deleteById(id: lila.search.Id) =
     config.writeable ??
@@ -46,12 +51,15 @@ final class ESClientHttp(
       HTTP(s"delete/ids/${index.name}", Json.obj("ids" -> ids.map(_.value)))
 
   def putMapping =
-    HTTP(s"mapping/${index.name}/${index.name}", Json.obj())
+    HTTP(s"mapping/${index.name}", Json.obj())
 
   def storeBulk(docs: Seq[(Id, JsObject)]) =
-    HTTP(s"store/bulk/${index.name}/${index.name}", JsObject(docs map {
-      case (Id(id), doc) => id -> JsString(Json.stringify(doc))
-    }))
+    HTTP(
+      s"store/bulk/${index.name}",
+      JsObject(docs map { case (Id(id), doc) =>
+        id -> JsString(Json.stringify(doc))
+      })
+    )
 
   def refresh =
     HTTP(s"refresh/${index.name}", Json.obj())
@@ -68,13 +76,13 @@ final class ESClientHttp(
 }
 
 final class ESClientStub extends ESClient {
-  import com.github.ghik.silencer.silent
-  @silent def search[Q: Writes](query: Q, from: From, size: Size) = fuccess(SearchResponse(Nil))
-  @silent def count[Q: Writes](query: Q)                          = fuccess(CountResponse(0))
-  @silent def store(id: Id, doc: JsObject)                        = funit
-  @silent def storeBulk(docs: Seq[(Id, JsObject)])                = funit
-  @silent def deleteById(id: Id)                                  = funit
-  @silent def deleteByIds(ids: List[Id])                          = funit
-  def putMapping                                                  = funit
-  def refresh                                                     = funit
+  def search[Q: Writes](query: Q, from: From, size: Size) = fuccess(SearchResponse(Nil))
+  def count[Q: Writes](query: Q)                          = fuccess(CountResponse(0))
+  def store(id: Id, doc: JsObject)                        = funit
+  @nowarn("msg=parameter value")
+  def storeBulk(docs: Seq[(Id, JsObject)]) = funit
+  def deleteById(id: Id)                   = funit
+  def deleteByIds(ids: List[Id])           = funit
+  def putMapping                           = funit
+  def refresh                              = funit
 }

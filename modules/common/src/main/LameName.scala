@@ -5,63 +5,75 @@ import scala.util.matching.Regex
 object LameName {
 
   def username(name: String): Boolean =
-    usernameRegex.find(name.replaceIf('_', "")) || lameTitlePrefix.matcher(name).lookingAt
+    usernameRegex.find(name.replaceIf('_', "")) || containsTitleRegex.matches(name)
 
   def tournament(name: String): Boolean = tournamentRegex find name
 
-  private val lameTitlePrefix =
-    "[Ww]?+[NCFIGl1L]M|(?i:w?+[ncfigl1])m[-_A-Z0-9]".r.pattern
+  private val titlePattern = "W*(?:[NCFI1L]|I?G)"
+  private val containsTitleRegex = (
+    "^"
+      + "(?i:" + titlePattern + "M[^a-z].*)|"                  // title at start, separated by non-letter
+      + "(?:(?i:" + titlePattern + ")m[^a-z].*)|"              // title at start with lowercase m, not followed by lowercase letter
+      + "(?:" + titlePattern + "M.*)|"                         // uppercase title at start
+      + "(?i:.*[^a-z]" + titlePattern + "M)|"                  // title at end, separated by non-letter
+      + "(?i:.*[^a-z]" + titlePattern + "M[^a-z].*)|"          // title in middle, surrounded by non-letters
+      + "(?:.*[^A-Z]" + titlePattern + "M(?:[A-Z]?[^A-Z].*)?)" // uppercase title not preceeded by uppercase letter,
+      + "$"                                                    //   either at end or followed by at most one uppercase letter and then something else
+  ).r
 
   private val baseWords = List(
-    "hitler",
-    "fuck",
-    "fvck",
-    "penis",
-    "vagin",
+    "1488",
+    "8814",
+    "administrator",
     "anus",
+    "asshole",
     "bastard",
+    "biden",
     "bitch",
-    "shit",
+    "butthole",
+    "buttsex",
+    "cancer",
+    "cheat",
+    "coon",
+    "cuck",
     "cunniling",
     "cunt",
-    "kunt",
+    "cyka",
+    "dick",
     "douche",
     "fag",
+    "fart",
+    "feces",
+    "fuck",
     "golam",
+    "hitler",
     "jerk",
+    "kanker",
+    "kunt",
+    "moderator",
+    "mongool",
+    "nazi",
     "nigg",
-    "coon",
+    "pedo",
+    "penis",
+    "pidar",
+    "pidr",
     "piss",
     "poon",
     "poop",
-    "pussy",
-    "slut",
-    "whore",
-    "nazi",
-    "buttsex",
-    "retard",
-    "resign",
-    "pedo",
-    "moderator",
-    "cheat",
-    "administrator",
-    "cock",
-    "dick",
-    "wanker",
-    "feces",
-    "fart",
-    "cancer",
-    "cuck",
-    "butthole",
-    "cyka",
-    "xyuta",
-    "xyulo",
-    "xyula",
     "poxyu",
-    "1488",
-    "8814",
-    "pidar",
-    "pidr"
+    "pussy",
+    "resign",
+    "retard",
+    "shit",
+    "slut",
+    "trump",
+    "vagin",
+    "wanker",
+    "whore",
+    "xyula",
+    "xyulo",
+    "xyuta"
   )
 
   private val usernameRegex = lameWords(

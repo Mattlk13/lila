@@ -1,17 +1,16 @@
 package views.html.analyse
 
+import bits.dataPanel
 import chess.variant.Crazyhouse
+import controllers.routes
 import play.api.i18n.Lang
 import play.api.libs.json.Json
 
-import bits.dataPanel
 import lila.api.Context
 import lila.app.templating.Environment._
 import lila.app.ui.ScalatagsTemplate._
 import lila.common.String.html.safeJsonValue
 import lila.game.Pov
-
-import controllers.routes
 
 object replay {
 
@@ -40,32 +39,41 @@ object replay {
         c.chat,
         name = trans.spectatorRoom.txt(),
         timeout = c.timeout,
-        withNote = ctx.isAuth,
+        withNoteAge = ctx.isAuth option game.secondsSinceCreation,
         public = true,
         resourceId = lila.chat.Chat.ResourceId(s"game/${c.chat.id}"),
         palantir = ctx.me.exists(_.canPalantir)
       )
     }
     val pgnLinks = div(
-      a(dataIcon := "x", cls := "text", href := s"${routes.Game.exportOne(game.id)}?literate=1")(
+      a(
+        dataIcon := "",
+        cls := "text",
+        href := s"${routes.Game.exportOne(game.id)}?literate=1",
+        downloadAttr
+      )(
         trans.downloadAnnotated()
       ),
-      a(dataIcon := "x", cls := "text", href := s"${routes.Game.exportOne(game.id)}?evals=0&clocks=0")(
+      a(
+        dataIcon := "",
+        cls := "text",
+        href := s"${routes.Game.exportOne(game.id)}?evals=0&clocks=0",
+        downloadAttr
+      )(
         trans.downloadRaw()
       ),
       game.isPgnImport option a(
-        dataIcon := "x",
+        dataIcon := "",
         cls := "text",
-        href := s"${routes.Game.exportOne(game.id)}?imported=1"
+        href := s"${routes.Game.exportOne(game.id)}?imported=1",
+        downloadAttr
       )(trans.downloadImported()),
       ctx.noBlind option frag(
-        a(dataIcon := "=", cls := "text embed-howto", target := "_blank")(
-          trans.embedInYourWebsite()
-        ),
+        a(dataIcon := "", cls := "text embed-howto")(trans.embedInYourWebsite()),
         a(
-          dataIcon := "$",
+          dataIcon := "",
           cls := "text",
-          target := "_blank",
+          targetBlank,
           href := cdnUrl(routes.Export.gif(pov.gameId, pov.color.name).url)
         )(
           "Share as a GIF"
@@ -83,18 +91,20 @@ object replay {
       moreJs = frag(
         analyseTag,
         analyseNvuiTag,
-        embedJsUnsafe(s"""lichess=lichess||{};lichess.analyse=${safeJsonValue(
-          Json.obj(
-            "data"   -> data,
-            "i18n"   -> jsI18n(),
-            "userId" -> ctx.userId,
-            "chat"   -> chatJson,
-            "explorer" -> Json.obj(
-              "endpoint"          -> explorerEndpoint,
-              "tablebaseEndpoint" -> tablebaseEndpoint
+        embedJsUnsafeLoadThen(s"""LichessAnalyse.boot(${safeJsonValue(
+          Json
+            .obj(
+              "data"   -> data,
+              "i18n"   -> jsI18n(),
+              "userId" -> ctx.userId,
+              "chat"   -> chatJson,
+              "explorer" -> Json.obj(
+                "endpoint"          -> explorerEndpoint,
+                "tablebaseEndpoint" -> tablebaseEndpoint
+              )
             )
-          )
-        )}""")
+            .add("hunter" -> isGranted(_.Hunter))
+        )})""")
       ),
       openGraph = povOpenGraph(pov).some
     )(
@@ -102,7 +112,14 @@ object replay {
         main(cls := "analyse")(
           st.aside(cls := "analyse__side")(
             views.html.game
-              .side(pov, initialFen, none, simul = simul, userTv = userTv, bookmarked = bookmarked)
+              .side(
+                pov,
+                initialFen,
+                none,
+                simul = simul,
+                userTv = userTv,
+                bookmarked = bookmarked
+              )
           ),
           chatOption.map(_ => views.html.chat.frag),
           div(cls := "analyse__board main-board")(chessgroundBoard),
@@ -111,7 +128,6 @@ object replay {
           !ctx.blind option frag(
             div(cls := "analyse__underboard")(
               div(cls := "analyse__underboard__panels")(
-                div(cls := "active"),
                 game.analysable option div(cls := "computer-analysis")(
                   if (analysis.isDefined || analysisStarted) div(id := "acpl-chart")
                   else
@@ -123,6 +139,9 @@ object replay {
                         span(cls := "is3 text", dataIcon := "")(trans.requestAComputerAnalysis())
                       )
                     )
+                ),
+                div(cls := "move-times")(
+                  game.turns > 1 option div(id := "movetimes-chart")
                 ),
                 div(cls := "fen-pgn")(
                   div(
@@ -139,9 +158,6 @@ object replay {
                   ),
                   div(cls := "pgn")(pgn)
                 ),
-                div(cls := "move-times")(
-                  game.turns > 1 option div(id := "movetimes-chart")
-                ),
                 cross.map { c =>
                   div(cls := "ctable")(
                     views.html.game.crosstable(pov.player.userId.fold(c)(c.fromPov), pov.gameId.some)
@@ -152,10 +168,7 @@ object replay {
                 game.analysable option
                   span(
                     cls := "computer-analysis",
-                    dataPanel := "computer-analysis",
-                    title := analysis.map { a =>
-                      s"Provided by ${usernameOrId(a.providedBy)}"
-                    }
+                    dataPanel := "computer-analysis"
                   )(trans.computerAnalysis()),
                 !game.isPgnImport option frag(
                   game.turns > 1 option span(dataPanel := "move-times")(trans.moveTimes()),
@@ -169,7 +182,11 @@ object replay {
         if (ctx.blind)
           div(cls := "blind-content none")(
             h2("PGN downloads"),
-            pgnLinks
+            pgnLinks,
+            input(tpe := "hidden", value := pgn, cls := "game-pgn"),
+            button(cls := "copy-pgn", dataRel := "game-pgn")(
+              "Copy PGN to clipboard"
+            )
           )
       )
     )

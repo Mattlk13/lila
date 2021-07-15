@@ -1,41 +1,60 @@
 package lila.relay
 
 import play.api.libs.json._
+import scala.concurrent.duration._
 
+import lila.common.config.BaseUrl
 import lila.common.Json.jodaWrites
 
-final class JsonView(markup: RelayMarkup) {
+final class JsonView(baseUrl: BaseUrl, markup: RelayMarkup) {
 
   import JsonView._
 
-  implicit val relayWrites = OWrites[Relay] { r =>
+  def apply(trs: RelayTour.WithRounds, withUrls: Boolean = false): JsObject =
     Json
       .obj(
-        "id"          -> r.id,
-        "slug"        -> r.slug,
-        "name"        -> r.name,
-        "description" -> r.description,
-        "ownerId"     -> r.ownerId,
-        "sync"        -> r.sync
+        "tour" -> Json
+          .obj(
+            "id"          -> trs.tour.id,
+            "name"        -> trs.tour.name,
+            "slug"        -> trs.tour.slug,
+            "description" -> trs.tour.description
+          )
+          .add("markup" -> trs.tour.markup.map(markup.apply))
+          .add("url" -> withUrls.option(s"$baseUrl/broadcast/${trs.tour.slug}/${trs.tour.id}")),
+        "rounds" -> trs.rounds.map { round =>
+          if (withUrls) withUrl(round withTour trs.tour) else apply(round)
+        }
       )
-      .add("credit", r.credit)
-      .add("markup" -> r.markup.map(markup.apply))
-  }
 
-  def makeData(relay: Relay, studyData: lila.study.JsonView.JsData) = JsData(
-    relay = relayWrites writes relay,
-    study = studyData.study,
-    analysis = studyData.analysis
-  )
+  def apply(round: RelayRound): JsObject =
+    Json
+      .obj(
+        "id"   -> round.id,
+        "name" -> round.name,
+        "slug" -> round.slug
+      )
+      .add("finished" -> round.finished)
+      .add("ongoing" -> (round.hasStarted && !round.finished))
+      .add("startsAt" -> round.startedAt.orElse(round.startsAt))
 
-  def apiShow(r: Relay) =
-    relayWrites
-      .writes(r)
-      .add("markdown" -> r.markup)
-      .add("startsAt" -> r.startsAt)
-      .add("startedAt" -> r.startedAt)
-      .add("official" -> r.official.option(true))
-      .add("throttle" -> r.sync.delay)
+  def withUrl(rt: RelayRound.WithTour): JsObject =
+    apply(rt.round).add("url" -> s"$baseUrl${rt.path}".some)
+
+  def sync(round: RelayRound) = syncWrites writes round.sync
+
+  def makeData(
+      trs: RelayTour.WithRounds,
+      currentRoundId: RelayRound.Id,
+      studyData: lila.study.JsonView.JsData,
+      canContribute: Boolean
+  ) =
+    JsData(
+      relay = apply(trs)
+        .add("sync" -> (canContribute ?? trs.rounds.find(_.id == currentRoundId).map(_.sync))),
+      study = studyData.study,
+      analysis = studyData.analysis
+    )
 }
 
 object JsonView {
@@ -44,15 +63,22 @@ object JsonView {
 
   implicit val syncLogEventWrites = Json.writes[SyncLog.Event]
 
-  implicit val idWrites: Writes[Relay.Id] = Writes[Relay.Id] { id =>
+  implicit val roundIdWrites: Writes[RelayRound.Id] = Writes[RelayRound.Id] { id =>
     JsString(id.value)
   }
 
-  implicit private val syncWrites: OWrites[Relay.Sync] = OWrites[Relay.Sync] { s =>
+  implicit val tourIdWrites: Writes[RelayTour.Id] = Writes[RelayTour.Id] { id =>
+    JsString(id.value)
+  }
+
+  implicit private val syncWrites: OWrites[RelayRound.Sync] = OWrites[RelayRound.Sync] { s =>
     Json.obj(
       "ongoing" -> s.ongoing,
-      "log"     -> s.log.events,
-      "url"     -> s.upstream.map(_.url)
-    )
+      "log"     -> s.log.events
+    ) ++
+      s.upstream.?? {
+        case RelayRound.Sync.UpstreamUrl(url) => Json.obj("url" -> url)
+        case RelayRound.Sync.UpstreamIds(ids) => Json.obj("ids" -> ids)
+      }
   }
 }
